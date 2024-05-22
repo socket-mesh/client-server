@@ -1,0 +1,54 @@
+{
+	"name": "@socket-mesh/sandbox",
+	"description": "A TCP socket pair for easily transmitting full messages without worrying about request size limits.",
+	"version": "1.0.0",
+	"type": "module",
+	"author": {
+		"name": "JF Gros-Dubois",
+		"email": "flashthink@gmail.com"
+	},
+	"contributors": [
+		{
+			"name": "Greg Kimmy"
+		}
+	],
+	"scripts": {
+		"build": "node ./scripts/build.mjs && tsc",
+		"deploy": "cd dist && npm publish --access public",
+		"test": "cross-env node --test --loader ts-node/esm test/test.ts"
+	},
+	"devDependencies": {
+		"@socket-mesh/local-storage": "^1.0.2",
+		"@types/base64id": "^2.0.2",
+		"@types/clone-deep": "^4.0.4",
+		"@types/jsonwebtoken": "^9.0.5",
+		"@types/node": "^20.12.8",
+		"@types/ws": "^8.5.10",
+		"cross-env": "^7.0.3",
+		"ts-node": "^10.9.2",
+		"typescript": "^5.4.5"
+	},
+	"dependencies": {
+		"@socket-mesh/async-stream-emitter": "^7.1.0",
+		"@socket-mesh/auth": "^2.1.6",
+		"@socket-mesh/errors": "^3.1.4",
+		"@socket-mesh/formatter": "^4.0.5",
+		"base64id": "^2.0.0",
+		"clone-deep": "^4.0.1",
+		"events": "^3.3.0",
+		"isomorphic-ws": "^5.0.0",
+		"jsonwebtoken": "^9.0.2",
+		"ws": "^8.15.1"
+	},
+	"keywords": [
+		"ncom",
+		"tcp",
+		"simple",
+		"socket",
+		"messages"
+	],
+	"main": "index",
+	"engines": {
+		"node": ">= 0.8.0"
+	}
+}
