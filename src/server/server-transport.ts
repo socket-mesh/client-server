@@ -14,11 +14,11 @@ export class ServerTransport<
 	TChannelMap extends ChannelMap<TChannelMap>,
 	TServiceMap extends ServiceMap<TServiceMap>,
 	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap> & ServerPrivateMap,
+	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap>,
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
-> extends SocketTransport<TIncomingMap & TPrivateIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState> {
+> extends SocketTransport<TIncomingMap & TPrivateIncomingMap & ServerPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState> {
 	readonly service?: string;
 
 	constructor(
@@ -39,7 +39,7 @@ export class ServerTransport<
 		this.webSocket = options.socket;
 	}
 
-	protected override onRequest(packet: AnyPacket<TServiceMap, TIncomingMap & TPrivateIncomingMap>): boolean {
+	protected override onRequest(packet: AnyPacket<TServiceMap, TIncomingMap & TPrivateIncomingMap & ServerPrivateMap>): boolean {
 		let wasHandled = false;
 
 		if (!this.service || !('service' in packet) || packet.service === this.service) {

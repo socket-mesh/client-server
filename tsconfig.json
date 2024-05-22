@@ -19,5 +19,5 @@
 		"esm": true,
     "experimentalSpecifierResolution": "node"
 	},
-	"exclude": ["test.js", "dist", "**/*.spec.ts"]
+	"exclude": ["test.js", "dist", "**/*.spec.ts", "test"]
 }

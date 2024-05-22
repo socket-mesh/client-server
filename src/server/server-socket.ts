@@ -12,12 +12,12 @@ export interface ServerSocketOptions<
 	TIncomingMap extends PublicMethodMap<TIncomingMap, TPrivateIncomingMap>,
 	TServiceMap extends ServiceMap<TServiceMap>,
 	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap> & ServerPrivateMap,
+	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap>,
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TSocketState extends object,
-	TSocket extends Socket<TIncomingMap & TPrivateIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>
-> extends SocketOptions<TIncomingMap & TPrivateIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState> {
-	handlers: HandlerMap<TIncomingMap & TPrivateIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>,
+	TSocket extends Socket<TIncomingMap & TPrivateIncomingMap & ServerPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>
+> extends SocketOptions<TIncomingMap & TPrivateIncomingMap & ServerPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState> {
+	handlers: HandlerMap<TIncomingMap & TPrivateIncomingMap & ServerPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>,
 	service?: string,
 	socket: ws.WebSocket
 }
@@ -27,11 +27,11 @@ export class ServerSocket<
 	TChannelMap extends ChannelMap<TChannelMap>,
 	TServiceMap extends ServiceMap<TServiceMap>,
 	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap> & ServerPrivateMap,
+	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap>,
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
-> extends Socket<TIncomingMap & TPrivateIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState> {
+> extends Socket<TIncomingMap & TPrivateIncomingMap & ServerPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState> {
 
 	private _serverTransport: ServerTransport<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TSocketState>;
 

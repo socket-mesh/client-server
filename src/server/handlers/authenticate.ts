@@ -1,7 +1,7 @@
 import { RequestHandlerArgs } from "../../request-handler.js";
 import jwt from "jsonwebtoken";
 import { ServerSocketState } from "../server-socket-state.js";
-import { AuthTokenError, AuthTokenExpiredError, AuthTokenInvalidError, AuthTokenNotBeforeError, dehydrateError } from "@socket-mesh/errors";
+import { AuthTokenError, AuthTokenExpiredError, AuthTokenInvalidError, AuthTokenNotBeforeError } from "@socket-mesh/errors";
 import { AuthEngine } from "../auth-engine.js";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
 import { Socket } from "../../socket.js";

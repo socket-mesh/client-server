@@ -38,9 +38,9 @@ interface ClientSocketDetails<
 	TChannelMap extends ChannelMap<TChannelMap>,
 	TServiceMap extends ServiceMap<TServiceMap>,
 	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ServerPrivateMap,
+	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>,
 	TSocketState extends object,
-> extends SocketDetails<TIncomingMap & ClientPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState, ClientSocket<TOutgoingMap, TChannelMap, TServiceMap, TSocketState, TIncomingMap, TPrivateOutgoingMap>> {
+> extends SocketDetails<TIncomingMap & ClientPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap & ServerPrivateMap, TSocketState, ClientSocket<TOutgoingMap, TChannelMap, TServiceMap, TSocketState, TIncomingMap, TPrivateOutgoingMap>> {
 	type: 'client',
 }
 
@@ -49,11 +49,11 @@ interface ServerSocketDetails<
 	TChannelMap extends ChannelMap<TChannelMap>,
 	TServiceMap extends ServiceMap<TServiceMap>,
 	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap> & ServerPrivateMap,
+	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap>,
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
-> extends SocketDetails<TIncomingMap & TPrivateIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState, ServerSocket<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TSocketState>> {
+> extends SocketDetails<TIncomingMap & TPrivateIncomingMap & ServerPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState, ServerSocket<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TSocketState>> {
 	type: 'server',
 	isAlive: boolean
 }
@@ -64,7 +64,7 @@ export class Server<
 	TChannelMap extends ChannelMap<TChannelMap>,
 	TServiceMap extends ServiceMap<TServiceMap>,
 	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap> & ServerPrivateMap,
+	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap>,
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState> = ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
 > extends AsyncStreamEmitter<ServerEvent<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TChannelMap, TSocketState>> {
@@ -75,8 +75,8 @@ export class Server<
 	private _isReady: boolean;
 	private _isListening: boolean;
 	private _handlers:
-		HandlerMap<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TSocketState> |
-		HandlerMap<TIncomingMap & TPrivateIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>;
+		HandlerMap<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap & ServerPrivateMap, TSocketState> |
+		HandlerMap<TIncomingMap & TPrivateIncomingMap & ServerPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>;
 
 	//| ServerSocket<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TSocketState>
 	public ackTimeoutMs: number;
@@ -192,7 +192,7 @@ export class Server<
 			state: {
 				server: this
 			} as any,
-			handlers: this._handlers as HandlerMap<TIncomingMap & TPrivateIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>,
+			handlers: this._handlers as HandlerMap<TIncomingMap & TPrivateIncomingMap & ServerPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>,
 			onUnhandledRequest: this.onUnhandledRequest.bind(this)
 		});
 
@@ -234,7 +234,7 @@ export class Server<
 	}
 
 	private bind(
-		socket: ClientSocket<TOutgoingMap, TChannelMap, TServiceMap, TSocketState, TIncomingMap, TPrivateIncomingMap> | ServerSocket<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TSocketState>
+		socket: ClientSocket<TOutgoingMap, TChannelMap, TServiceMap, TSocketState, TIncomingMap, TPrivateIncomingMap & ServerPrivateMap> | ServerSocket<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TSocketState>
 	) {
 		(async () => {
 			for await (let event of socket.listen()) {
