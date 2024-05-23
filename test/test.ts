@@ -1,7 +1,6 @@
 import assert from 'node:assert';
 import { beforeEach, afterEach, describe, it, mock } from "node:test";
 import { ClientSocket } from '../src/client/client-socket.js';
-import { ClientPrivateMap } from '../src/client/maps/client-private-map.js';
 import { ServerPrivateMap } from '../src/client/maps/server-private-map.js';
 import { SocketStatus } from '../src/socket.js';
 import { AuthStateChangeEvent, CloseEvent, DisconnectEvent } from '../src/socket-event.js';
@@ -30,7 +29,7 @@ interface ServerIncomingMap {
 	performTask: (num: number) => void
 }
 
-let server: Server<ServerIncomingMap, {}, MyChannels, {}, {}, {}, ClientPrivateMap>;
+let server: Server<ServerIncomingMap, {}, MyChannels, {}, {}, {}, {}>;
 let client: ClientSocket<ServerIncomingMap, MyChannels>;
 const PORT_NUMBER = 8009;
 const TOKEN_EXPIRY_IN_SECONDS = 60 * 60 * 24 * 366 * 5000;
@@ -81,7 +80,7 @@ async function performTaskHandler(
 
 describe('Integration tests', function () {
 	beforeEach(async function () {
-		server = listen<ServerIncomingMap, MyChannels, {}, {}, {}, ClientPrivateMap>(
+		server = listen<ServerIncomingMap, MyChannels, {}, {}, {}, {}>(
 			PORT_NUMBER,
 			{
 				authEngine: { authKey: SERVER_AUTH_KEY },

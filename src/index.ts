@@ -2,7 +2,6 @@ import http from "http";
 import { Server } from "./server/server.js";
 import { ServerOptions } from "./server/server-options.js";
 import { MethodMap, PublicMethodMap, ServiceMap } from "./client/maps/method-map.js";
-import { ClientPrivateMap } from "./client/maps/client-private-map.js";
 import { ChannelMap } from "./client/channels/channel-map.js";
 export { Server } from "./server/server.js";
 export { ServerSocket } from "./server/server-socket.js";
@@ -19,49 +18,47 @@ export { MiddlewareType } from "./middleware/middleware.js";
  */
 export function listen<
 	TIncomingMap extends PublicMethodMap<TIncomingMap, TPrivateIncomingMap>,
-	TChannelMap extends ChannelMap<TChannelMap>,
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap
+	TChannelMap extends ChannelMap<TChannelMap> = {},
+	TServiceMap extends ServiceMap<TServiceMap> = {},
+	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap> = {},
+	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap> = {},
+	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> = {}
 >(): Server<TIncomingMap, {}, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap>;
-/*
 export function listen<
 	TIncomingMap extends PublicMethodMap<TIncomingMap, TPrivateIncomingMap>,
-	TChannelMap extends ChannelMap<TChannelMap>,
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap
+	TChannelMap extends ChannelMap<TChannelMap> = {},
+	TServiceMap extends ServiceMap<TServiceMap> = {},
+	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap> = {},
+	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap> = {},
+	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> = {}
 >(port: number, fn: () => void): Server<TIncomingMap, {}, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap>;
-*/
 export function listen<
 	TIncomingMap extends PublicMethodMap<TIncomingMap, TPrivateIncomingMap>,
-	TChannelMap extends ChannelMap<TChannelMap>,
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap
+	TChannelMap extends ChannelMap<TChannelMap> = {},
+	TServiceMap extends ServiceMap<TServiceMap> = {},
+	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap> = {},
+	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap> = {},
+	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> = {}
 >(
 	port: number, options: ServerOptions<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, {}>
 ): Server<TIncomingMap, {}, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap>;
 export function listen<
 	TIncomingMap extends PublicMethodMap<TIncomingMap, TPrivateIncomingMap>,
-	TChannelMap extends ChannelMap<TChannelMap>,
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap
+	TChannelMap extends ChannelMap<TChannelMap> = {},
+	TServiceMap extends ServiceMap<TServiceMap> = {},
+	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap> = {},
+	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap> = {},
+	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> = {}
 >(
 	port: number, options: ServerOptions<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, {}>, fn: () => void
 ): Server<TIncomingMap, {}, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap>;
 export function listen<
 	TIncomingMap extends PublicMethodMap<TIncomingMap, TPrivateIncomingMap>,
-	TChannelMap extends ChannelMap<TChannelMap>,
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap
+	TChannelMap extends ChannelMap<TChannelMap> = {},
+	TServiceMap extends ServiceMap<TServiceMap> = {},
+	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap> = {},
+	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap> = {},
+	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> = {}
 >(
 	port?: number, options?: ServerOptions<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, {}> | (() => void), fn?: () => void
 ): Server<TIncomingMap, {}, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap> {
@@ -97,11 +94,11 @@ export function listen<
  */
 export function attach<
 	TIncomingMap extends PublicMethodMap<TIncomingMap, TPrivateIncomingMap>,
-	TChannelMap extends ChannelMap<TChannelMap>,
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap
+	TChannelMap extends ChannelMap<TChannelMap> = {},
+	TServiceMap extends ServiceMap<TServiceMap> = {},
+	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap> = {},
+	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap> = {},
+	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> = {}
 >(server: http.Server, options?: ServerOptions<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, {}>): Server<TIncomingMap, {}, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap> {
   if (options == null) {
     options = {};
