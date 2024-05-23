@@ -8,7 +8,6 @@ import { AuthStateChangeEvent, CloseEvent, DisconnectEvent } from '../src/socket
 import { Server, listen } from '../src';
 import localStorage from '@socket-mesh/local-storage';
 import { RequestHandlerArgs } from '../src/request-handler.js';
-import { ServerSocketState } from '../src/server/server-socket-state.js';
 import { ClientSocketOptions } from '../src/client/client-socket-options.js';
 import { LocalStorageAuthEngine } from '../src/client/client-auth-engine.js';
 import { wait } from '../src/utils.js';
@@ -57,7 +56,7 @@ const allowedUsers: { [name: string]: true } = {
 let performTaskTriggered: boolean;
 
 async function loginHandler(
-	{ transport, options }: RequestHandlerArgs<LoginRequest, {}, ServerIncomingMap & ServerPrivateMap, {}, {}, ClientPrivateMap>
+	{ transport, options }: RequestHandlerArgs<LoginRequest, {}, ServerIncomingMap & ServerPrivateMap>
 ): Promise<void> {
 	if (!allowedUsers[options.username]) {
 		const err = new Error('Failed to login');
@@ -74,7 +73,7 @@ async function loginHandler(
 }
 
 async function performTaskHandler(
-	{ options }: RequestHandlerArgs<number, {}, ServerIncomingMap & ServerPrivateMap, {}, ClientPrivateMap, {}>
+	{ options }: RequestHandlerArgs<number, {}, ServerIncomingMap & ServerPrivateMap>
 ): Promise<void> {
 	performTaskTriggered = true;
 	await wait(options);

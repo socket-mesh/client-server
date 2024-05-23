@@ -15,10 +15,10 @@ export class ServerTransport<
 	TServiceMap extends ServiceMap<TServiceMap>,
 	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
 	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
+	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>,
 	TServerState extends object,
 	TSocketState extends object
-> extends SocketTransport<TIncomingMap & TPrivateIncomingMap & ServerPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState & ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>> {
+> extends SocketTransport<TIncomingMap & TPrivateIncomingMap & ServerPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap & ClientPrivateMap, TSocketState & ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>> {
 	readonly service?: string;
 
 	constructor(

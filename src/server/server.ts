@@ -11,7 +11,6 @@ import { AnyPacket } from "../request.js";
 import { AuthEngine, DefaultAuthEngine, isAuthEngine } from "./auth-engine.js";
 import { ServerPrivateMap } from "../client/maps/server-private-map.js";
 import { handshakeHandler } from "./handlers/handshake.js";
-import { ServerSocketState } from "./server-socket-state.js";
 import { ServerMiddleware } from "./middleware/server-middleware.js";
 import { authenticateHandler } from "./handlers/authenticate.js";
 import { removeAuthTokenHandler } from "../client/handlers/remove-auth-token.js";
@@ -50,10 +49,10 @@ interface ServerSocketDetails<
 	TServiceMap extends ServiceMap<TServiceMap>,
 	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
 	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
+	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>,
 	TServerState extends object,
 	TSocketState extends object
-> extends SocketDetails<TIncomingMap & TPrivateIncomingMap & ServerPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState, ServerSocket<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TSocketState>> {
+> extends SocketDetails<TIncomingMap & TPrivateIncomingMap & ServerPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap & ClientPrivateMap, TSocketState, ServerSocket<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TSocketState>> {
 	type: 'server',
 	isAlive: boolean
 }
@@ -65,8 +64,8 @@ export class Server<
 	TServiceMap extends ServiceMap<TServiceMap>,
 	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
 	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
-	TSocketState extends object = {} // ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState> = ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>,
+	TSocketState extends object = {}
 > extends AsyncStreamEmitter<ServerEvent<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TChannelMap, TSocketState>> {
 	private readonly _callIdGenerator: CallIdGenerator;
 	private readonly _clients: { [ id: string ]: ClientSocketDetails<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TSocketState> | ServerSocketDetails<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TSocketState> };

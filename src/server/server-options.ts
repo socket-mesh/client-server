@@ -16,7 +16,7 @@ export interface ServerOptions<
 	TServiceMap extends ServiceMap<TServiceMap>,
 	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
 	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
+	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>,
 	TSocketState extends object = {}
 > extends ws.ServerOptions {
 	// In milliseconds, the timeout for receiving a response
@@ -45,7 +45,7 @@ export interface ServerOptions<
 			TIncomingMap & TPrivateIncomingMap & ServerPrivateMap,
 			TServiceMap,
 			TOutgoingMap,
-			TPrivateOutgoingMap,
+			TPrivateOutgoingMap & ClientPrivateMap,
 			TSocketState
 		>;
 

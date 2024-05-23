@@ -8,6 +8,7 @@ import { InvokeMethodOptions, InvokeServiceOptions, SocketTransport } from "../s
 import { AutoReconnectOptions, ClientSocketOptions, ConnectOptions } from "./client-socket-options.js";
 import { AuthToken } from "@socket-mesh/auth";
 import { AbortablePromise } from "../utils.js";
+import { ClientPrivateMap } from "./maps/client-private-map.js";
 
 /*
 export interface ClientSocketWsOptions extends BaseClientSocketOptions {
@@ -39,7 +40,7 @@ export class ClientTransport<
 	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>,
 	TSocketState extends object
-> extends SocketTransport<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap & ServerPrivateMap, TSocketState> {
+> extends SocketTransport<TIncomingMap & ClientPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap & ServerPrivateMap, TSocketState> {
 	public readonly authEngine: ClientAuthEngine;
 
 	private _uri: URL;
