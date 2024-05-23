@@ -9,33 +9,27 @@ import { ChannelEvent, ChannelSubscribeEvent, ChannelSubscribeFailEvent, Channel
 import { ChannelMap } from "./channel-map.js";
 import { MethodMap, PublicMethodMap, ServiceMap } from "../maps/method-map.js";
 import { ServerPrivateMap } from "../maps/server-private-map.js";
+import { WritableStreamConsumer } from "@socket-mesh/writable-consumable-stream";
 
 export class Channel<
 	TChannelMap extends ChannelMap<TChannelMap>,
-	TChannel extends keyof TChannelMap & string,
+	TItem,
 	TIncomingMap extends MethodMap<TIncomingMap>,
 	TServiceMap extends ServiceMap<TServiceMap>,
 	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap & ServerPrivateMap>,
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>,
 	TSocketState extends object
-> extends ConsumableStream<TChannelMap[TChannel]> {
-	readonly name: TChannel;
-	readonly channels: Channels<
-		TChannelMap,
-		TIncomingMap,
-		TServiceMap,
-		TOutgoingMap,
-		TPrivateOutgoingMap,
-		TSocketState
-	>;
-
-	readonly listeners: ChannelListeners<TChannelMap, TChannel>;
+> extends ConsumableStream<TItem> {
+	readonly channels: Channels<TChannelMap, TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>;
+	readonly listeners: ChannelListeners<TChannelMap>;
+	readonly name: string;
 	readonly output: ChannelOutput;
+
 	private readonly _eventDemux: StreamDemux<ChannelEvent>;
-	private readonly _dataStream: DemuxedConsumableStream<TChannelMap[TChannel]>;
+	private readonly _dataStream: DemuxedConsumableStream<TItem>;
 
 	constructor(
-		name: TChannel,
+		name: string,
 		channels: Channels<
 			TChannelMap,
 			TIncomingMap,
@@ -67,7 +61,7 @@ export class Channel<
 		return this._eventDemux.listen(`${this.name}/${eventName}`);
 	}
 
-	createConsumer(timeout?: number) {
+	createConsumer(timeout?: number): WritableStreamConsumer<TItem> {
 		return this._dataStream.createConsumer(timeout);
 	}
 
@@ -103,11 +97,11 @@ export class Channel<
 		return this.channels.isSubscribed(this.name, includePending);
 	}
 
-	transmitPublish(data: TChannelMap[TChannel]): Promise<void> {
+	transmitPublish(data: TItem): Promise<void> {
 		return this.channels.transmitPublish(this.name, data);
 	}
 
-	invokePublish(data: TChannelMap[TChannel]): Promise<void> {
+	invokePublish(data: TItem): Promise<void> {
 		return this.channels.invokePublish(this.name, data);
 	}
 }

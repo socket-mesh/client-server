@@ -11,13 +11,13 @@ export class ChannelsListeners<TChannelMap extends ChannelMap<TChannelMap>> {
 
 	getConsumerStats(): StreamDemuxStats[]; 
 	getConsumerStats(consumerId: number): StreamDemuxStats;
-	getConsumerStats(channelName: keyof TChannelMap & string): StreamDemuxStats[];
-	getConsumerStats(channelName: keyof TChannelMap & string, eventName: 'subscribe') : StreamDemuxStats[];
-	getConsumerStats(channelName: keyof TChannelMap & string, eventName: 'subscribeStateChange') : StreamDemuxStats[];
-	getConsumerStats(channelName: keyof TChannelMap & string, eventName: 'subscribeFail') : StreamDemuxStats[];
-	getConsumerStats(channelName: keyof TChannelMap & string, eventName: 'unsubscribe') : StreamDemuxStats[];
-	getConsumerStats(channelName: keyof TChannelMap & string, eventName: string) : StreamDemuxStats[];
-	getConsumerStats(channelName?: number | keyof TChannelMap & string, eventName?: string): StreamDemuxStats[] | StreamDemuxStats {
+	getConsumerStats(channelName: keyof TChannelMap & string | string): StreamDemuxStats[];
+	getConsumerStats(channelName: keyof TChannelMap & string | string, eventName: 'subscribe') : StreamDemuxStats[];
+	getConsumerStats(channelName: keyof TChannelMap & string | string, eventName: 'subscribeStateChange') : StreamDemuxStats[];
+	getConsumerStats(channelName: keyof TChannelMap & string | string, eventName: 'subscribeFail') : StreamDemuxStats[];
+	getConsumerStats(channelName: keyof TChannelMap & string | string, eventName: 'unsubscribe') : StreamDemuxStats[];
+	getConsumerStats(channelName: keyof TChannelMap & string | string, eventName: string) : StreamDemuxStats[];
+	getConsumerStats(channelName?: keyof TChannelMap & string | number | string, eventName?: string): StreamDemuxStats[] | StreamDemuxStats {
 		if (channelName === undefined) {
 			return this._eventDemux.getConsumerStats();
 		}
@@ -44,13 +44,13 @@ export class ChannelsListeners<TChannelMap extends ChannelMap<TChannelMap>> {
 
 	getBackpressure(): number;
 	getBackpressure(consumerId: number): number;
-	getBackpressure(channelName: keyof TChannelMap & string): number;
-	getBackpressure(channelName: keyof TChannelMap & string, eventName: 'subscribe') : number;
-	getBackpressure(channelName: keyof TChannelMap & string, eventName: 'subscribeStateChange') : number;
-	getBackpressure(channelName: keyof TChannelMap & string, eventName: 'subscribeFail') : number;
-	getBackpressure(channelName: keyof TChannelMap & string, eventName: 'unsubscribe') : number;
-	getBackpressure(channelName: keyof TChannelMap & string, eventName: string): number;
-	getBackpressure(channelName?: number | keyof TChannelMap & string, eventName?: string): number {
+	getBackpressure(channelName: keyof TChannelMap & string | string): number;
+	getBackpressure(channelName: keyof TChannelMap & string | string, eventName: 'subscribe') : number;
+	getBackpressure(channelName: keyof TChannelMap & string | string, eventName: 'subscribeStateChange') : number;
+	getBackpressure(channelName: keyof TChannelMap & string | string, eventName: 'subscribeFail') : number;
+	getBackpressure(channelName: keyof TChannelMap & string | string, eventName: 'unsubscribe') : number;
+	getBackpressure(channelName: keyof TChannelMap & string | string, eventName: string): number;
+	getBackpressure(channelName?: keyof TChannelMap & string | number | string, eventName?: string): number {
 		if (channelName === undefined) {
 			return this._eventDemux.getBackpressure();
 		}
@@ -73,13 +73,13 @@ export class ChannelsListeners<TChannelMap extends ChannelMap<TChannelMap>> {
 	}
 
 	close(): void;
-	close(channelName: keyof TChannelMap & string): void;
-	close(channelName: keyof TChannelMap & string, eventName: 'subscribe') : void;
-	close(channelName: keyof TChannelMap & string, eventName: 'subscribeStateChange') : void;
-	close(channelName: keyof TChannelMap & string, eventName: 'subscribeFail') : void;
-	close(channelName: keyof TChannelMap & string, eventName: 'unsubscribe') : void;
-	close(channelName: keyof TChannelMap & string, eventName: string): void;
-	close(channelName?: keyof TChannelMap & string, eventName?: string): void {
+	close(channelName: keyof TChannelMap & string | string): void;
+	close(channelName: keyof TChannelMap & string | string, eventName: 'subscribe') : void;
+	close(channelName: keyof TChannelMap & string | string, eventName: 'subscribeStateChange') : void;
+	close(channelName: keyof TChannelMap & string | string, eventName: 'subscribeFail') : void;
+	close(channelName: keyof TChannelMap & string | string, eventName: 'unsubscribe') : void;
+	close(channelName: keyof TChannelMap & string | string, eventName: string): void;
+	close(channelName?: keyof TChannelMap & string | string, eventName?: string): void {
 		if (channelName === undefined) {
 			this._eventDemux.closeAll();
 			return;
@@ -99,12 +99,12 @@ export class ChannelsListeners<TChannelMap extends ChannelMap<TChannelMap>> {
 
 	kill(): void;
 	kill(consumerId: number): void;
-	kill(channelName: keyof TChannelMap & string, eventName: 'subscribe') : void;
-	kill(channelName: keyof TChannelMap & string, eventName: 'subscribeStateChange') : void;
-	kill(channelName: keyof TChannelMap & string, eventName: 'subscribeFail') : void;
-	kill(channelName: keyof TChannelMap & string, eventName: 'unsubscribe') : void;
-	kill(channelName: keyof TChannelMap & string, eventName?: string): void;
-	kill(channelName?: keyof TChannelMap & string | number, eventName?: string): void {
+	kill(channelName: keyof TChannelMap & string | string, eventName: 'subscribe') : void;
+	kill(channelName: keyof TChannelMap & string | string, eventName: 'subscribeStateChange') : void;
+	kill(channelName: keyof TChannelMap & string | string, eventName: 'subscribeFail') : void;
+	kill(channelName: keyof TChannelMap & string | string, eventName: 'unsubscribe') : void;
+	kill(channelName: keyof TChannelMap & string | string, eventName?: string): void;
+	kill(channelName?: keyof TChannelMap & string | number | string, eventName?: string): void {
 		if (channelName === undefined) {
 			this._eventDemux.killAll();
 			return;
@@ -127,13 +127,13 @@ export class ChannelsListeners<TChannelMap extends ChannelMap<TChannelMap>> {
 		);
 	}
 
-	hasConsumer(channelName: keyof TChannelMap & string, consumerId: number): boolean;
-	hasConsumer(channelName: keyof TChannelMap & string, eventName: 'subscribe', consumerId: number): boolean;
-	hasConsumer(channelName: keyof TChannelMap & string, eventName: 'subscribeStateChange', consumerId: number): boolean;
-	hasConsumer(channelName: keyof TChannelMap & string, eventName: 'subscribeFail', consumerId: number): boolean;
-	hasConsumer(channelName: keyof TChannelMap & string, eventName: 'unsubscribe', consumerId: number): boolean;
-	hasConsumer(channelName: keyof TChannelMap & string, eventName: string, consumerId: number): boolean;
-	hasConsumer(channelName: keyof TChannelMap & string, eventName: string | number, consumerId?: number): boolean {
+	hasConsumer(channelName: keyof TChannelMap & string | string, consumerId: number): boolean;
+	hasConsumer(channelName: keyof TChannelMap & string | string, eventName: 'subscribe', consumerId: number): boolean;
+	hasConsumer(channelName: keyof TChannelMap & string | string, eventName: 'subscribeStateChange', consumerId: number): boolean;
+	hasConsumer(channelName: keyof TChannelMap & string | string, eventName: 'subscribeFail', consumerId: number): boolean;
+	hasConsumer(channelName: keyof TChannelMap & string | string, eventName: 'unsubscribe', consumerId: number): boolean;
+	hasConsumer(channelName: keyof TChannelMap & string | string, eventName: string, consumerId: number): boolean;
+	hasConsumer(channelName: keyof TChannelMap & string | string, eventName: string | number, consumerId?: number): boolean {
 		if (typeof eventName === 'string') {
 			return this._eventDemux.hasConsumer(`${channelName}/${eventName}`, consumerId);
 		}
@@ -144,7 +144,7 @@ export class ChannelsListeners<TChannelMap extends ChannelMap<TChannelMap>> {
 			});
 	}
 
-	private getAllStreamNames(channelName: keyof TChannelMap & string): string[] {
+	private getAllStreamNames(channelName: keyof TChannelMap & string | string): string[] {
 		const streamNamesLookup = this._eventDemux.getConsumerStats()
 			.filter((stats) => {
 				return stats.stream.indexOf(`${channelName}/`) === 0;

@@ -1215,7 +1215,7 @@ describe('Integration tests', function () {
 		it('Should support event listener timeout using once(timeout) method', async function () {
 			client = new ClientSocket(clientOptions);
 
-			let event: AuthStateChangeEvent;
+			let event: AuthStateChangeEvent | null = null;
 			let error: Error | null = null;
 
 			try {

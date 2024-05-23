@@ -18,7 +18,6 @@ export { MiddlewareType } from "./middleware/middleware.js";
  * @return {AGServer} websocket cluster server
  * @api public
  */
-
 export function listen<
 	TIncomingMap extends PublicMethodMap<TIncomingMap, TPrivateIncomingMap>,
 	TChannelMap extends ChannelMap<TChannelMap>,

@@ -2,11 +2,11 @@ import { StreamDemuxStats } from "@socket-mesh/stream-demux";
 import { ChannelsListeners } from "./channels-listeners.js";
 import { ChannelMap } from "./channel-map.js";
 
-export class ChannelListeners<TChannelMap extends ChannelMap<TChannelMap>, TChannel extends keyof TChannelMap & string> {
-	private readonly _name: TChannel;
+export class ChannelListeners<TChannelMap extends ChannelMap<TChannelMap>> {
+	private readonly _name: string;
 	private readonly _listeners: ChannelsListeners<TChannelMap>;
 
-	constructor(name: TChannel, listeners: ChannelsListeners<TChannelMap>) {
+	constructor(name: string, listeners: ChannelsListeners<TChannelMap>) {
 		this._name = name;
 		this._listeners = listeners;
 	}

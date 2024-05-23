@@ -15,7 +15,7 @@
 	"scripts": {
 		"build": "node ./scripts/build.mjs && tsc",
 		"deploy": "cd dist && npm publish --access public",
-		"test": "cross-env node --test --loader ts-node/esm test/test.ts"
+		"test": "cross-env node --test --import=./run-test.js test/test.ts"
 	},
 	"devDependencies": {
 		"@socket-mesh/local-storage": "^1.0.2",
