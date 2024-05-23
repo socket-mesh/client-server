@@ -3,6 +3,7 @@ import { MethodMap, PublicMethodMap, ServiceMap } from "./maps/method-map";
 import { SocketOptions } from "../socket.js";
 import { ClientAuthEngine, LocalStorageAuthEngineOptions } from "./client-auth-engine";
 import { ServerPrivateMap } from "./maps/server-private-map";
+import { ClientPrivateMap } from "./maps/client-private-map";
 
 export interface AutoReconnectOptions {
 	initialDelay: number,
@@ -23,7 +24,7 @@ export interface ClientSocketOptions<
 	TSocketState extends object = {},
 	TIncomingMap extends MethodMap<TIncomingMap> = {},
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> = {}
-> extends SocketOptions<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap & ServerPrivateMap, TSocketState>, ConnectOptions {
+> extends SocketOptions<TIncomingMap & ClientPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap & ServerPrivateMap, TSocketState>, ConnectOptions {
 	// Whether or not to automatically connect the socket as soon as it is created. Default is true.
 	autoConnect?: boolean,
 

@@ -49,8 +49,8 @@ export class ClientSocket<
 	public readonly channels: Channels<TChannelMap, TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>;
 
 	constructor(address: string | URL);
-	constructor(options: ClientSocketOptions<TOutgoingMap, TServiceMap, TSocketState, TIncomingMap & ClientPrivateMap, TPrivateOutgoingMap & ServerPrivateMap>);
-	constructor(options: ClientSocketOptions<TOutgoingMap, TServiceMap, TSocketState, TIncomingMap & ClientPrivateMap, TPrivateOutgoingMap & ServerPrivateMap> | string | URL) {
+	constructor(options: ClientSocketOptions<TOutgoingMap, TServiceMap, TSocketState, TIncomingMap & ClientPrivateMap, TPrivateOutgoingMap>);
+	constructor(options: ClientSocketOptions<TOutgoingMap, TServiceMap, TSocketState, TIncomingMap & ClientPrivateMap, TPrivateOutgoingMap> | string | URL) {
 		options = parseClientOptions(options);
 
 		options.handlers = options.handlers || {};

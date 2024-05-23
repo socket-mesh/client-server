@@ -52,7 +52,7 @@ interface ServerSocketDetails<
 	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap>,
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
-	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object
 > extends SocketDetails<TIncomingMap & TPrivateIncomingMap & ServerPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState, ServerSocket<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TSocketState>> {
 	type: 'server',
 	isAlive: boolean
@@ -66,7 +66,7 @@ export class Server<
 	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
 	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap>,
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
-	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState> = ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object = {} // ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState> = ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
 > extends AsyncStreamEmitter<ServerEvent<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TChannelMap, TSocketState>> {
 	private readonly _callIdGenerator: CallIdGenerator;
 	private readonly _clients: { [ id: string ]: ClientSocketDetails<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TSocketState> | ServerSocketDetails<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TSocketState> };

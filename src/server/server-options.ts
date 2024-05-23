@@ -17,16 +17,7 @@ export interface ServerOptions<
 	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
 	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap>,
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
-	TServerState extends object,
-	TSocketState extends ServerSocketState<
-		TIncomingMap,
-		TChannelMap,
-		TServiceMap,
-		TOutgoingMap,
-		TPrivateIncomingMap,
-		TPrivateOutgoingMap,
-		TServerState
-	> = ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object = {}
 > extends ws.ServerOptions {
 	// In milliseconds, the timeout for receiving a response
 	// when using invoke() or invokePublish().

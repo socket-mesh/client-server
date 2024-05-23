@@ -26,7 +26,7 @@ export type ServerEvent<
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TChannelMap extends ChannelMap<TChannelMap>,
-	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object
 > =
 	ConnectionEvent<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TChannelMap, TSocketState> |
 	CloseEvent |
@@ -58,10 +58,10 @@ export type ServerEvent<
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TChannelMap extends ChannelMap<TChannelMap>,
-	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object
 > {
 	socket:
-		ClientSocket<TOutgoingMap, TChannelMap, TServiceMap, TSocketState, TIncomingMap, TPrivateIncomingMap & ServerPrivateMap> |
+		ClientSocket<TOutgoingMap, TChannelMap, TServiceMap, TSocketState & ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>, TIncomingMap, TPrivateIncomingMap & ServerPrivateMap> |
 		ServerSocket<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TSocketState>,
 	upgradeReq: IncomingMessage
 }
@@ -88,10 +88,10 @@ export interface ServerSocketEvent<
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TChannelMap extends ChannelMap<TChannelMap>,
-	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object
 > {
 	socket:
-		ClientSocket<TOutgoingMap, TChannelMap, TServiceMap, TSocketState, TIncomingMap, TPrivateIncomingMap & ServerPrivateMap> |
+		ClientSocket<TOutgoingMap, TChannelMap, TServiceMap, TSocketState & ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>, TIncomingMap, TPrivateIncomingMap & ServerPrivateMap> |
 		ServerSocket<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TSocketState>
 }
 
@@ -103,7 +103,7 @@ export type SocketAuthenticatedChangeEvent<
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TChannelMap extends ChannelMap<TChannelMap>,
-	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object
 > = AuthenticatedChangeEvent & ServerSocketEvent<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TChannelMap, TSocketState>;
 
 export type SocketAuthenticationEvent<
@@ -114,7 +114,7 @@ export type SocketAuthenticationEvent<
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TChannelMap extends ChannelMap<TChannelMap>,
-	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object
 > = AuthenticationEvent & ServerSocketEvent<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TChannelMap, TSocketState>;
 
 export type SocketBadAuthTokenEvent<
@@ -125,7 +125,7 @@ export type SocketBadAuthTokenEvent<
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TChannelMap extends ChannelMap<TChannelMap>,
-	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object
 > = BadAuthTokenEvent & ServerSocketEvent<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TChannelMap, TSocketState>;
 
 export type SocketCloseEvent<
@@ -136,7 +136,7 @@ export type SocketCloseEvent<
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TChannelMap extends ChannelMap<TChannelMap>,
-	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object
 > = SCloseEvent & ServerSocketEvent<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TChannelMap, TSocketState>;
 
 export type SocketErrorEvent<
@@ -147,7 +147,7 @@ export type SocketErrorEvent<
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TChannelMap extends ChannelMap<TChannelMap>,
-	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object
 > = SErrorEvent & ServerSocketEvent<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TChannelMap, TSocketState>;
 
 export type SocketMessageEvent<
@@ -158,7 +158,7 @@ export type SocketMessageEvent<
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TChannelMap extends ChannelMap<TChannelMap>,
-	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object
 > = MessageEvent & ServerSocketEvent<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TChannelMap, TSocketState>;
 
 export type SocketConnectEvent<
@@ -169,7 +169,7 @@ export type SocketConnectEvent<
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TChannelMap extends ChannelMap<TChannelMap>,
-	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object
 > = ConnectEvent & ServerSocketEvent<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TChannelMap, TSocketState>;
 
 export type SocketConnectingEvent<
@@ -180,7 +180,7 @@ export type SocketConnectingEvent<
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TChannelMap extends ChannelMap<TChannelMap>,
-	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object
 > = ConnectingEvent & ServerSocketEvent<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TChannelMap, TSocketState>;
 
 export type SocketDisconnectEvent<
@@ -191,7 +191,7 @@ export type SocketDisconnectEvent<
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TChannelMap extends ChannelMap<TChannelMap>,
-	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object
 > = DisconnectEvent & ServerSocketEvent<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TChannelMap, TSocketState>;
 
 export type SocketPingEvent<
@@ -202,7 +202,7 @@ export type SocketPingEvent<
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TChannelMap extends ChannelMap<TChannelMap>,
-	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object
 > = PingEvent & ServerSocketEvent<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TChannelMap, TSocketState>;
 
 export type SocketPongEvent<
@@ -213,7 +213,7 @@ export type SocketPongEvent<
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TChannelMap extends ChannelMap<TChannelMap>,
-	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object
 > = PongEvent & ServerSocketEvent<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TChannelMap, TSocketState>;
 
 export type SocketRemoveAuthTokenEvent<
@@ -224,7 +224,7 @@ export type SocketRemoveAuthTokenEvent<
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TChannelMap extends ChannelMap<TChannelMap>,
-	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object
 > = RemoveAuthTokenEvent & ServerSocketEvent<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TChannelMap, TSocketState>;
 
 export type SocketRequestEvent<
@@ -235,7 +235,7 @@ export type SocketRequestEvent<
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TChannelMap extends ChannelMap<TChannelMap>,
-	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object
 > = RequestEvent<TServiceMap, TIncomingMap> & ServerSocketEvent<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TChannelMap, TSocketState>;
 
 export type SocketResponseEvent<
@@ -246,7 +246,7 @@ export type SocketResponseEvent<
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TChannelMap extends ChannelMap<TChannelMap>,
-	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object
 > = ResponseEvent<TServiceMap, TOutgoingMap, TPrivateOutgoingMap> & ServerSocketEvent<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TChannelMap, TSocketState>;
 
 export type SocketSubscribeEvent<
@@ -257,7 +257,7 @@ export type SocketSubscribeEvent<
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TChannelMap extends ChannelMap<TChannelMap>,
-	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object
 > = SubscribeEvent & ServerSocketEvent<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TChannelMap, TSocketState>;
 
 export type SocketSubscribeFailEvent<
@@ -268,7 +268,7 @@ export type SocketSubscribeFailEvent<
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TChannelMap extends ChannelMap<TChannelMap>,
-	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object
 > = SubscribeFailEvent & ServerSocketEvent<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TChannelMap, TSocketState>;
 
 export type SocketSubscribeStateChangeEvent<
@@ -279,7 +279,7 @@ export type SocketSubscribeStateChangeEvent<
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TChannelMap extends ChannelMap<TChannelMap>,
-	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object
 > = SubscribeStateChangeEvent & ServerSocketEvent<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TChannelMap, TSocketState>;
 
 export type SocketUnsubscribeEvent<
@@ -290,7 +290,7 @@ export type SocketUnsubscribeEvent<
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TChannelMap extends ChannelMap<TChannelMap>,
-	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object
 > = UnsubscribeEvent & ServerSocketEvent<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TChannelMap, TSocketState>;
 
 export type SocketUnexpectedResponseEvent<
@@ -301,7 +301,7 @@ export type SocketUnexpectedResponseEvent<
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TChannelMap extends ChannelMap<TChannelMap>,
-	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object
 > = UnexpectedResponseEvent & ServerSocketEvent<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TChannelMap, TSocketState>;
 
 export type SocketUpgradeEvent<
@@ -312,5 +312,5 @@ export type SocketUpgradeEvent<
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TChannelMap extends ChannelMap<TChannelMap>,
-	TSocketState extends ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>
+	TSocketState extends object
 > = UpgradeEvent & ServerSocketEvent<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TChannelMap, TSocketState>;

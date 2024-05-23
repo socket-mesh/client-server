@@ -28,7 +28,7 @@ interface MyChannels {
 
 interface ServerIncomingMap {
 	login: (req: LoginRequest) => void,
-	performTask: (num: Number) => void
+	performTask: (num: number) => void
 }
 
 let server: Server<ServerIncomingMap, {}, MyChannels, {}, {}, {}, ClientPrivateMap>;
@@ -57,7 +57,7 @@ const allowedUsers: { [name: string]: true } = {
 let performTaskTriggered: boolean;
 
 async function loginHandler(
-	{ transport, options }: RequestHandlerArgs<LoginRequest, ServerSocketState, ServerIncomingMap & ServerPrivateMap, {}, ClientPrivateMap, {}>
+	{ transport, options }: RequestHandlerArgs<LoginRequest, {}, ServerIncomingMap & ServerPrivateMap, {}, {}, ClientPrivateMap>
 ): Promise<void> {
 	if (!allowedUsers[options.username]) {
 		const err = new Error('Failed to login');
@@ -74,7 +74,7 @@ async function loginHandler(
 }
 
 async function performTaskHandler(
-	{ options }: RequestHandlerArgs<number, ServerSocketState, ServerIncomingMap & ServerPrivateMap, {}, ClientPrivateMap, {}>
+	{ options }: RequestHandlerArgs<number, {}, ServerIncomingMap & ServerPrivateMap, {}, ClientPrivateMap, {}>
 ): Promise<void> {
 	performTaskTriggered = true;
 	await wait(options);
@@ -336,8 +336,8 @@ describe('Integration tests', function () {
 			// stored correctly on the client.
 			assert.notEqual(client.authToken, null);
 			assert.strictEqual(client.authToken.username, 'kate');
-			assert.notEqual(caughtError, null);
-			assert.strictEqual(caughtError.name, 'FailedToSaveTokenError');
+			assert.notEqual(caughtError!, null);
+			assert.strictEqual(caughtError!.name, 'FailedToSaveTokenError');
 		});
 
 		it('Should gracefully handle authenticate abortion due to disconnection', async function () {
@@ -878,7 +878,7 @@ describe('Integration tests', function () {
       await client.listen('connect').once();
 
       let disconnectCode: number;
-      let disconnectReason: string;
+      let disconnectReason: string | undefined;
 
       (async () => {
         for await (let event of client.listen('disconnect')) {
@@ -889,7 +889,7 @@ describe('Integration tests', function () {
 
       client.connect();
 
-      assert.equal(disconnectCode, null);
+      assert.equal(disconnectCode!, null);
       assert.equal(disconnectReason, null);
     });
 
@@ -899,7 +899,7 @@ describe('Integration tests', function () {
       await client.listen('connect').once();
 
       let disconnectCode: number;
-      let disconnectReason: string;
+      let disconnectReason: string | undefined;
 
       (async () => {
         for await (let event of client.listen('disconnect')) {
@@ -911,7 +911,7 @@ describe('Integration tests', function () {
       client.connect(clientOptions);
       await client.listen('connect').once();
 
-      assert.equal(disconnectCode, 1000);
+      assert.equal(disconnectCode!, 1000);
       assert.equal(disconnectReason, 'Socket was disconnected by the client to initiate a new connection');
     });
   });
@@ -1227,7 +1227,7 @@ describe('Integration tests', function () {
 
 			assert.strictEqual(event, null);
 			assert.notEqual(error, null);
-			assert.strictEqual(error.name, 'TimeoutError');
+			assert.strictEqual(error!.name, 'TimeoutError');
 		});
 	});
 
@@ -1252,9 +1252,9 @@ describe('Integration tests', function () {
 				}
 			})();
 
-			let closeEvent: CloseEvent = null;
-			let disconnectEvent: DisconnectEvent = null;
-			let clientError: Error = null;
+			let closeEvent: CloseEvent | null = null;
+			let disconnectEvent: DisconnectEvent | null = null;
+			let clientError: Error | null = null;
 
 			(async () => {
 				for await (let { error } of client.listen('error')) {
@@ -1277,10 +1277,10 @@ describe('Integration tests', function () {
 			await wait(1000);
 
 			assert.strictEqual(disconnectEvent, null);
-			assert.strictEqual(closeEvent.code, 4000);
-			assert.strictEqual(closeEvent.reason, 'Server ping timed out');
+			assert.strictEqual(closeEvent!.code, 4000);
+			assert.strictEqual(closeEvent!.reason, 'Server ping timed out');
 			assert.notEqual(clientError, null);
-			assert.strictEqual(clientError.name, 'SocketProtocolError');
+			assert.strictEqual(clientError!.name, 'SocketProtocolError');
 		});
 
 		it('Should not close if ping is not received before timeout when pingTimeoutDisabled is true', async function () {
@@ -1296,9 +1296,9 @@ describe('Integration tests', function () {
 
 			assert.strictEqual(client.pingTimeoutMs, 500);
 
-			let closeEvent: CloseEvent = null;
-			let disconnectEvent: DisconnectEvent = null;
-			let clientError: Error = null;
+			let closeEvent: CloseEvent | null = null;
+			let disconnectEvent: DisconnectEvent | null = null;
+			let clientError: Error | null = null;
 
 			(async () => {
 				for await (let { error } of client.listen('error')) {
