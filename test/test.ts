@@ -31,7 +31,7 @@ interface ServerIncomingMap {
 	performTask: (num: Number) => void
 }
 
-let server: Server<ServerIncomingMap, {}, MyChannels, {}, {}, ServerPrivateMap, ClientPrivateMap>;
+let server: Server<ServerIncomingMap, {}, MyChannels, {}, {}, {}, ClientPrivateMap>;
 let client: ClientSocket<ServerIncomingMap, MyChannels>;
 const PORT_NUMBER = 8009;
 const TOKEN_EXPIRY_IN_SECONDS = 60 * 60 * 24 * 366 * 5000;
@@ -82,7 +82,7 @@ async function performTaskHandler(
 
 describe('Integration tests', function () {
 	beforeEach(async function () {
-		server = listen<ServerIncomingMap, MyChannels, {}, {}, ServerPrivateMap, ClientPrivateMap>(
+		server = listen<ServerIncomingMap, MyChannels, {}, {}, {}, ClientPrivateMap>(
 			PORT_NUMBER,
 			{
 				authEngine: { authKey: SERVER_AUTH_KEY },

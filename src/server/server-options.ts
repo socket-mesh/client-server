@@ -15,7 +15,7 @@ export interface ServerOptions<
 	TChannelMap extends ChannelMap<TChannelMap>, 	
 	TServiceMap extends ServiceMap<TServiceMap>,
 	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap> & ServerPrivateMap,
+	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap>,
 	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> & ClientPrivateMap,
 	TServerState extends object,
 	TSocketState extends ServerSocketState<
@@ -47,11 +47,11 @@ export interface ServerOptions<
 			TIncomingMap,
 			TServiceMap,
 			TOutgoingMap,
-			TPrivateIncomingMap,
+			TPrivateIncomingMap & ServerPrivateMap,
 			TSocketState
 		> |
 		HandlerMap<
-			TIncomingMap & TPrivateIncomingMap,
+			TIncomingMap & TPrivateIncomingMap & ServerPrivateMap,
 			TServiceMap,
 			TOutgoingMap,
 			TPrivateOutgoingMap,
