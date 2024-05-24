@@ -1,7 +1,7 @@
 import http from "http";
 import { Server } from "./server/server.js";
 import { ServerOptions } from "./server/server-options.js";
-import { ServerMap } from "./client/maps/socket-map.js";
+import { ServerMap } from "./client/maps/server-map.js";
 export { Server } from "./server/server.js";
 export { ServerSocket } from "./server/server-socket.js";
 export { MiddlewareType } from "./middleware/middleware.js";

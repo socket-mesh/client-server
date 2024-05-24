@@ -16,7 +16,9 @@ import { CloseEvent, ConnectionEvent, ErrorEvent, HeadersEvent, ListeningEvent, 
 import { AsyncStreamEmitter } from "@socket-mesh/async-stream-emitter";
 import { DemuxedConsumableStream, StreamEvent } from "@socket-mesh/stream-demux";
 import { ServerOptions } from "./server-options.js";
-import { ClientMapFromServer, ServerMap, SocketMapClientFromServer, SocketMapFromServer } from "../client/maps/socket-map.js";
+import { SocketMapFromServer } from "../client/maps/socket-map.js";
+import { ServerMap } from "../client/maps/server-map.js";
+import { ClientMapFromServer } from "../client/maps/client-map.js";
 
 interface ClientSocketDetails<T extends ServerMap> {
 	type: 'client',

@@ -1,10 +1,10 @@
 import { AnyPacket } from "../request.js";
-import { ServerPrivateMap } from "../client/maps/server-private-map.js";
+import { ServerMap, ServerPrivateMap } from "../client/maps/server-map.js";
 import { ServerSocket, ServerSocketOptions } from "./server-socket.js";
 import { SocketTransport } from "../socket-transport.js";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
 import { AuthError } from "@socket-mesh/errors";
-import { ServerMap, SocketMapFromServer } from "../client/maps/socket-map.js";
+import { SocketMapFromServer } from "../client/maps/socket-map.js";
 
 export class ServerTransport<T extends ServerMap> extends SocketTransport<SocketMapFromServer<T>> {
 	readonly service?: string;

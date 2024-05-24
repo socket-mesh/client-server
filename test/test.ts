@@ -10,6 +10,7 @@ import { ClientSocketOptions } from '../src/client/client-socket-options.js';
 import { LocalStorageAuthEngine } from '../src/client/client-auth-engine.js';
 import { wait } from '../src/utils.js';
 import { OfflineMiddleware } from '../src/middleware/offline-middleware.js';
+import { BasicServerMap } from '../src/client/maps/server-map.js';
 
 // Add to the global scope like in browser.
 global.localStorage = localStorage;
@@ -28,17 +29,6 @@ type ServerIncomingMap = {
 	performTask: (num: number) => void
 }
 
-interface MyServerMap {
-	Channel: MyChannels,
-	Service: {},
-	Incoming: ServerIncomingMap,
-	Outgoing: {},
-	PrivateIncoming: {},
-	PrivateOutgoing: {},
-	ServerState: {},
-	State: {}
-}
-
 interface MyClientMap {
 	Channel: MyChannels,
 	Incoming: {},
@@ -48,7 +38,7 @@ interface MyClientMap {
 	State: {}
 };
 
-let server: Server<MyServerMap>;
+let server: Server<BasicServerMap<ServerIncomingMap, MyChannels>>;
 
 let client: ClientSocket<MyClientMap>;
 
@@ -75,9 +65,7 @@ const allowedUsers: { [name: string]: true } = {
 
 let performTaskTriggered: boolean;
 
-async function loginHandler(
-	{ transport, options }: RequestHandlerArgs<LoginRequest, MyServerMap>
-): Promise<void> {
+async function loginHandler({ transport, options }: RequestHandlerArgs<LoginRequest>): Promise<void> {
 	if (!allowedUsers[options.username]) {
 		const err = new Error('Failed to login');
 		err.name = 'FailedLoginError';
@@ -92,16 +80,14 @@ async function loginHandler(
 	transport.setAuthorization(authToken);
 }
 
-async function performTaskHandler(
-	{ options }: RequestHandlerArgs<number, MyServerMap>
-): Promise<void> {
+async function performTaskHandler({ options }: RequestHandlerArgs<number>): Promise<void> {
 	performTaskTriggered = true;
 	await wait(options);
 }
 
 describe('Integration tests', function () {
 	beforeEach(async function () {
-		server = listen<MyServerMap>(
+		server = listen<BasicServerMap<ServerIncomingMap, MyChannels>>(
 			PORT_NUMBER,
 			{
 				authEngine: { authKey: SERVER_AUTH_KEY },
@@ -1442,9 +1428,9 @@ describe('Integration tests', function () {
 
 			const fooChannel = client.channels.channel('foo');
 			const barChannel = client.channels.subscribe('bar');
-
+console.log('4');
 			await barChannel.listen('subscribe').once();
-
+console.log('5');
 			const fooEvents: string[] = [];
 			const barEvents: string[] = [];
 			const barMessages: string[] = [];

@@ -6,7 +6,7 @@ import { Channel } from "./channel.js";
 import { ClientTransport } from "../client-transport.js";
 import { AbortablePromise } from "../../utils.js";
 import { ChannelEvent, ChannelSubscribeStateChangeEvent } from "./channel-events.js";
-import { ClientMap } from "../maps/socket-map.js";
+import { ClientMap } from "../maps/client-map.js";
 
 interface ChannelDetails {
 	name: string,

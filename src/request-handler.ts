@@ -1,7 +1,7 @@
 import { TimeoutError } from "@socket-mesh/errors";
 import { Socket } from "./socket.js";
 import { SocketTransport } from "./socket-transport.js";
-import { SocketMap } from "./client/maps/socket-map.js";
+import { EmptySocketMap, SocketMap } from "./client/maps/socket-map.js";
 
 export interface RequestHandlerArgsOptions<TOptions, T extends SocketMap> {
 	method: string,
@@ -11,7 +11,7 @@ export interface RequestHandlerArgsOptions<TOptions, T extends SocketMap> {
 	options?: TOptions
 }
 
-export class RequestHandlerArgs<TOptions, T extends SocketMap> {
+export class RequestHandlerArgs<TOptions, T extends SocketMap = EmptySocketMap> {
 	public requestedAt: Date;
 	public timeoutMs?: number | boolean;
 	public socket: Socket<T>;

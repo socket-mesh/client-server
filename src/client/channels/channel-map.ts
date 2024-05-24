@@ -13,6 +13,6 @@ interface JsonArray extends Array<JsonValue> {}
 
 type JsonValue = Primitive | JsonObject | JsonArray;
 
-export type ChannelMap = { [channel: string]: JsonValue };
+export interface ChannelMap { [channel: string]: JsonValue };
 
 //export type ChannelTypes<T> = T[keyof T];

@@ -1,5 +1,30 @@
 import { SignedAuthToken } from "@socket-mesh/auth";
-import { ChannelOptions } from "../channels/channel-options";
+import { ChannelOptions } from "../channels/channel-options.js";
+import { ChannelMap } from "../channels/channel-map.js";
+import { PrivateMethodMap, PublicMethodMap, ServiceMap } from "./method-map.js";
+import { ClientPrivateMap } from "./client-map.js";
+
+export interface ServerMap {
+	Channel: ChannelMap,
+	Service: ServiceMap,
+	Incoming: PublicMethodMap,
+	Outgoing: PublicMethodMap,
+	PrivateIncoming: PrivateMethodMap,
+	PrivateOutgoing: PrivateMethodMap,
+	ServerState: object,
+	State: object
+}
+
+export interface BasicServerMap<TIncoming extends PublicMethodMap = {}, TChannels extends ChannelMap = {}, TState extends object = {}> {
+	Channel: TChannels,
+	Service: {},
+	Incoming: TIncoming,
+	Outgoing: {},
+	PrivateIncoming: ServerPrivateMap,
+	PrivateOutgoing: ClientPrivateMap,
+	ServerState: {},
+	State: TState
+}
 
 export interface HandshakeOptions {
 	authToken: SignedAuthToken

@@ -7,7 +7,8 @@ import { SignedAuthToken } from "@socket-mesh/auth";
 import { hydrateError } from "@socket-mesh/errors";
 import { wait } from "../utils.js";
 import { Channels } from "./channels/channels.js";
-import { SocketMapFromClient, ClientMap } from "./maps/socket-map.js";
+import { SocketMapFromClient } from "./maps/socket-map.js";
+import { ClientMap } from "./maps/client-map.js";
 
 /*
 export interface ClientSocketWsOptions extends BaseClientSocketOptions {

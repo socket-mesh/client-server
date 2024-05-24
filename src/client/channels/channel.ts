@@ -7,7 +7,7 @@ import { ChannelListeners } from "./channel-listeners.js";
 import { ChannelOutput } from "./channel-output.js";
 import { ChannelEvent, ChannelSubscribeEvent, ChannelSubscribeFailEvent, ChannelSubscribeStateChangeEvent, ChannelUnsubscribeEvent } from "./channel-events.js";
 import { WritableStreamConsumer } from "@socket-mesh/writable-consumable-stream";
-import { ClientMap } from "../maps/socket-map.js";
+import { ClientMap } from "../maps/client-map.js";
 
 export class Channel<
 	TSocketMap extends ClientMap,

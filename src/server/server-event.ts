@@ -12,7 +12,8 @@ import {
 	SubscribeEvent,
 	SubscribeFailEvent
 } from "../socket-event.js";
-import { ClientMapFromServer, ServerMap } from "../client/maps/socket-map.js";
+import { ServerMap } from "../client/maps/server-map.js";
+import { ClientMapFromServer } from "../client/maps/client-map.js";
 
 export type ServerEvent<T extends ServerMap> =
 	ConnectionEvent<T> |

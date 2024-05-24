@@ -3,12 +3,13 @@ import ws from "isomorphic-ws";
 import { ClientAuthEngine, LocalStorageAuthEngine, isAuthEngine } from "./client-auth-engine.js";
 import { FunctionReturnType } from "./maps/method-map.js";
 import { hydrateError } from "@socket-mesh/errors";
-import { ServerPrivateMap, HandshakeStatus } from "./maps/server-private-map.js";
+import { ServerPrivateMap, HandshakeStatus } from "./maps/server-map.js";
 import { InvokeMethodOptions, InvokeServiceOptions, SocketTransport } from "../socket-transport.js";
 import { AutoReconnectOptions, ClientSocketOptions, ConnectOptions } from "./client-socket-options.js";
 import { AuthToken } from "@socket-mesh/auth";
 import { AbortablePromise } from "../utils.js";
-import { SocketMapFromClient, ClientMap } from "./maps/socket-map.js";
+import { SocketMapFromClient } from "./maps/socket-map.js";
+import { ClientMap } from "./maps/client-map.js";
 
 /*
 export interface ClientSocketWsOptions extends BaseClientSocketOptions {

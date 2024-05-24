@@ -1,8 +1,7 @@
 import { RequestHandlerArgs } from "../../request-handler.js";
-import { EmptySocketMapClient } from "../maps/socket-map.js";
 
 export async function removeAuthTokenHandler(
-	{ transport }: RequestHandlerArgs<void, EmptySocketMapClient>
+	{ transport }: RequestHandlerArgs<void>
 ): Promise<void> {
 	await transport.deauthenticate();
 }

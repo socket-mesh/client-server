@@ -5,7 +5,7 @@ import { AuthEngine } from "../auth-engine.js";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
 import { Socket } from "../../socket.js";
 import { SocketTransport } from "../../socket-transport.js";
-import { EmptySocketMapServer } from "../../client/maps/socket-map.js";
+import { BasicSocketMapServer } from "../../client/maps/socket-map.js";
 
 export type AuthInfo = ValidAuthInfo | InvalidAuthInfo;
 
@@ -20,7 +20,7 @@ export interface ValidAuthInfo {
 }
 
 export async function authenticateHandler(
-	{ socket, transport, options }: RequestHandlerArgs<string, EmptySocketMapServer>
+	{ socket, transport, options }: RequestHandlerArgs<string, BasicSocketMapServer>
 ): Promise<void> {
 	const state = transport.state;
 	const server = state.server;
@@ -61,8 +61,8 @@ function processTokenError(err: jwt.VerifyErrors): AuthTokenError {
 }
 
 export async function processAuthentication(
-	socket: Socket<EmptySocketMapServer>,
-	transport: SocketTransport<EmptySocketMapServer>,
+	socket: Socket<BasicSocketMapServer>,
+	transport: SocketTransport<BasicSocketMapServer>,
 	authInfo: AuthInfo
 ): Promise<void> {
 	if ('authError' in authInfo) {
