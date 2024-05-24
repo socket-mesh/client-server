@@ -1,18 +1,13 @@
-import { PublicMethodMap, MethodMap, ServiceMap } from "../client/maps/method-map.js";
+import { SocketMap } from "../client/maps/socket-map.js";
 import { SocketStatus } from "../socket.js";
 import { RequestMiddleware } from "./request-middleware.js";
 import { ResponseMiddleware } from "./response-middleware.js";
 
 export type MiddlewareType = 'request' | 'response' | 'handshake';
 
-export type AnyMiddleware<
-	TIncomingMap extends MethodMap<TIncomingMap>,
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>
-> = 
-	RequestMiddleware<TServiceMap, TOutgoingMap, TPrivateOutgoingMap> |
-	ResponseMiddleware<TServiceMap, TIncomingMap> |
+export type AnyMiddleware<T extends SocketMap> = 
+	RequestMiddleware<T['Service'], T['Outgoing'], T['PrivateOutgoing']> |
+	ResponseMiddleware<T['Service'], T['Incoming']> |
 	Middleware;
 
 export interface Middleware {

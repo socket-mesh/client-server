@@ -1,13 +1,13 @@
 import { RequestHandlerArgs } from "../../request-handler.js";
 import { HandshakeOptions, HandshakeStatus } from "../../client/maps/server-private-map.js";
-import { ServerSocketState } from "../server-socket-state.js";
 import { processAuthentication, validateAuthToken } from "./authenticate.js";
 import { dehydrateError } from "@socket-mesh/errors";
+import { EmptySocketMapServer } from "../../client/maps/socket-map.js";
 
 const HANDSHAKE_REJECTION_STATUS_CODE = 4008;
 
 export async function handshakeHandler(
-	{ options, socket, transport }: RequestHandlerArgs<HandshakeOptions, ServerSocketState>
+	{ options, socket, transport }: RequestHandlerArgs<HandshakeOptions, EmptySocketMapServer>
 ): Promise<HandshakeStatus> {
 	const state = transport.state;
 	const server = state.server;

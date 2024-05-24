@@ -1,8 +1,7 @@
 import http from "http";
 import { Server } from "./server/server.js";
 import { ServerOptions } from "./server/server-options.js";
-import { MethodMap, PublicMethodMap, ServiceMap } from "./client/maps/method-map.js";
-import { ChannelMap } from "./client/channels/channel-map.js";
+import { ServerMap } from "./client/maps/socket-map.js";
 export { Server } from "./server/server.js";
 export { ServerSocket } from "./server/server-socket.js";
 export { MiddlewareType } from "./middleware/middleware.js";
@@ -16,53 +15,11 @@ export { MiddlewareType } from "./middleware/middleware.js";
  * @return {AGServer} websocket cluster server
  * @api public
  */
-export function listen<
-	TIncomingMap extends PublicMethodMap<TIncomingMap, TPrivateIncomingMap>,
-	TChannelMap extends ChannelMap<TChannelMap> = {},
-	TServiceMap extends ServiceMap<TServiceMap> = {},
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap> = {},
-	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap> = {},
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> = {}
->(): Server<TIncomingMap, {}, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap>;
-export function listen<
-	TIncomingMap extends PublicMethodMap<TIncomingMap, TPrivateIncomingMap>,
-	TChannelMap extends ChannelMap<TChannelMap> = {},
-	TServiceMap extends ServiceMap<TServiceMap> = {},
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap> = {},
-	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap> = {},
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> = {}
->(port: number, fn: () => void): Server<TIncomingMap, {}, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap>;
-export function listen<
-	TIncomingMap extends PublicMethodMap<TIncomingMap, TPrivateIncomingMap>,
-	TChannelMap extends ChannelMap<TChannelMap> = {},
-	TServiceMap extends ServiceMap<TServiceMap> = {},
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap> = {},
-	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap> = {},
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> = {}
->(
-	port: number, options: ServerOptions<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, {}>
-): Server<TIncomingMap, {}, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap>;
-export function listen<
-	TIncomingMap extends PublicMethodMap<TIncomingMap, TPrivateIncomingMap>,
-	TChannelMap extends ChannelMap<TChannelMap> = {},
-	TServiceMap extends ServiceMap<TServiceMap> = {},
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap> = {},
-	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap> = {},
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> = {}
->(
-	port: number, options: ServerOptions<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, {}>, fn: () => void
-): Server<TIncomingMap, {}, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap>;
-export function listen<
-	TIncomingMap extends PublicMethodMap<TIncomingMap, TPrivateIncomingMap>,
-	TChannelMap extends ChannelMap<TChannelMap> = {},
-	TServiceMap extends ServiceMap<TServiceMap> = {},
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap> = {},
-	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap> = {},
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> = {}
->(
-	port?: number, options?: ServerOptions<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, {}> | (() => void), fn?: () => void
-): Server<TIncomingMap, {}, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap> {
-
+export function listen<T extends ServerMap>(): Server<T>;
+//export function listen<T extends ServerMap>(port: number, fn: () => void): Server<T>;
+export function listen<T extends ServerMap>(port: number, options: ServerOptions<T>): Server<T>;
+export function listen<T extends ServerMap>(port: number, options: ServerOptions<T>, fn: () => void): Server<T>;
+export function listen<T extends ServerMap>(port?: number, options?: ServerOptions<T> | (() => void), fn?: () => void): Server<T> {
   if (typeof options === 'function') {
     fn = options;
     options = {};
@@ -92,14 +49,7 @@ export function listen<
  * @return {AGServer} websocket cluster server
  * @api public
  */
-export function attach<
-	TIncomingMap extends PublicMethodMap<TIncomingMap, TPrivateIncomingMap>,
-	TChannelMap extends ChannelMap<TChannelMap> = {},
-	TServiceMap extends ServiceMap<TServiceMap> = {},
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap> = {},
-	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap> = {},
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> = {}
->(server: http.Server, options?: ServerOptions<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, {}>): Server<TIncomingMap, {}, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap> {
+export function attach<T extends ServerMap>(server: http.Server, options?: ServerOptions<T>): Server<T> {
   if (options == null) {
     options = {};
   }

@@ -1,11 +1,11 @@
-import { MethodMap, PublicMethodMap, ServiceMap } from "../client/maps/method-map.js";
+import { PrivateMethodMap, PublicMethodMap, ServiceMap } from "../client/maps/method-map.js";
 import { MethodRequest, ServiceRequest } from "../request.js";
 import { RequestMiddleware } from "./request-middleware.js";
 
 export class OfflineMiddleware<
-	TServiceMap extends ServiceMap<TServiceMap> = {},
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap> = {},
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> = {}
+	TServiceMap extends ServiceMap = {},
+	TOutgoingMap extends PublicMethodMap = {},
+	TPrivateOutgoingMap extends PrivateMethodMap = {}
 > implements RequestMiddleware<TServiceMap, TOutgoingMap, TPrivateOutgoingMap> {
 
 	private _isOpen: boolean;

@@ -1,17 +1,13 @@
 import { Socket } from "../socket.js";
-import { MethodMap, PublicMethodMap, ServiceMap } from "./maps/method-map.js";
-import { ServerPrivateMap } from "./maps/server-private-map.js";
 import { ClientTransport } from "./client-transport.js";
 import { AutoReconnectOptions, ClientSocketOptions, ConnectOptions, parseClientOptions } from "./client-socket-options.js";
-import { ClientPrivateMap } from "./maps/client-private-map.js";
 import { setAuthTokenHandler } from "./handlers/set-auth-token.js";
 import { removeAuthTokenHandler } from "./handlers/remove-auth-token.js";
 import { SignedAuthToken } from "@socket-mesh/auth";
 import { hydrateError } from "@socket-mesh/errors";
 import { wait } from "../utils.js";
-import { ChannelMap } from "./channels/channel-map.js";
 import { Channels } from "./channels/channels.js";
-
+import { SocketMapFromClient, ClientMap } from "./maps/socket-map.js";
 
 /*
 export interface ClientSocketWsOptions extends BaseClientSocketOptions {
@@ -37,20 +33,13 @@ function createSocket(options: ClientSocketOptions | string | URL): ws.WebSocket
 }
 */
 
-export class ClientSocket<
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap & ServerPrivateMap>,
-	TChannelMap extends ChannelMap<TChannelMap> = {},
-	TServiceMap extends ServiceMap<TServiceMap> = {},
-	TSocketState extends object = {},
-	TIncomingMap extends MethodMap<TIncomingMap> = {},
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> = {}
-> extends Socket<TIncomingMap & ClientPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState> {
-	private readonly _clientTransport: ClientTransport<TIncomingMap & ClientPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>;
-	public readonly channels: Channels<TChannelMap, TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>;
+export class ClientSocket<T extends ClientMap> extends Socket<SocketMapFromClient<T>> {
+	private readonly _clientTransport: ClientTransport<T>;
+	public readonly channels: Channels<T>;
 
 	constructor(address: string | URL);
-	constructor(options: ClientSocketOptions<TOutgoingMap, TServiceMap, TSocketState, TIncomingMap & ClientPrivateMap, TPrivateOutgoingMap>);
-	constructor(options: ClientSocketOptions<TOutgoingMap, TServiceMap, TSocketState, TIncomingMap & ClientPrivateMap, TPrivateOutgoingMap> | string | URL) {
+	constructor(options: ClientSocketOptions<T>);
+	constructor(options: ClientSocketOptions<T> | string | URL) {
 		options = parseClientOptions(options);
 
 		options.handlers = options.handlers || {};
@@ -68,7 +57,7 @@ export class ClientSocket<
 		super(clientTransport);
 
 		this._clientTransport = clientTransport;
-		this.channels = new Channels<TChannelMap, TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>(this._clientTransport, options);
+		this.channels = new Channels<T>(this._clientTransport, options);
 
 		if (options.autoConnect !== false) {
 			this.connect(options);

@@ -6,22 +6,15 @@ import { DemuxedConsumableStream, StreamDemux } from "@socket-mesh/stream-demux"
 import { ChannelListeners } from "./channel-listeners.js";
 import { ChannelOutput } from "./channel-output.js";
 import { ChannelEvent, ChannelSubscribeEvent, ChannelSubscribeFailEvent, ChannelSubscribeStateChangeEvent, ChannelUnsubscribeEvent } from "./channel-events.js";
-import { ChannelMap } from "./channel-map.js";
-import { MethodMap, PublicMethodMap, ServiceMap } from "../maps/method-map.js";
-import { ServerPrivateMap } from "../maps/server-private-map.js";
 import { WritableStreamConsumer } from "@socket-mesh/writable-consumable-stream";
+import { ClientMap } from "../maps/socket-map.js";
 
 export class Channel<
-	TChannelMap extends ChannelMap<TChannelMap>,
-	TItem,
-	TIncomingMap extends MethodMap<TIncomingMap>,
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap & ServerPrivateMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>,
-	TSocketState extends object
+	TSocketMap extends ClientMap,
+	TItem
 > extends ConsumableStream<TItem> {
-	readonly channels: Channels<TChannelMap, TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>;
-	readonly listeners: ChannelListeners<TChannelMap>;
+	readonly channels: Channels<TSocketMap>;
+	readonly listeners: ChannelListeners<TSocketMap['Channel']>;
 	readonly name: string;
 	readonly output: ChannelOutput;
 
@@ -30,16 +23,9 @@ export class Channel<
 
 	constructor(
 		name: string,
-		channels: Channels<
-			TChannelMap,
-			TIncomingMap,
-			TServiceMap,
-			TOutgoingMap,
-			TPrivateOutgoingMap,
-			TSocketState
-		>,
+		channels: Channels<TSocketMap>,
 		eventDemux: StreamDemux<ChannelEvent>,
-		dataDemux: StreamDemux<TChannelMap[keyof TChannelMap & string]>
+		dataDemux: StreamDemux<TSocketMap['Channel'][keyof TSocketMap['Channel'] & string]>
 	) {
 		super();
 

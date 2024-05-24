@@ -2,7 +2,7 @@ import { StreamDemux, StreamDemuxStats } from "@socket-mesh/stream-demux";
 import { ChannelEvent } from "./channel-events.js";
 import { ChannelMap } from "./channel-map.js";
 
-export class ChannelsListeners<TChannelMap extends ChannelMap<TChannelMap>> {
+export class ChannelsListeners<TChannelMap extends ChannelMap> {
 	private readonly _eventDemux: StreamDemux<ChannelEvent>;
 
 	constructor(eventDemux: StreamDemux<ChannelEvent>) {

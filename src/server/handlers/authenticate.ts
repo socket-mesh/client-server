@@ -1,11 +1,11 @@
 import { RequestHandlerArgs } from "../../request-handler.js";
 import jwt from "jsonwebtoken";
-import { ServerSocketState } from "../server-socket-state.js";
 import { AuthTokenError, AuthTokenExpiredError, AuthTokenInvalidError, AuthTokenNotBeforeError } from "@socket-mesh/errors";
 import { AuthEngine } from "../auth-engine.js";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
 import { Socket } from "../../socket.js";
 import { SocketTransport } from "../../socket-transport.js";
+import { EmptySocketMapServer } from "../../client/maps/socket-map.js";
 
 export type AuthInfo = ValidAuthInfo | InvalidAuthInfo;
 
@@ -20,7 +20,7 @@ export interface ValidAuthInfo {
 }
 
 export async function authenticateHandler(
-	{ socket, transport, options }: RequestHandlerArgs<string, ServerSocketState>
+	{ socket, transport, options }: RequestHandlerArgs<string, EmptySocketMapServer>
 ): Promise<void> {
 	const state = transport.state;
 	const server = state.server;
@@ -61,8 +61,8 @@ function processTokenError(err: jwt.VerifyErrors): AuthTokenError {
 }
 
 export async function processAuthentication(
-	socket: Socket<{}, {}, {}, {}, ServerSocketState>,
-	transport: SocketTransport<{}, {}, {}, {}, ServerSocketState>,
+	socket: Socket<EmptySocketMapServer>,
+	transport: SocketTransport<EmptySocketMapServer>,
 	authInfo: AuthInfo
 ): Promise<void> {
 	if ('authError' in authInfo) {

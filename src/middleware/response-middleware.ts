@@ -3,8 +3,8 @@ import { AnyResponse } from "../response";
 import { Middleware } from "./middleware";
 
 export interface ResponseMiddleware<
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TIncomingMap extends MethodMap<TIncomingMap>
+	TServiceMap extends ServiceMap,
+	TIncomingMap extends MethodMap
 > extends Middleware {
 	type: 'response',
 

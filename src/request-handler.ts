@@ -1,39 +1,25 @@
 import { TimeoutError } from "@socket-mesh/errors";
-import { MethodMap, PublicMethodMap, ServiceMap } from "./client/maps/method-map.js";
 import { Socket } from "./socket.js";
 import { SocketTransport } from "./socket-transport.js";
+import { SocketMap } from "./client/maps/socket-map.js";
 
-export interface RequestHandlerArgsOptions<
-	TOptions,
-	TIncomingMap extends MethodMap<TIncomingMap>,
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>,
-	TSocketState extends object
-> {
+export interface RequestHandlerArgsOptions<TOptions, T extends SocketMap> {
 	method: string,
-	socket: Socket<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>,
-	transport: SocketTransport<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>,
+	socket: Socket<T>,
+	transport: SocketTransport<T>,
 	timeoutMs?: number | boolean,
 	options?: TOptions
 }
 
-export class RequestHandlerArgs<
-	TOptions,
-	TSocketState extends object = {},
-	TIncomingMap extends MethodMap<TIncomingMap> = {},
-	TServiceMap extends ServiceMap<TServiceMap> = {},
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap> = {},
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> = {}
-> {
+export class RequestHandlerArgs<TOptions, T extends SocketMap> {
 	public requestedAt: Date;
 	public timeoutMs?: number | boolean;
-	public socket: Socket<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>;
-	public transport: SocketTransport<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>;
+	public socket: Socket<T>;
+	public transport: SocketTransport<T>;
 	public method: string;
 	public options: TOptions;
 
-	constructor(options: RequestHandlerArgsOptions<TOptions, TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>) {
+	constructor(options: RequestHandlerArgsOptions<TOptions, T>) {
 		this.requestedAt = new Date();
 		this.method = options.method;
 		this.socket = options.socket;
@@ -57,12 +43,4 @@ export class RequestHandlerArgs<
 	}
 }
 
-export type RequestHandler<
-	TOptions,
-	U,
-	TIncomingMap extends MethodMap<TIncomingMap>,
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>,
-	TSocketState extends object
-> = (args: RequestHandlerArgs<TOptions, TSocketState, TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap>) => Promise<U>;
+export type RequestHandler<TOptions, U, T extends SocketMap> = (args: RequestHandlerArgs<TOptions, T>) => Promise<U>;

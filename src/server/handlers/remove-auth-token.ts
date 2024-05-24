@@ -1,8 +1,8 @@
-import { ClientPrivateMap } from "../../client/maps/client-private-map";
-import { SocketTransport } from "../../socket-transport";
+import { EmptySocketMapServer } from "../../client/maps/socket-map.js";
+import { SocketTransport } from "../../socket-transport.js";
 
 export async function deauthenticate(
-	transport: SocketTransport<{}, {}, {}, ClientPrivateMap, {}>
+	transport: SocketTransport<EmptySocketMapServer>
 ): Promise<boolean> {
 	if (await transport.deauthenticate()) {
 		await transport.transmit('#removeAuthToken');

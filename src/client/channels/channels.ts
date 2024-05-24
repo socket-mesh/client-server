@@ -4,12 +4,9 @@ import { StreamDemux, StreamDemuxWrapper } from "@socket-mesh/stream-demux";
 import { ChannelsListeners } from "./channels-listeners.js";
 import { Channel } from "./channel.js";
 import { ClientTransport } from "../client-transport.js";
-import { MethodMap, PublicMethodMap, ServiceMap } from "../maps/method-map.js";
-import { ServerPrivateMap } from "../maps/server-private-map.js";
 import { AbortablePromise } from "../../utils.js";
-import { ChannelMap } from "./channel-map.js";
 import { ChannelEvent, ChannelSubscribeStateChangeEvent } from "./channel-events.js";
-import { ClientPrivateMap } from "../maps/client-private-map.js";
+import { ClientMap } from "../maps/socket-map.js";
 
 interface ChannelDetails {
 	name: string,
@@ -23,27 +20,20 @@ export interface ChannelsOptions {
 	channelPrefix?: string
 }
 
-export class Channels<
-	TChannelMap extends ChannelMap<TChannelMap>,
-	TIncomingMap extends MethodMap<TIncomingMap>,
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap & ServerPrivateMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>,
-	TSocketState extends object
-> {
+export class Channels<T extends ClientMap> {
 	public autoSubscribeOnConnect: boolean;
 	public readonly channelPrefix?: string;
-	public readonly output: StreamDemuxWrapper<TChannelMap[keyof TChannelMap & string]>;
-	public readonly listeners: ChannelsListeners<TChannelMap>;
+	public readonly output: StreamDemuxWrapper<T['Channel'][keyof T['Channel'] & string]>;
+	public readonly listeners: ChannelsListeners<T['Channel']>;
 
-	protected readonly _transport: ClientTransport<TIncomingMap & ClientPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap & ServerPrivateMap, TSocketState>;
+	protected readonly _transport: ClientTransport<T>;
 	protected readonly _channelEventDemux: StreamDemux<ChannelEvent>;
-	protected readonly _channelDataDemux: StreamDemux<TChannelMap[keyof TChannelMap & string]>;
+	protected readonly _channelDataDemux: StreamDemux<T['Channel'][keyof T['Channel'] & string]>;
 	protected readonly _channelMap: { [channelName: string]: ChannelDetails };
 	protected _preparingPendingSubscriptions: boolean;
 
 	constructor(
-		transport: ClientTransport<TIncomingMap & ClientPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap & ServerPrivateMap, TSocketState>,
+		transport: ClientTransport<T>,
 		options?: ChannelsOptions
 	) {
 		if (!options) {
@@ -55,8 +45,8 @@ export class Channels<
 		this._channelMap = {};
 		this._channelEventDemux = new StreamDemux<ChannelEvent>();
 		this.listeners = new ChannelsListeners(this._channelEventDemux);
-		this._channelDataDemux = new StreamDemux<TChannelMap[keyof TChannelMap & string]>();
-		this.output = new StreamDemuxWrapper<TChannelMap[keyof TChannelMap & string]>(this._channelDataDemux);
+		this._channelDataDemux = new StreamDemux<T['Channel'][keyof T['Channel'] & string]>();
+		this.output = new StreamDemuxWrapper<T['Channel'][keyof T['Channel'] & string]>(this._channelDataDemux);
 		this._transport = transport;
 		this._preparingPendingSubscriptions = false;
 
@@ -75,24 +65,24 @@ export class Channels<
 		});
 	}
 
-	close(channelName?: keyof TChannelMap & string | string): void {
+	close(channelName?: keyof T['Channel'] & string | string): void {
 		this.output.close(channelName);
 		this.listeners.close(channelName);
 	}
 
-	kill(channelName?: keyof TChannelMap & string | string): void {
+	kill(channelName?: keyof T['Channel'] & string | string): void {
 		this.output.kill(channelName);
 		this.listeners.kill(channelName);
 	}
 
-	getBackpressure(channelName?: keyof TChannelMap & string | string): number {
+	getBackpressure(channelName?: keyof T['Channel'] & string | string): number {
 		return Math.max(
 			this.output.getBackpressure(channelName),
 			this.listeners.getBackpressure(channelName)
 		);
 	}
 
-	getState(channelName: keyof TChannelMap & string | string): ChannelState {
+	getState(channelName: keyof T['Channel'] & string | string): ChannelState {
 		const channel = this._channelMap[channelName];
 
 		if (channel) {
@@ -102,7 +92,7 @@ export class Channels<
 		return ChannelState.UNSUBSCRIBED;
 	}
 
-	getOptions(channelName: keyof TChannelMap & string | string): ChannelOptions {
+	getOptions(channelName: keyof T['Channel'] & string | string): ChannelOptions {
 		const channel = this._channelMap[channelName];
 
 		if (channel) {
@@ -111,9 +101,9 @@ export class Channels<
 		return {};
 	}
 
-	subscribe<T extends keyof TChannelMap & string>(channelName: T, options?: ChannelOptions): Channel<TChannelMap, TChannelMap[T], TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>;
-	subscribe<T>(channelName: string, options?: ChannelOptions): Channel<TChannelMap, T, TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>;
-	subscribe<T>(channelName: string, options?: ChannelOptions): Channel<TChannelMap, T, TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState> {
+	subscribe<U extends keyof T['Channel'] & string>(channelName: U, options?: ChannelOptions): Channel<T, T['Channel'][U]>;
+	subscribe<U>(channelName: string, options?: ChannelOptions): Channel<T, U>;
+	subscribe<U>(channelName: string, options?: ChannelOptions): Channel<T, U> {
 		options = options || {};
 		let channel = this._channelMap[channelName];
 
@@ -140,7 +130,7 @@ export class Channels<
 			channel.options = sanitizedOptions;
 		}
 
-		const channelIterable = new Channel<TChannelMap, T, TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>(
+		const channelIterable = new Channel<T, U>(
 			channelName,
 			this,
 			this._channelEventDemux,
@@ -200,12 +190,12 @@ export class Channels<
 		}
 	}
 
-	channel<T extends keyof TChannelMap & string>(channelName: T): Channel<TChannelMap, TChannelMap[T], TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>;
-	channel<T>(channelName: string): Channel<TChannelMap, T, TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>;
-	channel<T>(channelName: string): Channel<TChannelMap, T, TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState> {
+	channel<U extends keyof T['Channel'] & string>(channelName: U): Channel<T, T['Channel'][U]>;
+	channel<U>(channelName: string): Channel<T, U>;
+	channel<U>(channelName: string): Channel<T, U> {
 		const currentChannel = this._channelMap[channelName];
 
-		return new Channel<TChannelMap, T, TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>(
+		return new Channel<T, U>(
 			channelName,
 			this,
 			this._channelEventDemux,
@@ -213,7 +203,7 @@ export class Channels<
 		);
 	}
 
-	private decorateChannelName(channelName: keyof TChannelMap & string | string): string {
+	private decorateChannelName(channelName: keyof T['Channel'] & string | string): string {
 		return `${this.channelPrefix || ''}${channelName}`;
 	}
 
@@ -245,7 +235,7 @@ export class Channels<
 		});
 	}
 
-	unsubscribe(channelName: keyof TChannelMap & string | string): void {
+	unsubscribe(channelName: keyof T['Channel'] & string | string): void {
 		const channel = this._channelMap[channelName];
 
 		if (channel) {
@@ -358,7 +348,7 @@ export class Channels<
 		return subs;
 	}
 
-	isSubscribed(channelName: keyof TChannelMap & string | string, includePending?: boolean): boolean {
+	isSubscribed(channelName: keyof T['Channel'] & string | string, includePending?: boolean): boolean {
 		const channel = this._channelMap[channelName];
 
 		if (includePending) {
@@ -367,7 +357,7 @@ export class Channels<
 		return !!channel && channel.state === ChannelState.SUBSCRIBED;
 	}
 
-	transmitPublish(channelName: keyof TChannelMap & string | string, data: any): Promise<void> {
+	transmitPublish(channelName: keyof T['Channel'] & string | string, data: any): Promise<void> {
 		const pubData = {
 			channel: this.decorateChannelName(channelName),
 			data
@@ -375,7 +365,7 @@ export class Channels<
 		return this._transport.transmit('#publish', pubData);
 	}
 
-	invokePublish<T>(channelName: keyof TChannelMap & string | string, data: T): AbortablePromise<void> {
+	invokePublish<U>(channelName: keyof T['Channel'] & string | string, data: U): AbortablePromise<void> {
 		const pubData = {
 			channel: this.decorateChannelName(channelName),
 			data

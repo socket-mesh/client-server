@@ -1,37 +1,17 @@
-import { MethodMap, PublicMethodMap, ServiceMap } from "../client/maps/method-map.js";
 import { AnyPacket } from "../request.js";
 import { ServerPrivateMap } from "../client/maps/server-private-map.js";
-import { ServerSocketState } from "./server-socket-state.js";
-import { ClientPrivateMap } from "../client/maps/client-private-map.js";
 import { ServerSocket, ServerSocketOptions } from "./server-socket.js";
 import { SocketTransport } from "../socket-transport.js";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
 import { AuthError } from "@socket-mesh/errors";
-import { ChannelMap } from "../client/channels/channel-map.js";
+import { ServerMap, SocketMapFromServer } from "../client/maps/socket-map.js";
 
-export class ServerTransport<
-	TIncomingMap extends PublicMethodMap<TIncomingMap, TPrivateIncomingMap>,
-	TChannelMap extends ChannelMap<TChannelMap>,
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>,
-	TServerState extends object,
-	TSocketState extends object
-> extends SocketTransport<TIncomingMap & TPrivateIncomingMap & ServerPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap & ClientPrivateMap, TSocketState & ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>> {
+export class ServerTransport<T extends ServerMap> extends SocketTransport<SocketMapFromServer<T>> {
 	readonly service?: string;
 
 	constructor(
 		options:
-			ServerSocketOptions<
-				TIncomingMap,
-				TServiceMap,
-				TOutgoingMap,
-				TPrivateIncomingMap,
-				TPrivateOutgoingMap,
-				TSocketState & ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>,
-				ServerSocket<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TSocketState>
-			>
+			ServerSocketOptions<T, ServerSocket<T>>
 	) {
 		super(options);
 
@@ -39,7 +19,7 @@ export class ServerTransport<
 		this.webSocket = options.socket;
 	}
 
-	protected override onRequest(packet: AnyPacket<TServiceMap, TIncomingMap & TPrivateIncomingMap & ServerPrivateMap>): boolean {
+	protected override onRequest(packet: AnyPacket<T['Service'], T['Incoming'] & T['PrivateIncoming'] & ServerPrivateMap>): boolean {
 		let wasHandled = false;
 
 		if (!this.service || !('service' in packet) || packet.service === this.service) {

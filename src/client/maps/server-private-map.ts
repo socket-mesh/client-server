@@ -28,7 +28,9 @@ export interface SubscribeOptions extends ChannelOptions {
 	channel: string
 }
 
-export interface ServerPrivateMap {
+// Typescript automatically adds an index signature to type definitions (vs interfaces). 
+// If you add an index signature to an interface it has effects on IntelliSense.
+export type ServerPrivateMap = {
 	'#authenticate': (authToken: string) => void,
 	'#handshake': (options: HandshakeOptions) => HandshakeStatus,
 	'#publish': (options: PublishOptions) => void,

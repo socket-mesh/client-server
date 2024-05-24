@@ -1,7 +1,6 @@
 import assert from 'node:assert';
 import { beforeEach, afterEach, describe, it, mock } from "node:test";
 import { ClientSocket } from '../src/client/client-socket.js';
-import { ServerPrivateMap } from '../src/client/maps/server-private-map.js';
 import { SocketStatus } from '../src/socket.js';
 import { AuthStateChangeEvent, CloseEvent, DisconnectEvent } from '../src/socket-event.js';
 import { Server, listen } from '../src';
@@ -19,23 +18,45 @@ interface LoginRequest {
 	username: string
 }
 
-interface MyChannels {
+type MyChannels = {
 	foo: string,
 	bar: string
 }
 
-interface ServerIncomingMap {
+type ServerIncomingMap = {
 	login: (req: LoginRequest) => void,
 	performTask: (num: number) => void
 }
 
-let server: Server<ServerIncomingMap, {}, MyChannels, {}, {}, {}, {}>;
-let client: ClientSocket<ServerIncomingMap, MyChannels>;
+interface MyServerMap {
+	Channel: MyChannels,
+	Service: {},
+	Incoming: ServerIncomingMap,
+	Outgoing: {},
+	PrivateIncoming: {},
+	PrivateOutgoing: {},
+	ServerState: {},
+	State: {}
+}
+
+interface MyClientMap {
+	Channel: MyChannels,
+	Incoming: {},
+	Service: {},
+	Outgoing: ServerIncomingMap,
+	PrivateOutgoing: {},
+	State: {}
+};
+
+let server: Server<MyServerMap>;
+
+let client: ClientSocket<MyClientMap>;
+
 const PORT_NUMBER = 8009;
 const TOKEN_EXPIRY_IN_SECONDS = 60 * 60 * 24 * 366 * 5000;
 const authTokenName = 'socketmesh.authToken';
 
-const clientOptions: ClientSocketOptions<ServerIncomingMap> = {
+const clientOptions: ClientSocketOptions<MyClientMap> = {
 	authEngine: { authTokenName },
 	address: `ws://127.0.0.1:${PORT_NUMBER}`,
 	ackTimeoutMs: 200
@@ -55,7 +76,7 @@ const allowedUsers: { [name: string]: true } = {
 let performTaskTriggered: boolean;
 
 async function loginHandler(
-	{ transport, options }: RequestHandlerArgs<LoginRequest, {}, ServerIncomingMap & ServerPrivateMap>
+	{ transport, options }: RequestHandlerArgs<LoginRequest, MyServerMap>
 ): Promise<void> {
 	if (!allowedUsers[options.username]) {
 		const err = new Error('Failed to login');
@@ -72,7 +93,7 @@ async function loginHandler(
 }
 
 async function performTaskHandler(
-	{ options }: RequestHandlerArgs<number, {}, ServerIncomingMap & ServerPrivateMap>
+	{ options }: RequestHandlerArgs<number, MyServerMap>
 ): Promise<void> {
 	performTaskTriggered = true;
 	await wait(options);
@@ -80,7 +101,7 @@ async function performTaskHandler(
 
 describe('Integration tests', function () {
 	beforeEach(async function () {
-		server = listen<ServerIncomingMap, MyChannels, {}, {}, {}, {}>(
+		server = listen<MyServerMap>(
 			PORT_NUMBER,
 			{
 				authEngine: { authKey: SERVER_AUTH_KEY },

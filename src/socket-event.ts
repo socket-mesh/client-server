@@ -1,18 +1,14 @@
 import ws from "isomorphic-ws";
 import { ClientRequest, IncomingMessage } from "http";
 import { MethodPacket, ServicePacket } from "./request.js";
-import { PublicMethodMap, ServiceMap, MethodMap } from "./client/maps/method-map.js";
+import { PublicMethodMap, ServiceMap, MethodMap, PrivateMethodMap } from "./client/maps/method-map.js";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
 import { AnyResponse } from "./response.js";
 import { ChannelState } from "./client/channels/channel-state.js";
 import { ChannelOptions } from "./client/channels/channel-options.js";
+import { SocketMap } from "./client/maps/socket-map.js";
 
-export type SocketEvent<
-	TIncomingMap extends MethodMap<TIncomingMap>,
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>
-> =
+export type SocketEvent<T extends SocketMap> =
 	AuthStateChangeEvent |
 	RemoveAuthTokenEvent |
 	AuthenticationEvent |
@@ -25,8 +21,8 @@ export type SocketEvent<
 	DisconnectEvent | 
 	PingEvent |
 	PongEvent |
-	RequestEvent<TServiceMap, TIncomingMap> |
-	ResponseEvent<TServiceMap, TOutgoingMap, TPrivateOutgoingMap> |
+	RequestEvent<T['Service'], T['Incoming']> |
+	ResponseEvent<T['Service'], T['Outgoing'], T['PrivateOutgoing']> |
 	SubscribeEvent |
 	SubscribeFailEvent |
 	SubscribeStateChangeEvent |
@@ -98,14 +94,14 @@ export interface RemoveAuthTokenEvent {
 	oldAuthToken: SignedAuthToken
 }
 
-export interface RequestEvent<TServiceMap extends ServiceMap<TServiceMap>, TIncomingMap extends MethodMap<TIncomingMap>> {
+export interface RequestEvent<TServiceMap extends ServiceMap, TIncomingMap extends MethodMap> {
 	request: ServicePacket<TServiceMap> | MethodPacket<TIncomingMap>
 }
 
 export interface ResponseEvent<
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>
+	TServiceMap extends ServiceMap,
+	TOutgoingMap extends PublicMethodMap,
+	TPrivateOutgoingMap extends PrivateMethodMap
 > {
 	response: AnyResponse<TServiceMap, TOutgoingMap, TPrivateOutgoingMap>
 }

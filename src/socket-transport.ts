@@ -12,33 +12,27 @@ import { Socket, SocketStatus } from "./socket.js";
 import base64id from "base64id";
 import { RequestHandlerArgs } from "./request-handler.js";
 import { AbortablePromise } from "./utils.js";
+import { SocketMap } from "./client/maps/socket-map.js";
 
 export type CallIdGenerator = () => number;
 
-export interface SocketOptions<
-	TIncomingMap extends MethodMap<TIncomingMap>,
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>,
-	TSocketState extends object,
-	TSocket extends Socket<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState> = Socket<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>
-> {
+export interface SocketOptions<T extends SocketMap, TSocket extends Socket<T> = Socket<T>> {
 	ackTimeoutMs?: number,
 	id?: string,
 	callIdGenerator?: CallIdGenerator,
-	handlers?: HandlerMap<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>;
-	onUnhandledRequest?: (socket: TSocket, packet: AnyPacket<TServiceMap, TIncomingMap>) => boolean,
+	handlers?: HandlerMap<T>;
+	onUnhandledRequest?: (socket: TSocket, packet: AnyPacket<T['Service'], T['Incoming']>) => boolean,
 	codecEngine?: CodecEngine,
-	middleware?: AnyMiddleware<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap>[],
-	state?: TSocketState
+	middleware?: AnyMiddleware<T>[],
+	state?: T['State']
 }
 
-export interface InvokeMethodOptions<TMethodMap extends MethodMap<TMethodMap>, TMethod extends keyof TMethodMap> {
+export interface InvokeMethodOptions<TMethodMap extends MethodMap, TMethod extends keyof TMethodMap> {
 	method: TMethod,
 	ackTimeoutMs?: number | false
 }
 
-export interface InvokeServiceOptions<TServiceMap extends ServiceMap<TServiceMap>, TService extends keyof TServiceMap, TMethod extends keyof TServiceMap[TService]> {
+export interface InvokeServiceOptions<TServiceMap extends ServiceMap, TService extends keyof TServiceMap, TMethod extends keyof TServiceMap[TService]> {
 	service: TService,
 	method: TMethod,
 	ackTimeoutMs?: number | false
@@ -50,30 +44,24 @@ interface InvokeCallback<T> {
 	callback: (err: Error, result?: T) => void
 }
 
-export class SocketTransport<
-	TIncomingMap extends MethodMap<TIncomingMap>,
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>,
-	TSocketState extends object
-> {
-	private _socket: Socket<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>;
+export class SocketTransport<T extends SocketMap> {
+	private _socket: Socket<T>;
 	private _webSocket: ws.WebSocket;
 	private _isOpen: boolean;
 	private _authToken?: AuthToken;
 	private _signedAuthToken?: SignedAuthToken;
 	private readonly _callIdGenerator: CallIdGenerator;
 	private readonly _callbackMap: {[cid: number]: InvokeCallback<unknown>};
-	private _handlers: HandlerMap<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>;
-	private _onUnhandledRequest: (socket: this, packet: AnyPacket<TServiceMap, TIncomingMap>) => boolean;
+	private _handlers: HandlerMap<T>;
+	private _onUnhandledRequest: (socket: this, packet: AnyPacket<T['Service'], T['Incoming']>) => boolean;
 	public readonly codecEngine: CodecEngine;
-	public readonly middleware: AnyMiddleware<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap>[];
-	public readonly state: Partial<TSocketState>;
+	public readonly middleware: AnyMiddleware<T>[];
+	public readonly state: Partial<T['State']>;
 	public id: string;
 	public ackTimeoutMs: number;
 
 	protected constructor(
-		options?: SocketOptions<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>
+		options?: SocketOptions<T>
 	) {
 		let cid = 1;
 
@@ -113,11 +101,11 @@ export class SocketTransport<
 		});
 	}
 
-	public get socket(): Socket<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState> {
+	public get socket(): Socket<T> {
 		return this._socket;
 	}
 
-	public set socket(value: Socket<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>) {
+	public set socket(value: Socket<T>) {
 		this._socket = value;
 	}
 
@@ -287,8 +275,8 @@ export class SocketTransport<
 
 		this._socket.emit('message', { data, isBinary });
 
-		let packet: AnyPacket<TServiceMap, TIncomingMap> | AnyResponse<TServiceMap, TOutgoingMap, TPrivateOutgoingMap> |
-			(AnyPacket<TServiceMap, TIncomingMap> | AnyResponse<TServiceMap, TOutgoingMap, TPrivateOutgoingMap>)[];
+		let packet: AnyPacket<T['Service'], T['Incoming']> | AnyResponse<T['Service'], T['Outgoing'], T['PrivateOutgoing']> |
+			(AnyPacket<T['Service'], T['Incoming']> | AnyResponse<T['Service'], T['Outgoing'], T['PrivateOutgoing']>)[];
 
 		try {
 			packet = this.codecEngine.decode(message as string);
@@ -328,13 +316,13 @@ export class SocketTransport<
 		this._socket.emit('pong', { data });
 	}
 
-	protected onRequest(packet: AnyPacket<TServiceMap, TIncomingMap>): boolean {
+	protected onRequest(packet: AnyPacket<T['Service'], T['Incoming']>): boolean {
 		packet.requestedAt = new Date();
 		
 		const timeoutAt = typeof packet.ackTimeoutMs === 'number' ? new Date(packet.requestedAt.valueOf() + packet.ackTimeoutMs) : null;
 		let wasHandled = false;
 
-		const handler = this._handlers[(packet as MethodPacket<TIncomingMap>).method];
+		const handler = this._handlers[(packet as MethodPacket<T['Incoming']>).method];
 
 		if (handler) {
 			wasHandled = true;
@@ -353,7 +341,7 @@ export class SocketTransport<
 						rid: packet.cid,
 						timeoutAt,
 						data
-					} as MethodDataResponse<TIncomingMap>
+					} as MethodDataResponse<T['Incoming']>
 				])
 			}).catch(error => {
 				this.sendResponse([
@@ -375,7 +363,7 @@ export class SocketTransport<
 		return wasHandled;
 	}
 
-	protected onUnhandledRequest(packet: AnyPacket<TServiceMap, TIncomingMap>): boolean {
+	protected onUnhandledRequest(packet: AnyPacket<T['Service'], T['Incoming']>): boolean {
 		if (this._onUnhandledRequest) {
 			return this._onUnhandledRequest(this, packet);
 		}
@@ -383,7 +371,7 @@ export class SocketTransport<
 		return false;
 	}
 
-	protected onResponse(response: AnyResponse<TServiceMap, TOutgoingMap, TPrivateOutgoingMap>) {
+	protected onResponse(response: AnyResponse<T['Service'], T['Outgoing'], T['PrivateOutgoing']>) {
 		const map = this._callbackMap[response.rid];
 
 		if (map) {
@@ -492,9 +480,9 @@ export class SocketTransport<
 		this._socket.emit('connect', { isAuthenticated: !!this.signedAuthToken });
 	}
 
-	protected sendRequest(requests: (AnyRequest<TServiceMap, TPrivateOutgoingMap, TOutgoingMap>)[]): void;
-	protected sendRequest(index: number, requests: (AnyRequest<TServiceMap, TPrivateOutgoingMap, TOutgoingMap>)[]): void;
-	protected sendRequest(index: (AnyRequest<TServiceMap, TPrivateOutgoingMap, TOutgoingMap>)[] | number, requests?: (AnyRequest<TServiceMap, TPrivateOutgoingMap, TOutgoingMap>)[]): void {
+	protected sendRequest(requests: (AnyRequest<T['Service'], T['PrivateOutgoing'], T['Outgoing']>)[]): void;
+	protected sendRequest(index: number, requests: (AnyRequest<T['Service'], T['PrivateOutgoing'], T['Outgoing']>)[]): void;
+	protected sendRequest(index: (AnyRequest<T['Service'], T['PrivateOutgoing'], T['Outgoing']>)[] | number, requests?: (AnyRequest<T['Service'], T['PrivateOutgoing'], T['Outgoing']>)[]): void {
 		if (typeof index === 'object') {
 			requests = index;
 			index = 0;
@@ -511,7 +499,7 @@ export class SocketTransport<
 			}
 		}
 
-		const bypassRequests: AnyRequest<TServiceMap, TPrivateOutgoingMap, TOutgoingMap>[] = [];
+		const bypassRequests: AnyRequest<T['Service'], T['PrivateOutgoing'], T['Outgoing']>[] = [];
 
 		for (let i = 0; i < requests.length; i++) {
 			if (requests[i].bypassMiddleware) {
@@ -609,9 +597,9 @@ export class SocketTransport<
 		);
 	}
 
-	protected sendResponse(responses: (AnyResponse<TServiceMap, TIncomingMap>)[]): void;
-	protected sendResponse(index: number, responses: (AnyResponse<TServiceMap, TIncomingMap>)[]): void;
-	protected sendResponse(index: (AnyResponse<TServiceMap, TIncomingMap>)[] | number, responses?: (AnyResponse<TServiceMap, TIncomingMap>)[]): void {
+	protected sendResponse(responses: (AnyResponse<T['Service'], T['Incoming']>)[]): void;
+	protected sendResponse(index: number, responses: (AnyResponse<T['Service'], T['Incoming']>)[]): void;
+	protected sendResponse(index: (AnyResponse<T['Service'], T['Incoming']>)[] | number, responses?: (AnyResponse<T['Service'], T['Incoming']>)[]): void {
 		if (typeof index === 'object') {
 			responses = index;
 			index = 0;
@@ -677,19 +665,19 @@ export class SocketTransport<
 		);
 	}
 
-	public transmit<TMethod extends keyof TOutgoingMap>(
-		method: TMethod, arg?: Parameters<TOutgoingMap[TMethod]>[0], bypassMiddleware?: boolean): Promise<void>;
-	public transmit<TService extends keyof TServiceMap, TMethod extends keyof TServiceMap[TService]>(
-		options: [TService, TMethod], arg?: Parameters<TServiceMap[TService][TMethod]>[0], bypassMiddleware?: boolean): Promise<void>;
-	public transmit<TMethod extends keyof TPrivateOutgoingMap>(
-		method: TMethod, arg?: Parameters<TPrivateOutgoingMap[TMethod]>[0], bypassMiddleware?: boolean): Promise<void>;
+	public transmit<TMethod extends keyof T['Outgoing']>(
+		method: TMethod, arg?: Parameters<T['Outgoing'][TMethod]>[0], bypassMiddleware?: boolean): Promise<void>;
+	public transmit<TService extends keyof T['Service'], TMethod extends keyof T['Service'][TService]>(
+		options: [TService, TMethod], arg?: Parameters<T['Service'][TService][TMethod]>[0], bypassMiddleware?: boolean): Promise<void>;
+	public transmit<TMethod extends keyof T['PrivateOutgoing']>(
+		method: TMethod, arg?: Parameters<T['PrivateOutgoing'][TMethod]>[0], bypassMiddleware?: boolean): Promise<void>;
 	public transmit<
-		TService extends keyof TServiceMap,
-		TServiceMethod extends keyof TServiceMap[TService],
-		TMethod extends keyof TOutgoingMap
+		TService extends keyof T['Service'],
+		TServiceMethod extends keyof T['Service'][TService],
+		TMethod extends keyof T['Outgoing']
 	>(
 		serviceAndMethod: TMethod | [TService, TServiceMethod],
-		arg?: (Parameters<TOutgoingMap[TMethod] | TServiceMap[TService][TServiceMethod]>)[0],
+		arg?: (Parameters<T['Outgoing'][TMethod] | T['Service'][TService][TServiceMethod]>)[0],
 		bypassMiddleware?: boolean
 	 ): Promise<void> {
 		let service: TService;
@@ -703,7 +691,7 @@ export class SocketTransport<
 			method = serviceAndMethod;
 		}
 
-		const request: TransmitMethodRequest<TOutgoingMap, TMethod> | TransmitServiceRequest<TServiceMap, TService, TServiceMethod> = 
+		const request: TransmitMethodRequest<T['Outgoing'], TMethod> | TransmitServiceRequest<T['Service'], TService, TServiceMethod> = 
 			Object.assign(
 				{
 					cid: this._callIdGenerator(),
@@ -712,10 +700,10 @@ export class SocketTransport<
 				service ? {
 					service,
 					method: serviceMethod,
-					data: arg as Parameters<TServiceMap[TService][TServiceMethod]>[0]
+					data: arg as Parameters<T['Service'][TService][TServiceMethod]>[0]
 				} : {
 					method,
-					data: arg as Parameters<TOutgoingMap[TMethod]>[0]
+					data: arg as Parameters<T['Outgoing'][TMethod]>[0]
 				}
 			);
 
@@ -737,28 +725,28 @@ export class SocketTransport<
 		return promise;
 	}
 
-	public invoke<TMethod extends keyof TOutgoingMap>(
-		method: TMethod, arg?: Parameters<TOutgoingMap[TMethod]>[0], bypassMiddleware?: boolean): AbortablePromise<FunctionReturnType<TOutgoingMap[TMethod]>>;
-	public invoke<TService extends keyof TServiceMap, TMethod extends keyof TServiceMap[TService]>(
-		options: [TService, TMethod, (number | false)?], arg?: Parameters<TServiceMap[TService][TMethod]>[0], bypassMiddleware?: boolean): AbortablePromise<FunctionReturnType<TServiceMap[TService][TMethod]>>;
-	public invoke<TService extends keyof TServiceMap, TMethod extends keyof TServiceMap[TService]>(
-		options: InvokeServiceOptions<TServiceMap, TService, TMethod>, arg?: Parameters<TServiceMap[TService][TMethod]>[0], bypassMiddleware?: boolean): AbortablePromise<FunctionReturnType<TServiceMap[TService][TMethod]>>;
-	public invoke<TMethod extends keyof TOutgoingMap>(
-		options: InvokeMethodOptions<TOutgoingMap, TMethod>, arg?: Parameters<TOutgoingMap[TMethod]>[0], bypassMiddleware?: boolean): AbortablePromise<FunctionReturnType<TOutgoingMap[TMethod]>>;
-	public invoke<TMethod extends keyof TPrivateOutgoingMap>(
-		method: TMethod, arg: Parameters<TPrivateOutgoingMap[TMethod]>[0], bypassMiddleware?: boolean): AbortablePromise<FunctionReturnType<TPrivateOutgoingMap[TMethod]>>;
-	public invoke<TMethod extends keyof TPrivateOutgoingMap>(
-		options: InvokeMethodOptions<TPrivateOutgoingMap, TMethod>, arg?: Parameters<TPrivateOutgoingMap[TMethod]>[0], bypassMiddleware?: boolean): AbortablePromise<FunctionReturnType<TPrivateOutgoingMap[TMethod]>>;
+	public invoke<TMethod extends keyof T['Outgoing']>(
+		method: TMethod, arg?: Parameters<T['Outgoing'][TMethod]>[0], bypassMiddleware?: boolean): AbortablePromise<FunctionReturnType<T['Outgoing'][TMethod]>>;
+	public invoke<TService extends keyof T['Service'], TMethod extends keyof T['Service'][TService]>(
+		options: [TService, TMethod, (number | false)?], arg?: Parameters<T['Service'][TService][TMethod]>[0], bypassMiddleware?: boolean): AbortablePromise<FunctionReturnType<T['Service'][TService][TMethod]>>;
+	public invoke<TService extends keyof T['Service'], TMethod extends keyof T['Service'][TService]>(
+		options: InvokeServiceOptions<T['Service'], TService, TMethod>, arg?: Parameters<T['Service'][TService][TMethod]>[0], bypassMiddleware?: boolean): AbortablePromise<FunctionReturnType<T['Service'][TService][TMethod]>>;
+	public invoke<TMethod extends keyof T['Outgoing']>(
+		options: InvokeMethodOptions<T['Outgoing'], TMethod>, arg?: Parameters<T['Outgoing'][TMethod]>[0], bypassMiddleware?: boolean): AbortablePromise<FunctionReturnType<T['Outgoing'][TMethod]>>;
+	public invoke<TMethod extends keyof T['PrivateOutgoing']>(
+		method: TMethod, arg: Parameters<T['PrivateOutgoing'][TMethod]>[0], bypassMiddleware?: boolean): AbortablePromise<FunctionReturnType<T['PrivateOutgoing'][TMethod]>>;
+	public invoke<TMethod extends keyof T['PrivateOutgoing']>(
+		options: InvokeMethodOptions<T['PrivateOutgoing'], TMethod>, arg?: Parameters<T['PrivateOutgoing'][TMethod]>[0], bypassMiddleware?: boolean): AbortablePromise<FunctionReturnType<T['PrivateOutgoing'][TMethod]>>;
 	public invoke<
-		TService extends keyof TServiceMap,
-		TServiceMethod extends keyof TServiceMap[TService],
-		TMethod extends keyof TOutgoingMap,
-		TPrivateMethod extends keyof TPrivateOutgoingMap
+		TService extends keyof T['Service'],
+		TServiceMethod extends keyof T['Service'][TService],
+		TMethod extends keyof T['Outgoing'],
+		TPrivateMethod extends keyof T['PrivateOutgoing']
 	> (
-		methodOptions: TMethod | TPrivateMethod | [TService, TServiceMethod, (number | false)?] | InvokeServiceOptions<TServiceMap, TService, TServiceMethod> | InvokeMethodOptions<TOutgoingMap, TMethod> | InvokeMethodOptions<TPrivateOutgoingMap, TPrivateMethod>,
-		arg?: (Parameters<TOutgoingMap[TMethod] | TPrivateOutgoingMap[TPrivateMethod] | TServiceMap[TService][TServiceMethod]>)[0],
+		methodOptions: TMethod | TPrivateMethod | [TService, TServiceMethod, (number | false)?] | InvokeServiceOptions<T['Service'], TService, TServiceMethod> | InvokeMethodOptions<T['Outgoing'], TMethod> | InvokeMethodOptions<T['PrivateOutgoing'], TPrivateMethod>,
+		arg?: (Parameters<T['Outgoing'][TMethod] | T['PrivateOutgoing'][TPrivateMethod] | T['Service'][TService][TServiceMethod]>)[0],
 		bypassMiddleware?: boolean
-	): AbortablePromise<FunctionReturnType<TServiceMap[TService][TServiceMethod] | TOutgoingMap[TMethod] | TPrivateOutgoingMap[TPrivateMethod]>> {
+	): AbortablePromise<FunctionReturnType<T['Service'][TService][TServiceMethod] | T['Outgoing'][TMethod] | T['PrivateOutgoing'][TPrivateMethod]>> {
 
 		let service: TService;
 		let serviceMethod: TServiceMethod;
@@ -786,7 +774,7 @@ export class SocketTransport<
 
 		let callbackMap = this._callbackMap;
 
-		const request: InvokeMethodRequest<TOutgoingMap, TMethod> | InvokeMethodRequest<TPrivateOutgoingMap, TPrivateMethod> | InvokeServiceRequest<TServiceMap, TService, TServiceMethod> = 
+		const request: InvokeMethodRequest<T['Outgoing'], TMethod> | InvokeMethodRequest<T['PrivateOutgoing'], TPrivateMethod> | InvokeServiceRequest<T['Service'], TService, TServiceMethod> = 
 			Object.assign(
 				{
 					cid: this._callIdGenerator(),
@@ -797,16 +785,16 @@ export class SocketTransport<
 				service ? {
 					service,
 					method: serviceMethod,
-					data: arg as Parameters<TServiceMap[TService][TServiceMethod]>[0]
+					data: arg as Parameters<T['Service'][TService][TServiceMethod]>[0]
 				} : {
 					method: method as TMethod,
-					data: arg as Parameters<TOutgoingMap[TMethod]>[0]
+					data: arg as Parameters<T['Outgoing'][TMethod]>[0]
 				}
 			);
 
 		let abort: () => void;
 
-		const promise = new Promise<FunctionReturnType<TServiceMap[TService][TServiceMethod] | TOutgoingMap[TMethod] | TPrivateOutgoingMap[TPrivateMethod]>>((resolve, reject) => {
+		const promise = new Promise<FunctionReturnType<T['Service'][TService][TServiceMethod] | T['Outgoing'][TMethod] | T['PrivateOutgoing'][TPrivateMethod]>>((resolve, reject) => {
 			if (request.ackTimeoutMs) {
 				request.timeoutId = setTimeout(
 					() => {
@@ -832,7 +820,7 @@ export class SocketTransport<
 				}
 			}
 
-			request.callback = (err: Error, result: FunctionReturnType<TServiceMap[TService][TServiceMethod] | TOutgoingMap[TMethod]>) => {
+			request.callback = (err: Error, result: FunctionReturnType<T['Service'][TService][TServiceMethod] | T['Outgoing'][TMethod]>) => {
 				delete callbackMap[request.cid];
 				request.callback = null;
 
