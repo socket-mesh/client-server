@@ -19,6 +19,12 @@ import { ServerOptions } from "./server-options.js";
 import { SocketMapFromServer } from "../client/maps/socket-map.js";
 import { ServerMap } from "../client/maps/server-map.js";
 import { ClientMapFromServer } from "../client/maps/client-map.js";
+import { subscribeHandler } from "./handlers/subscribe.js";
+import { unsubscribeHandler } from "./handlers/unsubscribe.js";
+import { Broker } from "./broker/broker.js";
+import { SimpleBroker } from "./broker/simple-broker.js";
+import { Exchange } from "./broker/exchange.js";
+import { publishHandler } from "./handlers/publish.js";
 
 interface ClientSocketDetails<T extends ServerMap> {
 	type: 'client',
@@ -42,10 +48,14 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 
 	//| ServerSocket<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TSocketState>
 	public ackTimeoutMs: number;
+	public allowClientPublish: boolean;
 	public pingIntervalMs: number;
 	public isPingTimeoutDisabled: boolean;
 	public pingTimeoutMs: number;
+	public socketChannelLimit?: number;
+
 	public readonly auth: AuthEngine;
+	public readonly brokerEngine: Broker<T['Channel']>;
 	public readonly codecEngine: CodecEngine;
 	public readonly httpServer: HttpServer;
 
@@ -64,6 +74,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 
 		this._clients = {};
 		this.ackTimeoutMs = options.ackTimeoutMs || 10000;
+		this.allowClientPublish = options.allowClientPublish ?? true;
 		this.pingIntervalMs = options.pingIntervalMs || 8000;
 		this.isPingTimeoutDisabled = (options.pingTimeoutMs === false);
 		this.pingTimeoutMs = options.pingTimeoutMs || 20000;
@@ -74,8 +85,10 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 		});
 
 		this.auth = isAuthEngine(options.authEngine) ? options.authEngine : new DefaultAuthEngine(options.authEngine);
+		this.brokerEngine = options.brokerEngine || new SimpleBroker<T['Channel']>();
 		this.codecEngine = options.codecEngine || defaultCodec;
 		this.middleware = options.middleware || [];
+		this.socketChannelLimit = options.socketChannelLimit;
 		this.httpServer = options.server;
 		this._handlers = options.handlers || {};
 
@@ -84,7 +97,10 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 			{
 				"#authenticate": authenticateHandler,
 				"#handshake": handshakeHandler,
-				"#removeAuthToken": removeAuthTokenHandler
+				"#publish": publishHandler,
+				"#removeAuthToken": removeAuthTokenHandler,
+				"#subscribe": subscribeHandler,
+				"#unsubscribe": unsubscribeHandler
 			}
 		);
 
@@ -96,10 +112,25 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 		this._wss.on('headers', this.onHeaders.bind(this));
 		this._wss.on('listening', this.onListening.bind(this));
 
-		setTimeout(() => {
-			this._isReady = true;
-			this.emit('ready', {});
-		}, 0);
+		(async () => {
+			for await (let { error } of this.brokerEngine.listen('error')) {
+				this.emit('warning', { error });
+			}
+		})();
+
+		if (this.brokerEngine.isReady) {
+			setTimeout(() => {
+				this._isReady = true;
+				this.emit('ready', {});
+			}, 0);	
+		} else {
+			this._isReady = false;
+			(async () => {
+				await this.brokerEngine.listen('ready').once();
+				this._isReady = true;
+				this.emit('ready', {});
+			})();
+		}
 	}
 
 	close(keepSocketsOpen?: boolean): Promise<void> {
@@ -124,6 +155,10 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 				this._pingIntervalId = null;
 			}
 		});
+	}
+
+	public get exchange(): Exchange<T['Channel']> {
+		return this.brokerEngine.exchange;
 	}
 
 	public get isListening(): boolean {
@@ -284,6 +319,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 	emit(event: 'socketUnsubscribe', data: SocketUnsubscribeEvent<T>): void;
 	emit(event: 'socketUnexpectedResponse', data: SocketUnexpectedResponseEvent<T>): void;
 	emit(event: 'socketUpgrade', data: SocketUpgradeEvent<T>): void;
+	emit(event: "warning", data: ErrorEvent): void;
 	emit(event: string, data: any): void {
 		super.emit(event, data);
 	}
@@ -318,67 +354,8 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 	listen(event: 'socketUnsubscribe'): DemuxedConsumableStream<SocketUnsubscribeEvent<T>>;
 	listen(event: 'socketUnexpectedResponse'): DemuxedConsumableStream<SocketUnexpectedResponseEvent<T>>;
 	listen(event: 'socketUpgrade'): DemuxedConsumableStream<SocketUpgradeEvent<T>>;
-	listen(eventName?: string): DemuxedConsumableStream<StreamEvent<any>> | DemuxedConsumableStream<ServerEvent<T>> {
-		return super.listen(eventName);
+	listen(event: "warning"): DemuxedConsumableStream<ErrorEvent>;
+	listen(event?: string): DemuxedConsumableStream<StreamEvent<any>> | DemuxedConsumableStream<ServerEvent<T>> {
+		return super.listen(event);
 	}
-
-
-
-
-
-/*
-	listen(port?: number, hostname?: string, backlog?: number, listeningListener?: () => void): this;
-	listen(port?: number, hostname?: string, listeningListener?: () => void): this;
-	listen(port?: number, backlog?: number, listeningListener?: () => void): this;
-	listen(port?: number, listeningListener?: () => void): this;
-	listen(path: string, backlog?: number, listeningListener?: () => void): this;
-	listen(path: string, listeningListener?: () => void): this;
-	listen(options: net.ListenOptions, listeningListener?: () => void): this;
-	listen(handle: any, backlog?: number, listeningListener?: () => void): this;
-	listen(handle: any, listeningListener?: () => void): this;
-	listen(): this {
-		this.server.listen.apply(this.server, arguments);
-
-		return this;
-	}
-
-	on(event: 'close', listener: () => void): this;
-	on(event: 'connection', listener: ConnectionListener): this;
-	on(event: 'error', listener: (err: Error) => void): this;	
-	on(event: 'listening', listener: () => void): this;
-	on(event: 'drop', listener: (data?: net.DropArgument) => void): this;
-	on(event: string, listener: (...args: any[]) => void): this;
-	on(event: string, listener: (...args: any[]) => void): this {
-		if (event === 'connection' || event === 'error') {
-			super.on.call(this, event, listener);
-		} else {
-			this.server.on(event, listener);
-		}
-
-		return this;
-	}
-
-	removeListener(event: 'connection', listener: ConnectionListener): this;	
-	removeListener(event: 'error', listener: (err: Error) => void): this;
-	removeListener(eventName: string | symbol, listener: (...args: any[]) => void): this
-	removeListener(): this {
-		super.removeListener.apply(this, arguments);
-		this.server.removeListener.apply(this.server, arguments);
-
-		return this;
-	}
-
-	removeAllListeners(event?: string | symbol): this {
-		super.removeAllListeners.apply(this, arguments);
-		this.removeAllListeners.apply(this.server, arguments);
-
-		return this;
-	}
-
-	close(callback?: (err?: Error) => void): this {
-		this.server.close(callback);
-
-		return this;
-	}
-*/
 }

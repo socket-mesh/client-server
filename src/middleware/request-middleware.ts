@@ -1,4 +1,4 @@
-import { MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap } from "../client/maps/method-map";
+import { PrivateMethodMap, PublicMethodMap, ServiceMap } from "../client/maps/method-map";
 import { AnyRequest } from "../request";
 import { Middleware } from "./middleware";
 

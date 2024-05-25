@@ -32,10 +32,7 @@ export class Channels<T extends ClientMap> {
 	protected readonly _channelMap: { [channelName: string]: ChannelDetails };
 	protected _preparingPendingSubscriptions: boolean;
 
-	constructor(
-		transport: ClientTransport<T>,
-		options?: ChannelsOptions
-	) {
+	constructor(transport: ClientTransport<T>, options?: ChannelsOptions) {
 		if (!options) {
 			options = {};
 		}
@@ -61,7 +58,10 @@ export class Channels<T extends ClientMap> {
 				if (this.autoSubscribeOnConnect) {
 					this.processPendingSubscriptions();
 				}		
-			}
+			},
+			onClose: () => {
+				this.suspendSubscriptions();
+			},
 		});
 	}
 
@@ -99,6 +99,12 @@ export class Channels<T extends ClientMap> {
 			return { ...channel.options };
 		}
 		return {};
+	}
+
+	private suspendSubscriptions(): void {
+		for (const channel in this._channelMap) {
+			this.triggerChannelUnsubscribe(this._channelMap[channel], true);
+		}
 	}
 
 	subscribe<U extends keyof T['Channel'] & string>(channelName: U, options?: ChannelOptions): Channel<T, T['Channel'][U]>;
@@ -147,7 +153,7 @@ export class Channels<T extends ClientMap> {
 		if (
 			this._transport.status === 'open' &&
 			!this._preparingPendingSubscriptions &&
-			channel.subscribePromise &&
+			!channel.subscribePromise &&
 			meetsAuthRequirements
 		) {
 			const subscriptionOptions: ChannelOptions = {};
@@ -166,7 +172,7 @@ export class Channels<T extends ClientMap> {
 					...subscriptionOptions
 				}
 			) as AbortablePromise<void>;
-			
+
 			channel.subscribePromise.then(() => {
 				delete channel.subscribePromise;
 				this.triggerChannelSubscribe(channel, subscriptionOptions);
@@ -205,6 +211,14 @@ export class Channels<T extends ClientMap> {
 
 	private decorateChannelName(channelName: keyof T['Channel'] & string | string): string {
 		return `${this.channelPrefix || ''}${channelName}`;
+	}
+
+	private undecorateChannelName(channelName: keyof T['Channel'] & string | string): string {
+		if (this.channelPrefix && channelName.indexOf(this.channelPrefix) === 0) {
+			return channelName.replace(this.channelPrefix, '');
+		}
+
+		return channelName;
 	}
 
 	processPendingSubscriptions(): void {
@@ -357,7 +371,9 @@ export class Channels<T extends ClientMap> {
 		return !!channel && channel.state === ChannelState.SUBSCRIBED;
 	}
 
-	transmitPublish(channelName: keyof T['Channel'] & string | string, data: any): Promise<void> {
+	transmitPublish<U extends keyof T['Channel'] & string>(channelName: U, data: T['Channel'][U]): Promise<void>;
+	transmitPublish<U>(channelName: string, data: U): Promise<void>;
+	transmitPublish<U>(channelName: keyof T['Channel'] & string | string, data: U): Promise<void> {
 		const pubData = {
 			channel: this.decorateChannelName(channelName),
 			data
@@ -365,6 +381,8 @@ export class Channels<T extends ClientMap> {
 		return this._transport.transmit('#publish', pubData);
 	}
 
+	invokePublish<U extends keyof T['Channel'] & string>(channelName: keyof T['Channel'] & string, data: T['Channel'][U]): AbortablePromise<void>
+	invokePublish<U>(channelName: string, data: U): AbortablePromise<void>;
 	invokePublish<U>(channelName: keyof T['Channel'] & string | string, data: U): AbortablePromise<void> {
 		const pubData = {
 			channel: this.decorateChannelName(channelName),
@@ -372,5 +390,16 @@ export class Channels<T extends ClientMap> {
 		};
 
 		return this._transport.invoke('#publish', pubData) as AbortablePromise<void>;
+	}
+
+	write<U extends keyof T['Channel'] & string>(channelName: keyof T['Channel'] & string, data: T['Channel'][U]): void
+	write<U>(channelName: string, data: U): void;
+	write<U extends T["Channel"][keyof T["Channel"] & string]>(channelName: string, data: U): void {
+		const undecoratedChannelName = this.undecorateChannelName(channelName);
+		const isSubscribed = this.isSubscribed(undecoratedChannelName, true);
+
+		if (isSubscribed) {
+			this._channelDataDemux.write(undecoratedChannelName, data);
+		}
 	}
 }

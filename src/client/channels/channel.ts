@@ -38,13 +38,22 @@ export class Channel<
 		this._dataStream = dataDemux.listen(this.name);
 	}
 
-	listen(eventName: 'subscribe'): DemuxedConsumableStream<ChannelSubscribeEvent>;
-	listen(eventName: 'subscribeStateChange'): DemuxedConsumableStream<ChannelSubscribeStateChangeEvent>;
-	listen(eventName: 'subscribeFail'): DemuxedConsumableStream<ChannelSubscribeFailEvent>;
-	listen(eventName: 'unsubscribe'): DemuxedConsumableStream<ChannelUnsubscribeEvent>;
-	listen<U>(eventName: string): DemuxedConsumableStream<U>;
-	listen<U>(eventName: string): DemuxedConsumableStream<ChannelEvent | U> {
-		return this._eventDemux.listen(`${this.name}/${eventName}`);
+	emit(event: 'subscribe', data: ChannelSubscribeEvent): void;
+	emit(event: 'subscribeStateChange', data: ChannelSubscribeStateChangeEvent): void;
+	emit(event: 'subscribeFail', data: ChannelSubscribeFailEvent): void;
+	emit(event: 'unsubscribe', data: ChannelUnsubscribeEvent): void;
+	emit<U>(event: string, data: U): void;
+	emit<U>(event: string, data: U): void {
+		this._eventDemux.write(`${this.name}/${event}`, data);
+	}
+
+	listen(event: 'subscribe'): DemuxedConsumableStream<ChannelSubscribeEvent>;
+	listen(event: 'subscribeStateChange'): DemuxedConsumableStream<ChannelSubscribeStateChangeEvent>;
+	listen(event: 'subscribeFail'): DemuxedConsumableStream<ChannelSubscribeFailEvent>;
+	listen(event: 'unsubscribe'): DemuxedConsumableStream<ChannelUnsubscribeEvent>;
+	listen<U>(event: string): DemuxedConsumableStream<U>;
+	listen<U>(event: string): DemuxedConsumableStream<ChannelEvent | U> {
+		return this._eventDemux.listen(`${this.name}/${event}`);
 	}
 
 	createConsumer(timeout?: number): WritableStreamConsumer<TItem> {
@@ -55,12 +64,20 @@ export class Channel<
 		this.channels.close(this.name);
 	}
 
+	closeEvent(event: string): void {
+		this._eventDemux.close(`${this.name}/${event}`);
+	}
+
 	getBackpressure(): number {
 		return this.channels.getBackpressure(this.name);
 	}
 
 	kill(): void {
 		this.channels.kill(this.name);
+	}
+
+	killEvent(event: string): void {
+		this._eventDemux.kill(`${this.name}/${event}`);
 	}
 
 	get state(): ChannelState {

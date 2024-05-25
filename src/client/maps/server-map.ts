@@ -2,7 +2,7 @@ import { SignedAuthToken } from "@socket-mesh/auth";
 import { ChannelOptions } from "../channels/channel-options.js";
 import { ChannelMap } from "../channels/channel-map.js";
 import { PrivateMethodMap, PublicMethodMap, ServiceMap } from "./method-map.js";
-import { ClientPrivateMap } from "./client-map.js";
+import { ClientPrivateMap, PublishOptions } from "./client-map.js";
 
 export interface ServerMap {
 	Channel: ChannelMap,
@@ -42,11 +42,6 @@ export interface HandshakeAuthenticatedStatus {
 	id: string,
 	pingTimeoutMs: number,
 	authToken: SignedAuthToken
-}
-
-export interface PublishOptions {
-	channel: string,
-	data: any
 }
 
 export interface SubscribeOptions extends ChannelOptions {

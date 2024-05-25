@@ -9,6 +9,7 @@ import { wait } from "../utils.js";
 import { Channels } from "./channels/channels.js";
 import { SocketMapFromClient } from "./maps/socket-map.js";
 import { ClientMap } from "./maps/client-map.js";
+import { publishHandler } from "./handlers/publish.js";
 
 /*
 export interface ClientSocketWsOptions extends BaseClientSocketOptions {
@@ -48,6 +49,7 @@ export class ClientSocket<T extends ClientMap> extends Socket<SocketMapFromClien
 		Object.assign(
 			options.handlers,
 			{
+				"#publish": publishHandler,
 				"#setAuthToken": setAuthTokenHandler,
 				"#removeAuthToken": removeAuthTokenHandler
 			}

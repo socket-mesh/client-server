@@ -101,7 +101,7 @@ describe('Integration tests', function () {
 
 		performTaskTriggered = false;
 
-		await server.listen('ready').once();
+		await server.listen('ready').once(100);
 	});
 
 	afterEach(async function () {
@@ -184,14 +184,14 @@ describe('Integration tests', function () {
 		it('Should not send back error if JWT is not provided in handshake', async function () {
 			client = new ClientSocket(clientOptions);
 
-			await client.listen('connect').once();
+			await client.listen('connect').once(100);
 		});
 
 		it('Should be authenticated on connect if previous JWT token is present', async function () {
 			global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
 			client = new ClientSocket(clientOptions);
 
-			const event = await client.listen('connect').once();
+			const event = await client.listen('connect').once(100);
 
 			assert.strictEqual(client.signedAuthToken, validSignedAuthTokenBob);
 			assert.strictEqual(client.authToken.username, 'bob');
@@ -203,7 +203,7 @@ describe('Integration tests', function () {
 			let authenticateTriggered = false;
 			let authStateChangeTriggered = false;
 
-			await client.listen('connect').once();
+			await client.listen('connect').once(100);
 
 			assert.strictEqual(client.signedAuthToken, validSignedAuthTokenBob);
 			assert.strictEqual(client.authToken.username, 'bob');
@@ -231,11 +231,11 @@ describe('Integration tests', function () {
 //				authSignAsync: false
 			client = new ClientSocket(clientOptions);
 
-			await client.listen('connect').once();
+			await client.listen('connect').once(100);
 
 			await Promise.all([
-				client.invoke('login', {username: 'bob'}),
-				client.listen('authenticate').once()
+				client.invoke('login', { username: 'bob' }),
+				client.listen('authenticate').once(100)
 			]);
 
 			//assert.strictEqual(client.authState, AuthState.AUTHENTICATED);
@@ -247,11 +247,11 @@ describe('Integration tests', function () {
 			// authSignAsync: true
 			client = new ClientSocket(clientOptions);
 
-			await client.listen('connect').once();
+			await client.listen('connect').once(100);
 
 			await Promise.all([
 				client.invoke('login', {username: 'bob'}),
-				client.listen('authenticate').once()
+				client.listen('authenticate').once(100)
 			]);
 
 			//assert.strictEqual(client.authState, AuthState.AUTHENTICATED);
@@ -538,80 +538,87 @@ describe('Integration tests', function () {
 			assert.strictEqual(JSON.stringify(authTokenChanges), JSON.stringify(expectedAuthTokenChanges));
 		});
 
-/*
 		it('Should wait for socket to be authenticated before subscribing to waitForAuth channel', async function () {
-			client = socketClusterClient.create(clientOptions);
+			client = new ClientSocket(clientOptions);
 
-			let privateChannel = client.subscribe('priv', {waitForAuth: true});
+			let privateChannel = client.channels.subscribe('priv', { waitForAuth: true });
 			assert.strictEqual(privateChannel.state, 'pending');
 
-			await client.listen('connect').once();
+			await client.listen('connect').once(100);
 			assert.strictEqual(privateChannel.state, 'pending');
 
-			let authState: AuthState | null = null;
+			let isAuthenticated = false;
 
 			(async () => {
 				await client.invoke('login', {username: 'bob'});
 
-				authState = client.authState;
+				isAuthenticated = !!client.signedAuthToken;
 			})();
 
-			await client.listen('subscribe').once();
+			await client.listen('subscribe').once(100);
 			assert.strictEqual(privateChannel.state, 'subscribed');
 
 			client.disconnect();
 			assert.strictEqual(privateChannel.state, 'pending');
 
 			client.authenticate(validSignedAuthTokenBob);
-			await client.listen('subscribe').once();
+			await client.listen('subscribe').once(100);
 			assert.strictEqual(privateChannel.state, 'subscribed');
 
-			assert.strictEqual(authState, AuthState.AUTHENTICATED);
+			assert.strictEqual(isAuthenticated, true);
 		});
 
 		it('Subscriptions (including those with waitForAuth option) should have priority over the authenticate action', async function () {
-			global.localStorage.setItem('socketcluster.authToken', validSignedAuthTokenBob);
-			client = socketClusterClient.create(clientOptions);
+			global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
+			client = new ClientSocket(
+				Object.assign(
+					{},
+					clientOptions,
+					{
+						middleware: [new OfflineMiddleware()]
+					}
+				)
+			);
 
-			let expectedAuthStateChanges = [
-				'unauthenticated->authenticated',
-				'authenticated->unauthenticated'
+			const expectedAuthStateChanges = [
+				'false->true',
+				'true->false'
 			];
 			let initialSignedAuthToken: string | null;
-			let authStateChanges: string[] = [];
+			const authStateChanges: string[] = [];
 
 			(async () => {
 				for await (let status of client.listen('authStateChange')) {
-					authStateChanges.push(status.oldAuthState + '->' + status.newAuthState);
+					authStateChanges.push(`${status.wasAuthenticated}->${status.isAuthenticated}`);
 				}
 			})();
 
 			(async () => {
-				let error: any = null;
+				let error: Error | null = null;
 				try {
 					await client.authenticate(invalidSignedAuthToken);
 				} catch (err) {
 					error = err;
 				}
 				assert.notEqual(error, null);
-				assert.strictEqual(error.name, 'AuthTokenInvalidError');
+				assert.strictEqual(error!.name, 'AuthTokenInvalidError');
 			})();
 
-			let privateChannel = client.subscribe<any>('priv', {waitForAuth: true});
+			const privateChannel = client.channels.subscribe('priv', {waitForAuth: true});
 			assert.strictEqual(privateChannel.state, 'pending');
 
 			(async () => {
-				let event = await client.listen('connect').once();
+				const event = await client.listen('connect').once();
 				initialSignedAuthToken = client.signedAuthToken;
 				assert.strictEqual(event.isAuthenticated, true);
 				assert.strictEqual(privateChannel.state, 'pending');
 
 				await Promise.race([
 					(async () => {
-						let err = await privateChannel.listen('subscribeFail').once();
+						const fail = await privateChannel.listen('subscribeFail').once();
 						// This shouldn't happen because the subscription should be
 						// processed before the authenticate() call with the invalid token fails.
-						throw new Error('Failed to subscribe to channel: ' + err.message);
+						throw new Error('Failed to subscribe to channel: ' + fail.error.message);
 					})(),
 					(async () => {
 						await privateChannel.listen('subscribe').once();
@@ -622,17 +629,17 @@ describe('Integration tests', function () {
 
 			(async () => {
 				// The subscription already went through so it should still be subscribed.
-				let {oldSignedAuthToken, oldAuthToken} = await client.listen('deauthenticate').once();
+				const { signedAuthToken, authToken } = await client.listen('deauthenticate').once();
 				// The subscription already went through so it should still be subscribed.
 				assert.strictEqual(privateChannel.state, 'subscribed');
-				assert.strictEqual(client.authState, AuthState.UNAUTHENTICATED);
+				assert.strictEqual(!!client.signedAuthToken, false);
 				assert.strictEqual(client.authToken, null);
 
-				assert.notEqual(oldAuthToken, null);
-				assert.strictEqual(oldAuthToken!.username, 'bob');
-				assert.strictEqual(oldSignedAuthToken, initialSignedAuthToken!);
+				assert.notEqual(authToken, null);
+				assert.strictEqual(authToken!.username, 'bob');
+				assert.strictEqual(signedAuthToken, initialSignedAuthToken!);
 
-				let privateChannel2 = client.subscribe('priv2', {waitForAuth: true});
+				const privateChannel2 = client.channels.subscribe('priv2', { waitForAuth: true });
 
 				await privateChannel2.listen('subscribe').once();
 
@@ -644,7 +651,6 @@ describe('Integration tests', function () {
 			client.closeListeners('authStateChange');
 			assert.strictEqual(JSON.stringify(authStateChanges), JSON.stringify(expectedAuthStateChanges));
 		});
-*/
 
 		it('Should trigger the close event if the socket disconnects in the middle of the handshake phase', async function () {
 			client = new ClientSocket(clientOptions);
@@ -747,14 +753,14 @@ describe('Integration tests', function () {
 		});
 	});
 
-/*
 	describe('Pub/sub', function () {
-		let publisherClient: socketClusterClient.ClientSocket;
-		let lastServerMessage: any = null;
+		let publisherClient: ClientSocket<MyClientMap>;
+		let lastServerMessage: string | null = null;
 
 		beforeEach(async function () {
-			publisherClient = socketClusterClient.create(clientOptions);
+			publisherClient = new ClientSocket(clientOptions);
 
+/*
 			server.removeMiddleware(MiddlewareType.MIDDLEWARE_INBOUND);
 			server.setMiddleware(MiddlewareType.MIDDLEWARE_INBOUND, async (middlewareStream) => {
 				for await (let action of middlewareStream) {
@@ -764,6 +770,7 @@ describe('Integration tests', function () {
 					action.allow();
 				}
 			});
+*/
 		});
 
 		afterEach(async function () {
@@ -771,22 +778,22 @@ describe('Integration tests', function () {
 		});
 
 		it('Should receive transmitted publish messages if subscribed to channel', async function () {
-			client = socketClusterClient.create(clientOptions);
+			client = new ClientSocket(clientOptions);
 
-			let channel = client.subscribe<string>('foo');
+			const channel = client.channels.subscribe('foo');
 			await channel.listen('subscribe').once();
 
 			(async () => {
 				await wait(10);
-				publisherClient.transmitPublish('foo', 'hello');
+				publisherClient.channels.transmitPublish('foo', 'hello');
 				await wait(20);
-				publisherClient.transmitPublish('foo', 'world');
-				publisherClient.transmitPublish('foo', {abc: 123});
+				publisherClient.channels.transmitPublish('foo', 'world');
+				publisherClient.channels.transmitPublish('foo', {abc: 123});
 				await wait(10);
 				channel.close();
 			})();
 
-			let receivedMessages: string[] = [];
+			const receivedMessages: string[] = [];
 
 			for await (let message of channel) {
 				receivedMessages.push(message);
@@ -799,19 +806,19 @@ describe('Integration tests', function () {
 		});
 
 		it('Should receive invoked publish messages if subscribed to channel', async function () {
-			client = socketClusterClient.create(clientOptions);
+			client = new ClientSocket(clientOptions);
 
-			let channel = client.subscribe<string>('bar');
+			const channel = client.channels.subscribe('bar');
 			await channel.listen('subscribe').once();
 
 			(async () => {
 				await wait(10);
-				await publisherClient.transmitPublish('bar', 'hi');
+				await publisherClient.channels.transmitPublish('bar', 'hi');
 				// assert.strictEqual(lastServerMessage, 'hi');
 				await wait(20);
-				await publisherClient.transmitPublish('bar', 'world');
+				await publisherClient.channels.transmitPublish('bar', 'world');
 				// assert.strictEqual(lastServerMessage, 'world');
-				await publisherClient.transmitPublish('bar', {def: 123});
+				await publisherClient.channels.transmitPublish('bar', {def: 123});
 				// assert.strictEqual(JSON.stringify(clientReceivedMessages[2]), JSON.stringify({def: 123}));
 				await wait(10);
 				channel.close();
@@ -829,7 +836,6 @@ describe('Integration tests', function () {
 			assert.strictEqual(JSON.stringify(clientReceivedMessages[2]), JSON.stringify({def: 123}));
 		});
 	});
-*/
 
 	describe('Reconnecting socket', function () {
 		it('Should disconnect socket with code 1000 and reconnect', async function () {
@@ -922,12 +928,11 @@ describe('Integration tests', function () {
   });
 
 	describe('Events', function () {
-/*
 		it('Should trigger unsubscribe event on channel before disconnect event', async function () {
 			client = new ClientSocket(clientOptions);
 			let hasUnsubscribed = false;
 
-			let fooChannel = client.subscribe('foo');
+			let fooChannel = client.channels.subscribe('foo');
 
 			(async () => {
 				for await (let event of fooChannel.listen('subscribe')) {
@@ -957,7 +962,7 @@ describe('Integration tests', function () {
 					wasConnected = true;
 					(async () => {
 						try {
-							await client.invoke('someEvent', 123);
+							await client.invoke('performTask', 123);
 						} catch (err) {
 							if (err.name === 'BadConnectionError') {
 								gotBadConnectionError = true;
@@ -965,7 +970,7 @@ describe('Integration tests', function () {
 						}
 					})();
 
-					let fooChannel = client.subscribe('foo');
+					let fooChannel = client.channels.subscribe('foo');
 					(async () => {
 						for await (let event of fooChannel.listen('subscribeFail')) {
 							hasSubscribeFailed = true;
@@ -985,7 +990,7 @@ describe('Integration tests', function () {
 			assert.strictEqual(gotBadConnectionError, true);
 			assert.strictEqual(hasSubscribeFailed, false);
 		});
-*/
+
 		it('Should resolve invoke Promise with BadConnectionError before triggering the disconnect event', async function () {
 			client = new ClientSocket(
 				Object.assign(
@@ -999,7 +1004,7 @@ describe('Integration tests', function () {
 				)
 			);
 
-			let messageList: any[] = [];
+			const messageList: any[] = [];
 			let clientStatus = client.status;
 
 			(async () => {
@@ -1399,12 +1404,12 @@ describe('Integration tests', function () {
 					for (let i = 0; i < 20; i++) {
 						(fooChannel as any)._eventDemux.write('foo/customEvent', `message${i}`);
 					}
-					(barChannel as any)._eventDemux.write('bar/customEvent', `hi0`);
-					(barChannel as any)._eventDemux.write('bar/customEvent', `hi1`);
-					(barChannel as any)._eventDemux.write('bar/anotherEvent', `hi2`);
-					(barChannel as any)._eventDemux.close('bar/customEvent');
-					(barChannel as any)._eventDemux.close('bar/anotherEvent');
-					(fooChannel as any)._eventDemux.close('foo/customEvent');
+					barChannel.emit('customEvent', `hi0`);
+					barChannel.emit('customEvent', `hi1`);
+					barChannel.emit('anotherEvent', `hi2`);
+					barChannel.closeEvent('customEvent');
+					barChannel.closeEvent('anotherEvent');
+					fooChannel.closeEvent('customEvent');
 				})()
 			]);
 
@@ -1428,9 +1433,9 @@ describe('Integration tests', function () {
 
 			const fooChannel = client.channels.channel('foo');
 			const barChannel = client.channels.subscribe('bar');
-console.log('4');
-			await barChannel.listen('subscribe').once();
-console.log('5');
+
+			await barChannel.listen('subscribe').once(100);
+
 			const fooEvents: string[] = [];
 			const barEvents: string[] = [];
 			const barMessages: string[] = [];
@@ -1461,19 +1466,19 @@ console.log('5');
 				})(),
 				(async () => {
 					for (let i = 0; i < 20; i++) {
-					(fooChannel as any)._eventDemux.write('foo/customEvent', `message${i}`);
+						fooChannel.emit('customEvent', `message${i}`);
 					}
 					for (let i = 0; i < 50; i++) {
 						barChannel.transmitPublish(`hello${i}`);
 					}
 
-					(barChannel as any)._eventDemux.write('bar/customEvent', `hi0`);
-					(barChannel as any)._eventDemux.write('bar/customEvent', `hi1`);
-					(barChannel as any)._eventDemux.write('bar/customEvent', `hi2`);
-					(barChannel as any)._eventDemux.write('bar/customEvent', `hi3`);
-					(barChannel as any)._eventDemux.write('bar/customEvent', `hi4`);
+					barChannel.emit('customEvent', `hi0`);
+					barChannel.emit('customEvent', `hi1`);
+					barChannel.emit('customEvent', `hi2`);
+					barChannel.emit('customEvent', `hi3`);
+					barChannel.emit('customEvent', `hi4`);
 					assert.strictEqual(client.channels.getBackpressure('bar'), 5);
-					(fooChannel as any)._eventDemux.close('foo/customEvent');
+					fooChannel.closeEvent('customEvent');
 					client.channels.kill('foo');
 
 
