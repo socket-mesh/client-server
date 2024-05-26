@@ -154,32 +154,6 @@ export class ClientChannels<T extends ClientMap> extends Channels<T['Channel']> 
 		}
 	}
 
-	private triggerChannelSubscribe(channel: ChannelDetails, options: ChannelOptions): void {
-		const channelName = channel.name;
-
-		if (channel.state !== 'subscribed') {
-			const oldState = channel.state;
-			channel.state = 'subscribed';
-
-			const stateChangeData: SubscribeStateChangeEvent = {
-				channel: channel.name,
-				oldState,
-				newState: channel.state,
-				options
-			};
-			this._channelEventDemux.write(`${channelName}/subscribeStateChange`, stateChangeData);
-			this._channelEventDemux.write(`${channelName}/subscribe`, { channel: channel.name, options });
-			this.emit('subscribeStateChange', {
-				channel: channelName,
-				...stateChangeData
-			});
-			this.emit('subscribe', {
-				channel: channelName,
-				options
-			});
-		}
-	}
-
 	private triggerChannelSubscribeFail(err: Error, channel: ChannelDetails, options: ChannelOptions): void {
 		const meetsAuthRequirements = !channel.options.waitForAuth || !!this._transport.signedAuthToken;
 		const hasChannel = !!this._channelMap[channel.name];
@@ -197,41 +171,6 @@ export class ClientChannels<T extends ClientMap> extends Channels<T['Channel']> 
 				channel: channel.name,
 				options
 			});
-		}
-	}
-
-	private triggerChannelUnsubscribe(channel: ChannelDetails, setAsPending?: boolean): void {
-		const channelName = channel.name;
-
-		this.cancelPendingSubscribeCallback(channel);
-
-		if (channel.state === 'subscribed') {
-			const stateChangeData: SubscribeStateChangeEvent = {
-				channel: channel.name,
-				oldState: channel.state as ChannelState,
-				newState: setAsPending ? 'pending' : 'unsubscribed',
-				options: channel.options
-			};
-			this._channelEventDemux.write(`${channelName}/subscribeStateChange`, stateChangeData);
-			this._channelEventDemux.write(`${channelName}/unsubscribe`, { channel: channel.name });
-			this.emit('subscribeStateChange', {
-				channel: channelName,
-				...stateChangeData
-			});
-			this.emit('unsubscribe', { channel: channelName });
-		}
-
-		if (setAsPending) {
-			channel.state = 'pending';
-		} else {
-			delete this._channelMap[channelName];
-		}
-	}
-
-	// Cancel any pending subscribe callback
-	private cancelPendingSubscribeCallback(channel: ChannelDetails): void {
-		if (channel.subscribeAbort) {
-			channel.subscribeAbort();
 		}
 	}
 

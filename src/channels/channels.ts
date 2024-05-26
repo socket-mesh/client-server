@@ -3,7 +3,7 @@ import { ChannelState } from "./channel-state.js";
 import { StreamDemux, StreamDemuxWrapper } from "@socket-mesh/stream-demux";
 import { ChannelsListeners } from "./channels-listeners.js";
 import { Channel } from "./channel.js";
-import { ChannelEvent, SubscribeEvent, SubscribeFailEvent, SubscribeStateChangeEvent, UnsubscribeEvent } from "./channel-events.js";
+import { ChannelEvent, KickOutEvent, SubscribeEvent, SubscribeFailEvent, SubscribeStateChangeEvent, UnsubscribeEvent } from "./channel-events.js";
 import { ChannelMap } from "./channel-map.js";
 import { AsyncStreamEmitter } from "@socket-mesh/async-stream-emitter";
 import { DemuxedConsumableStream, StreamEvent } from "@socket-mesh/stream-demux";
@@ -49,9 +49,34 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 		this.output = new StreamDemuxWrapper<T[keyof T & string]>(this._channelDataDemux);
 	}
 
+	// Cancel any pending subscribe callback
+	protected cancelPendingSubscribeCallback(channel: ChannelDetails): void {
+		if (channel.subscribeAbort) {
+			channel.subscribeAbort();
+		}
+	}
+
+	channel<U extends keyof T & string>(channelName: U): Channel<T, T[U]>;
+	channel<U>(channelName: string): Channel<T, U>;
+	channel<U>(channelName: string): Channel<T, U> {
+		const currentChannel = this._channelMap[channelName];
+
+		return new Channel<T, U>(
+			channelName,
+			this,
+			this._channelEventDemux,
+			this._channelDataDemux
+		);
+	}
+
+
 	close(channelName?: keyof T & string | string): void {
 		this.output.close(channelName);
 		this.listeners.close(channelName);
+	}
+
+	protected decorateChannelName(channelName: keyof T & string | string): string {
+		return `${this.channelPrefix || ''}${channelName}`;
 	}
 
 	kill(channelName?: keyof T & string | string): void {
@@ -83,6 +108,20 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 			return { ...channel.options };
 		}
 		return {};
+	}
+
+	kickOut(channelName: keyof T & string | string, message: string): void {
+		const undecoratedChannelName = this.undecorateChannelName(channelName);		
+		const channel = this._channelMap[undecoratedChannelName];
+
+		if (channel) {
+			this.emit('kickOut', {
+				channel: undecoratedChannelName,
+				message: message
+			});
+			this._channelEventDemux.write(`${undecoratedChannelName}/kickOut`, { channel: undecoratedChannelName, message });
+			this.triggerChannelUnsubscribe(channel);
+		}
 	}
 
 	subscribe<U extends keyof T & string>(channelName: U, options?: ChannelOptions): Channel<T, T[U]>;
@@ -124,24 +163,63 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 		return channelIterable;
 	}
 
+	protected triggerChannelSubscribe(channel: ChannelDetails, options: ChannelOptions): void {
+		const channelName = channel.name;
+
+		if (channel.state !== 'subscribed') {
+			const oldState = channel.state;
+			channel.state = 'subscribed';
+
+			const stateChangeData: SubscribeStateChangeEvent = {
+				channel: channel.name,
+				oldState,
+				newState: channel.state,
+				options
+			};
+			this._channelEventDemux.write(`${channelName}/subscribeStateChange`, stateChangeData);
+			this._channelEventDemux.write(`${channelName}/subscribe`, { channel: channel.name, options });
+			this.emit('subscribeStateChange', {
+				channel: channelName,
+				...stateChangeData
+			});
+			this.emit('subscribe', {
+				channel: channelName,
+				options
+			});
+		}
+	}
+
+	protected triggerChannelUnsubscribe(channel: ChannelDetails, setAsPending?: boolean): void {
+		const channelName = channel.name;
+
+		this.cancelPendingSubscribeCallback(channel);
+
+		if (channel.state === 'subscribed') {
+			const stateChangeData: SubscribeStateChangeEvent = {
+				channel: channel.name,
+				oldState: channel.state as ChannelState,
+				newState: setAsPending ? 'pending' : 'unsubscribed',
+				options: channel.options
+			};
+			this._channelEventDemux.write(`${channelName}/subscribeStateChange`, stateChangeData);
+			this._channelEventDemux.write(`${channelName}/unsubscribe`, { channel: channel.name });
+			this.emit('subscribeStateChange', {
+				channel: channelName,
+				...stateChangeData
+			});
+			this.emit('unsubscribe', { channel: channelName });
+		}
+
+		if (setAsPending) {
+			channel.state = 'pending';
+		} else {
+			delete this._channelMap[channelName];
+		}
+	}
+
 	protected abstract trySubscribe(channel: ChannelDetails): void;
 
-	channel<U extends keyof T & string>(channelName: U): Channel<T, T[U]>;
-	channel<U>(channelName: string): Channel<T, U>;
-	channel<U>(channelName: string): Channel<T, U> {
-		const currentChannel = this._channelMap[channelName];
-
-		return new Channel<T, U>(
-			channelName,
-			this,
-			this._channelEventDemux,
-			this._channelDataDemux
-		);
-	}
-
-	protected decorateChannelName(channelName: keyof T & string | string): string {
-		return `${this.channelPrefix || ''}${channelName}`;
-	}
+	protected abstract tryUnsubscribe(channel: ChannelDetails): void;
 
 	protected undecorateChannelName(channelName: keyof T & string | string): string {
 		if (this.channelPrefix && channelName.indexOf(this.channelPrefix) === 0) {
@@ -158,8 +236,6 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 			this.tryUnsubscribe(channel);
 		}
 	}
-
-	protected abstract tryUnsubscribe(channel: ChannelDetails): void;
 
 	subscriptions(includePending?: boolean): string[] {
 		const subs: string[] = [];
@@ -181,6 +257,7 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 		return !!channel && channel.state === 'subscribed';
 	}
 
+	emit(eventName: 'kickOut', data: KickOutEvent): void;
 	emit(eventName: 'subscribe', data: SubscribeEvent): void;
 	emit(eventName: 'subscribeFail', data: SubscribeFailEvent): void;
 	emit(eventName: 'subscribeRequest', data: SubscribeEvent): void;
@@ -191,6 +268,7 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 	}
 
 	listen(): DemuxedConsumableStream<StreamEvent<ChannelEvent>>;
+	listen(eventName: 'kickOut'): DemuxedConsumableStream<KickOutEvent>;
 	listen(eventName: 'subscribe'): DemuxedConsumableStream<SubscribeEvent>;
 	listen(eventName: 'subscribeFail'): DemuxedConsumableStream<SubscribeFailEvent>;
 	listen(eventName: 'subscribeRequest'): DemuxedConsumableStream<SubscribeEvent>;

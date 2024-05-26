@@ -10,6 +10,7 @@ import { ClientChannels } from "./client-channels.js";
 import { SocketMapFromClient } from "./maps/socket-map.js";
 import { ClientMap } from "./maps/client-map.js";
 import { publishHandler } from "./handlers/publish.js";
+import { kickOutHandler } from "./handlers/kickout.js";
 
 /*
 export interface ClientSocketWsOptions extends BaseClientSocketOptions {
@@ -49,6 +50,7 @@ export class ClientSocket<T extends ClientMap> extends Socket<SocketMapFromClien
 		Object.assign(
 			options.handlers,
 			{
+				"#kickOut": kickOutHandler,
 				"#publish": publishHandler,
 				"#setAuthToken": setAuthTokenHandler,
 				"#removeAuthToken": removeAuthTokenHandler
