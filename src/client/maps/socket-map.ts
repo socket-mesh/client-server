@@ -45,7 +45,7 @@ export interface SocketMapClientFromServer<T extends ServerMap> {
 }
 
 export interface BasicSocketMapServer<TIncoming extends PublicMethodMap = {}, TChannels extends ChannelMap = {}, TState extends object = {}> {
-	Incoming: TIncoming,
+	Incoming: TIncoming & ServerPrivateMap,
 	Service: {},
 	Outgoing: {},
 	PrivateOutgoing: ClientPrivateMap,

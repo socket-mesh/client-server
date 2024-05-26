@@ -77,6 +77,7 @@ export async function processAuthentication(
 				socket.emit('badAuthToken', { error: authInfo.authError, signedAuthToken: authInfo.signedAuthToken });
 			}
 		}
+
 		throw authInfo.authError;
 	}
 
@@ -86,7 +87,7 @@ export async function processAuthentication(
 				transport.callMiddleware(
 					middleware,
 					() => {
-						middleware.authenticate(authInfo);
+						middleware.onAuthenticate(authInfo);
 					}
 				);
 			} catch (err) {

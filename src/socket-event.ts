@@ -51,7 +51,8 @@ export interface CloseEvent {
 }
 
 export interface ConnectEvent {
-	isAuthenticated: boolean
+	isAuthenticated: boolean,
+	authError?: Error
 }
 
 export interface ConnectingEvent {

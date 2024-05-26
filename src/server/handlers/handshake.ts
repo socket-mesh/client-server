@@ -53,7 +53,7 @@ export async function handshakeHandler(
 		}
 	}
 
-	transport.setOpenStatus();
+	transport.setOpenStatus(authError);
 
 	if (authError) {
 		return {

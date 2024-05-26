@@ -14,7 +14,7 @@ export class OfflineMiddleware<T extends SocketMap = EmptySocketMap> implements 
 		this._continue = null;
 	}
 
-	type: "request";
+	type: "offline";
 
 	public sendRequest(
 		requests: (MethodRequest<T['Outgoing']> | ServiceRequest<T['Service']>)[],
@@ -38,7 +38,7 @@ export class OfflineMiddleware<T extends SocketMap = EmptySocketMap> implements 
 		this._isOpen = false;
 	}
 
-	public onDisconnect(): void {
+	public onDisconnected(): void {
 		this._requests = [];
 		this._continue = null;
 	}

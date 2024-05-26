@@ -4,6 +4,7 @@ import { ChannelMap } from "../../channels/channel-map.js";
 import { PrivateMethodMap, PublicMethodMap, ServiceMap } from "./method-map.js";
 import { ClientPrivateMap } from "./client-map.js";
 import { PublishOptions } from "../../channels/channels.js";
+import { ServerSocketState } from "../../server/server-socket-state.js";
 
 export interface ServerMap {
 	Channel: ChannelMap,
@@ -24,7 +25,7 @@ export interface BasicServerMap<TIncoming extends PublicMethodMap = {}, TChannel
 	PrivateIncoming: ServerPrivateMap,
 	PrivateOutgoing: ClientPrivateMap,
 	ServerState: {},
-	State: TState
+	State: TState & ServerSocketState<BasicServerMap<TIncoming, TChannels, TState>>
 }
 
 export interface HandshakeOptions {

@@ -3,7 +3,7 @@ import { beforeEach, afterEach, describe, it, mock } from "node:test";
 import { ClientSocket } from '../src/client/client-socket.js';
 import { SocketStatus } from '../src/socket.js';
 import { AuthStateChangeEvent, CloseEvent, DisconnectEvent } from '../src/socket-event.js';
-import { Server, listen } from '../src';
+import { Server, listen } from '../src/index.js';
 import localStorage from '@socket-mesh/local-storage';
 import { RequestHandlerArgs } from '../src/request-handler.js';
 import { ClientSocketOptions } from '../src/client/client-socket-options.js';
@@ -11,9 +11,20 @@ import { LocalStorageAuthEngine } from '../src/client/client-auth-engine.js';
 import { wait } from '../src/utils.js';
 import { OfflineMiddleware } from '../src/middleware/offline-middleware.js';
 import { BasicServerMap } from '../src/client/maps/server-map.js';
+import jwt from "jsonwebtoken";
+import { BasicSocketMapServer } from '../src/client/maps/socket-map.js';
 
 // Add to the global scope like in browser.
 global.localStorage = localStorage;
+
+const PORT_NUMBER = 8009;
+const TOKEN_EXPIRY_IN_SECONDS = 60 * 60 * 24 * 366 * 5000;
+const authTokenName = 'socketmesh.authToken';
+
+const validSignedAuthTokenBob = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImJvYiIsImV4cCI6MzE2Mzc1ODk3ODIxNTQ4NywiaWF0IjoxNTAyNzQ3NzQ2fQ.GLf_jqi_qUSCRahxe2D2I9kD8iVIs0d4xTbiZMRiQq4';
+const validSignedAuthTokenKate = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImthdGUiLCJleHAiOjMxNjM3NTg5NzgyMTU0ODcsImlhdCI6MTUwMjc0Nzc5NX0.Yfb63XvDt9Wk0wHSDJ3t7Qb1F0oUVUaM5_JKxIE2kyw';
+const invalidSignedAuthToken = 'fakebGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.fakec2VybmFtZSI6ImJvYiIsImlhdCI6MTUwMjYyNTIxMywiZXhwIjoxNTAyNzExNjEzfQ.fakemYcOOjM9bzmS4UYRvlWSk_lm3WGHvclmFjLbyOk';
+const SERVER_AUTH_KEY = 'testkey';
 
 interface LoginRequest {
 	username: string
@@ -26,7 +37,8 @@ type MyChannels = {
 
 type ServerIncomingMap = {
 	login: (req: LoginRequest) => void,
-	performTask: (num: number) => void
+	performTask: (num: number) => void,
+	setAuthKey: (secret: jwt.Secret) => void,
 }
 
 interface MyClientMap {
@@ -38,30 +50,14 @@ interface MyClientMap {
 	State: {}
 };
 
-let server: Server<BasicServerMap<ServerIncomingMap, MyChannels>>;
-
-let client: ClientSocket<MyClientMap>;
-
-const PORT_NUMBER = 8009;
-const TOKEN_EXPIRY_IN_SECONDS = 60 * 60 * 24 * 366 * 5000;
-const authTokenName = 'socketmesh.authToken';
-
-const clientOptions: ClientSocketOptions<MyClientMap> = {
-	authEngine: { authTokenName },
-	address: `ws://127.0.0.1:${PORT_NUMBER}`,
-	ackTimeoutMs: 200
-}
-
-const validSignedAuthTokenBob = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImJvYiIsImV4cCI6MzE2Mzc1ODk3ODIxNTQ4NywiaWF0IjoxNTAyNzQ3NzQ2fQ.GLf_jqi_qUSCRahxe2D2I9kD8iVIs0d4xTbiZMRiQq4';
-const validSignedAuthTokenKate = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImthdGUiLCJleHAiOjMxNjM3NTg5NzgyMTU0ODcsImlhdCI6MTUwMjc0Nzc5NX0.Yfb63XvDt9Wk0wHSDJ3t7Qb1F0oUVUaM5_JKxIE2kyw';
-const invalidSignedAuthToken = 'fakebGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.fakec2VybmFtZSI6ImJvYiIsImlhdCI6MTUwMjYyNTIxMywiZXhwIjoxNTAyNzExNjEzfQ.fakemYcOOjM9bzmS4UYRvlWSk_lm3WGHvclmFjLbyOk';
-const SERVER_AUTH_KEY = 'testkey';
-
 const allowedUsers: { [name: string]: true } = {
 	bob: true,
 	kate: true,
 	alice: true
 };
+
+let client: ClientSocket<MyClientMap>;
+let server: Server<BasicServerMap<ServerIncomingMap, MyChannels>>;
 
 let performTaskTriggered: boolean;
 
@@ -85,6 +81,21 @@ async function performTaskHandler({ options }: RequestHandlerArgs<number>): Prom
 	await wait(options);
 }
 
+async function setAuthKeyHandler(
+	{ transport, options: secret }: RequestHandlerArgs<jwt.Secret, BasicSocketMapServer>
+): Promise<void> {
+	const server = transport.state.server;
+
+	server!.auth.signatureKey = secret;
+	server!.auth.verificationKey = secret;
+}
+
+const clientOptions: ClientSocketOptions<MyClientMap> = {
+	authEngine: { authTokenName },
+	address: `ws://127.0.0.1:${PORT_NUMBER}`,
+	ackTimeoutMs: 200
+}
+
 describe('Integration tests', function () {
 	beforeEach(async function () {
 		server = listen<BasicServerMap<ServerIncomingMap, MyChannels>>(
@@ -94,7 +105,8 @@ describe('Integration tests', function () {
 				ackTimeoutMs: 200,
 				handlers: {
 					login: loginHandler,
-					performTask: performTaskHandler
+					performTask: performTaskHandler,
+					setAuthKey: setAuthKeyHandler
 				}
 			}
 		);
@@ -184,7 +196,9 @@ describe('Integration tests', function () {
 		it('Should not send back error if JWT is not provided in handshake', async function () {
 			client = new ClientSocket(clientOptions);
 
-			await client.listen('connect').once(100);
+			const event = await client.listen('connect').once(100);
+
+			assert.strictEqual(event.authError, undefined);
 		});
 
 		it('Should be authenticated on connect if previous JWT token is present', async function () {
@@ -195,6 +209,41 @@ describe('Integration tests', function () {
 
 			assert.strictEqual(client.signedAuthToken, validSignedAuthTokenBob);
 			assert.strictEqual(client.authToken.username, 'bob');
+			assert.strictEqual(event.authError, undefined);
+		});
+
+		it('Should send back error if JWT is invalid during handshake', async function () {
+			global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
+			client = new ClientSocket(clientOptions);
+
+			let event = await client.listen('connect').once(100);
+			assert.notEqual(event, null);
+			assert.strictEqual(event.isAuthenticated, true);
+			assert.strictEqual(event.authError, undefined);
+
+			assert.notEqual(client.signedAuthToken, null);
+			assert.notEqual(client.authToken, null);
+
+			// Change the setAuthKey to invalidate the current token.
+			await client.invoke('setAuthKey', 'differentAuthKey');
+
+			client.disconnect();
+			client.connect();
+
+			event = await client.listen('connect').once(100);
+
+			assert.strictEqual(event.isAuthenticated, false);
+			assert.notEqual(event.authError, null);
+			assert.strictEqual(event.authError!.name, 'AuthTokenInvalidError');
+
+			// When authentication fails, the auth token properties on the client
+			// socket should be set to null; that way it's not going to keep
+			// throwing the same error every time the socket tries to connect.
+			assert.strictEqual(client.signedAuthToken, null);
+			assert.strictEqual(client.authToken, null);
+
+			// Set authKey back to what it was.
+			await client.invoke('setAuthKey', SERVER_AUTH_KEY);
 		});
 
 		it('Should allow switching between users', async function () {

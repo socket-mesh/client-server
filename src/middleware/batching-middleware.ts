@@ -32,7 +32,7 @@ export class BatchingMiddleware<T extends SocketMap = EmptySocketMap> implements
 		this.batchOnHandshakeDuration = options?.batchOnHandshakeDuration ?? false;
 	}
 
-	type: 'request'
+	type: 'batching'
 
 	public get isBatching(): boolean {
 		return this._isBatching || this._batchingIntervalId !== null;
@@ -49,7 +49,7 @@ export class BatchingMiddleware<T extends SocketMap = EmptySocketMap> implements
 		}
 	}
 
-	public onDisconnect(): void {
+	public onDisconnected(): void {
 		this.cancelBatching();
 	}
 	

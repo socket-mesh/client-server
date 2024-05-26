@@ -6,8 +6,7 @@ import { SocketMapFromServer } from "../client/maps/socket-map.js";
 import { ServerMap } from "../client/maps/server-map.js";
 
 export interface ServerSocketOptions<
-	T extends ServerMap,
-	TSocket extends Socket<SocketMapFromServer<T>>
+	T extends ServerMap
 > extends SocketOptions<SocketMapFromServer<T>> {
 	handlers: HandlerMap<SocketMapFromServer<T>>,
 	service?: string,
@@ -17,7 +16,7 @@ export interface ServerSocketOptions<
 export class ServerSocket<T extends ServerMap> extends Socket<SocketMapFromServer<T>> {
 	private _serverTransport: ServerTransport<T>;
 
-	constructor(options: ServerSocketOptions<T, ServerSocket<T>>) {
+	constructor(options: ServerSocketOptions<T>) {
 		const transport = new ServerTransport<T>(options);
 
 		super(transport);

@@ -28,7 +28,7 @@ export class ClientChannels<T extends ClientMap> extends Channels<T['Channel']> 
 
 		this._transport.middleware.push({
 			type: 'channels',
-			onAuthenticate: () => {
+			onAuthenticated: () => {
 				if (!this._preparingPendingSubscriptions) {
 					this.processPendingSubscriptions();
 				}	

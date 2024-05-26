@@ -90,13 +90,13 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 				this.resetPingTimeout();
 
 				if ('authToken' in status && status.authToken) {
-					return this.setAuthorization(status.authToken);
+					return [undefined, this.setAuthorization(status.authToken)];
 				}
 
-				return this.deauthenticate();
+				return ['authError' in status ? status.authError : undefined, this.deauthenticate()];
 			})
-			.then(() => {
-				this.setOpenStatus();
+			.then(([authError]: [Error]) => {
+				this.setOpenStatus(authError);
 				super.onOpen();
 			})
 			.catch(err => {
@@ -269,7 +269,7 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 	override async setAuthorization(authToken: AuthToken): Promise<boolean>;
 	override async setAuthorization(signedAuthToken: string, authToken?: AuthToken): Promise<boolean>;
 	override async setAuthorization(signedAuthToken: string | AuthToken, authToken?: AuthToken): Promise<boolean> {
-		const changed = super.setAuthorization(signedAuthToken as string, authToken);
+		const changed = await super.setAuthorization(signedAuthToken as string, authToken);
 
 		if (changed) {
 			// Even if saving the auth token failes we do NOT want to throw an exception.

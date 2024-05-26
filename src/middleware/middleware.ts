@@ -9,10 +9,10 @@ export interface Middleware<T extends SocketMap = EmptySocketMap> {
 	type: string,
 	publishIn?(): void,
 	publishOut?(): void,
-	onAuthenticate?() : void,
+	onAuthenticated?() : void,
 	onClose?() : void,
 	onDeauthenticate?() : void,
-	onDisconnect?(status: SocketStatus, code: number, reason?: string): void,
+	onDisconnected?(status: SocketStatus, code: number, reason?: string): void,
 	onOpen?() : void,
 	sendRequest?(
 		requests: AnyRequest<T['Service'], T['PrivateOutgoing'], T['Outgoing']>[],

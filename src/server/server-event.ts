@@ -33,7 +33,8 @@ export type ServerEvent<T extends ServerMap> =
 	SocketRequestEvent<T> |
 	SocketResponseEvent<T> |
 	SocketUnexpectedResponseEvent<T> |
-	SocketUpgradeEvent<T>;
+	SocketUpgradeEvent<T> |
+	WarningEvent;
 
 export interface ConnectionEvent<T extends ServerMap> {
 	socket: ClientSocket<ClientMapFromServer<T>> | ServerSocket<T>,
@@ -45,6 +46,10 @@ export interface CloseEvent {}
 
 export interface ErrorEvent {
 	error: Error
+}
+
+export interface WarningEvent {
+	warning: Error
 }
 
 export interface HeadersEvent {

@@ -2,7 +2,7 @@ import defaultCodec, { CodecEngine } from "@socket-mesh/formatter";
 import ws from "isomorphic-ws";
 import { Middleware } from "./middleware/middleware.js";
 import { AnyPacket, AnyRequest, InvokeMethodRequest, InvokeServiceRequest, MethodPacket, TransmitMethodRequest, TransmitServiceRequest } from "./request.js";
-import { AbortError, BadConnectionError, InvalidActionError, InvalidArgumentsError, MiddlewareBlockedError, MiddlewareCaughtError, MiddlewareError, SocketProtocolError, TimeoutError, dehydrateError, socketProtocolErrorStatuses, socketProtocolIgnoreStatuses } from "@socket-mesh/errors";
+import { AbortError, AuthError, BadConnectionError, InvalidActionError, InvalidArgumentsError, MiddlewareBlockedError, MiddlewareCaughtError, MiddlewareError, SocketProtocolError, TimeoutError, dehydrateError, socketProtocolErrorStatuses, socketProtocolIgnoreStatuses } from "@socket-mesh/errors";
 import { ClientRequest, IncomingMessage } from "http";
 import { FunctionReturnType, MethodMap, ServiceMap } from "./client/maps/method-map.js";
 import { AnyResponse, MethodDataResponse } from "./response.js";
@@ -52,7 +52,7 @@ export class SocketTransport<T extends SocketMap> {
 	private readonly _callIdGenerator: CallIdGenerator;
 	private readonly _callbackMap: {[cid: number]: InvokeCallback<unknown>};
 	private _handlers: HandlerMap<T>;
-	private _onUnhandledRequest: (socket: this, packet: AnyPacket<T['Service'], T['Incoming']>) => boolean;
+	private _onUnhandledRequest: (socket: SocketTransport<T>, packet: AnyPacket<T['Service'], T['Incoming']>) => boolean;
 	public readonly codecEngine: CodecEngine;
 	public readonly middleware: Middleware<T>[];
 	public readonly state: Partial<T['State']>;
@@ -176,8 +176,8 @@ export class SocketTransport<T extends SocketMap> {
 			this._socket.emit('authenticate', { signedAuthToken, authToken });
 
 			for (const middleware of this.middleware) {
-				if (middleware.onAuthenticate) {
-					middleware.onAuthenticate();
+				if (middleware.onAuthenticated) {
+					middleware.onAuthenticated();
 				}	
 			}
 
@@ -401,8 +401,8 @@ export class SocketTransport<T extends SocketMap> {
 		}
 
 		for (const middleware of this.middleware) {
-			if (middleware.onDisconnect) {
-				middleware.onDisconnect(status, code, reason);
+			if (middleware.onDisconnected) {
+				middleware.onDisconnected(status, code, reason);
 			}
 		}
 
@@ -463,7 +463,7 @@ export class SocketTransport<T extends SocketMap> {
 		}
 	}
 
-	public setOpenStatus(): void {
+	public setOpenStatus(authError?: Error): void {
 		if (this._webSocket?.readyState !== ws.OPEN) {
 			throw new InvalidActionError('Cannot set status to OPEN before socket is connected.');
 		}
@@ -476,7 +476,7 @@ export class SocketTransport<T extends SocketMap> {
 			}
 		}
 
-		this._socket.emit('connect', { isAuthenticated: !!this.signedAuthToken });
+		this._socket.emit('connect', { isAuthenticated: !!this.signedAuthToken, authError });
 	}
 
 	protected sendRequest(requests: (AnyRequest<T['Service'], T['PrivateOutgoing'], T['Outgoing']>)[]): void;

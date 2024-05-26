@@ -6,6 +6,9 @@ import { InvalidArgumentsError } from '@socket-mesh/errors';
 export interface AuthEngine {
 	readonly rejectOnFailedDelivery: boolean;
 
+	signatureKey: jwt.Secret;
+	verificationKey: jwt.Secret;
+
 	verifyToken(signedToken: string, options?: jwt.VerifyOptions): Promise<jwt.JwtPayload>;
 
 	signToken(token: object, options?: jwt.SignOptions): Promise<string>;
@@ -13,10 +16,6 @@ export interface AuthEngine {
 
 export function isAuthEngine(auth: AuthEngine | AuthEngineOptions): auth is AuthEngine {
 	return (typeof auth === 'object' && 'verifyToken' in auth && 'signToken' in auth);
-}
-
-export interface AuthTokenOptions extends jwt.SignOptions {
-	rejectOnFailedDelivery?: boolean;
 }
 
 export interface AuthEngineOptions {
@@ -45,10 +44,10 @@ export interface AuthEngineOptions {
 export class DefaultAuthEngine implements AuthEngine {
 	private readonly _signOptions: jwt.SignOptions;
 	private readonly _verificationOptions: jwt.VerifyOptions;
-	private readonly _signatureKey: jwt.Secret;
-	private readonly _verificationKey: jwt.Secret;
 
-	readonly rejectOnFailedDelivery: boolean;
+	public readonly rejectOnFailedDelivery: boolean;
+	public signatureKey: jwt.Secret;
+	public verificationKey: jwt.Secret;
 
 	constructor({ authAlgorithm, authKey, defaultExpiry, rejectOnFailedDelivery, verifyAlgorithms }: AuthEngineOptions = {}) {
 		this.rejectOnFailedDelivery = !!rejectOnFailedDelivery;
@@ -70,15 +69,15 @@ export class DefaultAuthEngine implements AuthEngine {
 		}
 
 		if (typeof authKey === 'object' && 'private' in authKey) {
-			this._signatureKey = authKey.private;
-			this._verificationKey = authKey.public;
+			this.signatureKey = authKey.private;
+			this.verificationKey = authKey.public;
 		} else {
 			if (!authKey == null) {
 				authKey = crypto.randomBytes(32).toString('hex');
 			}
 
-			this._signatureKey = authKey;
-			this._verificationKey = authKey;
+			this.signatureKey = authKey;
+			this.verificationKey = authKey;
 		}
 	}
 
@@ -95,7 +94,7 @@ export class DefaultAuthEngine implements AuthEngine {
 					resolve(token);
 				};
 				
-				jwt.verify(signedToken || '', this._verificationKey, jwtOptions, cb); 
+				jwt.verify(signedToken || '', this.verificationKey, jwtOptions, cb); 
 			});
 		}
 
@@ -139,7 +138,7 @@ export class DefaultAuthEngine implements AuthEngine {
 		}
 
 		return new Promise<string>((resolve, reject) => {
-			jwt.sign(token, this._signatureKey, options, (err, signedToken) => {
+			jwt.sign(token, this.signatureKey, options, (err, signedToken) => {
 				if (err) {
 					reject(err);
 					return;

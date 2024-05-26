@@ -1,25 +1,23 @@
 import { AnyPacket } from "../request.js";
 import { ServerMap, ServerPrivateMap } from "../client/maps/server-map.js";
-import { ServerSocket, ServerSocketOptions } from "./server-socket.js";
+import { ServerSocketOptions } from "./server-socket.js";
 import { SocketTransport } from "../socket-transport.js";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
 import { AuthError } from "@socket-mesh/errors";
 import { SocketMapFromServer } from "../client/maps/socket-map.js";
+import jwt from 'jsonwebtoken';
 
 export class ServerTransport<T extends ServerMap> extends SocketTransport<SocketMapFromServer<T>> {
 	readonly service?: string;
 
-	constructor(
-		options:
-			ServerSocketOptions<T, ServerSocket<T>>
-	) {
+	constructor(options: ServerSocketOptions<T>) {
 		super(options);
 
 		this.service = options.service;
 		this.webSocket = options.socket;
 	}
 
-	protected override onRequest(packet: AnyPacket<T['Service'], T['Incoming'] & T['PrivateIncoming'] & ServerPrivateMap>): boolean {
+	protected override onRequest(packet: AnyPacket<T['Service'], T["Incoming"] & T["PrivateIncoming"] & ServerPrivateMap>): boolean {
 		let wasHandled = false;
 
 		if (!this.service || !('service' in packet) || packet.service === this.service) {
@@ -31,18 +29,18 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		return wasHandled;
 	}
 
-	public override async setAuthorization(authToken: AuthToken): Promise<boolean>;
+	public override async setAuthorization(authToken: AuthToken, options?: jwt.SignOptions): Promise<boolean>;
 	public override async setAuthorization(signedAuthToken: SignedAuthToken, authToken?: AuthToken): Promise<boolean>;
-	public override async setAuthorization(signedAuthToken: AuthToken | SignedAuthToken, authToken?: AuthToken): Promise<boolean> {
-		if (typeof signedAuthToken === 'string') {
-			return super.setAuthorization(signedAuthToken, authToken);
+	public override async setAuthorization(authToken: AuthToken | SignedAuthToken, options?: AuthToken | jwt.SignOptions): Promise<boolean> {
+		if (typeof authToken === 'string') {
+			return super.setAuthorization(authToken, options as AuthToken);
 		}
 
 		const auth = this.state.server.auth;
+		let signedAuthToken: string;
 
 		try {
-			authToken = signedAuthToken;
-			signedAuthToken = await auth.signToken(authToken);
+			signedAuthToken = await auth.signToken(authToken, options as jwt.SignOptions);
 		} catch (err) {
 			this.onError(err);
 			this.disconnect(4002, err.toString());
