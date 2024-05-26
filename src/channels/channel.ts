@@ -5,16 +5,13 @@ import { Channels } from "./channels.js";
 import { DemuxedConsumableStream, StreamDemux } from "@socket-mesh/stream-demux";
 import { ChannelListeners } from "./channel-listeners.js";
 import { ChannelOutput } from "./channel-output.js";
-import { ChannelEvent, ChannelSubscribeEvent, ChannelSubscribeFailEvent, ChannelSubscribeStateChangeEvent, ChannelUnsubscribeEvent } from "./channel-events.js";
+import { ChannelEvent, SubscribeEvent, SubscribeFailEvent, SubscribeStateChangeEvent, UnsubscribeEvent } from "./channel-events.js";
 import { WritableStreamConsumer } from "@socket-mesh/writable-consumable-stream";
-import { ClientMap } from "../maps/client-map.js";
+import { ChannelMap } from "./channel-map.js";
 
-export class Channel<
-	TSocketMap extends ClientMap,
-	TItem
-> extends ConsumableStream<TItem> {
-	readonly channels: Channels<TSocketMap>;
-	readonly listeners: ChannelListeners<TSocketMap['Channel']>;
+export class Channel<TChannelMap extends ChannelMap, TItem> extends ConsumableStream<TItem> {
+	readonly channels: Channels<TChannelMap>;
+	readonly listeners: ChannelListeners<TChannelMap>;
 	readonly name: string;
 	readonly output: ChannelOutput;
 
@@ -23,9 +20,9 @@ export class Channel<
 
 	constructor(
 		name: string,
-		channels: Channels<TSocketMap>,
+		channels: Channels<TChannelMap>,
 		eventDemux: StreamDemux<ChannelEvent>,
-		dataDemux: StreamDemux<TSocketMap['Channel'][keyof TSocketMap['Channel'] & string]>
+		dataDemux: StreamDemux<TChannelMap[keyof TChannelMap & string]>
 	) {
 		super();
 
@@ -38,19 +35,19 @@ export class Channel<
 		this._dataStream = dataDemux.listen(this.name);
 	}
 
-	emit(event: 'subscribe', data: ChannelSubscribeEvent): void;
-	emit(event: 'subscribeStateChange', data: ChannelSubscribeStateChangeEvent): void;
-	emit(event: 'subscribeFail', data: ChannelSubscribeFailEvent): void;
-	emit(event: 'unsubscribe', data: ChannelUnsubscribeEvent): void;
+	emit(event: 'subscribe', data: SubscribeEvent): void;
+	emit(event: 'subscribeStateChange', data: SubscribeStateChangeEvent): void;
+	emit(event: 'subscribeFail', data: SubscribeFailEvent): void;
+	emit(event: 'unsubscribe', data: UnsubscribeEvent): void;
 	emit<U>(event: string, data: U): void;
-	emit<U>(event: string, data: U): void {
-		this._eventDemux.write(`${this.name}/${event}`, data);
+	emit<U>(event: string, data: U | ChannelEvent): void {
+		this._eventDemux.write(`${this.name}/${event}`, data as ChannelEvent);
 	}
 
-	listen(event: 'subscribe'): DemuxedConsumableStream<ChannelSubscribeEvent>;
-	listen(event: 'subscribeStateChange'): DemuxedConsumableStream<ChannelSubscribeStateChangeEvent>;
-	listen(event: 'subscribeFail'): DemuxedConsumableStream<ChannelSubscribeFailEvent>;
-	listen(event: 'unsubscribe'): DemuxedConsumableStream<ChannelUnsubscribeEvent>;
+	listen(event: 'subscribe'): DemuxedConsumableStream<SubscribeEvent>;
+	listen(event: 'subscribeStateChange'): DemuxedConsumableStream<SubscribeStateChangeEvent>;
+	listen(event: 'subscribeFail'): DemuxedConsumableStream<SubscribeFailEvent>;
+	listen(event: 'unsubscribe'): DemuxedConsumableStream<UnsubscribeEvent>;
 	listen<U>(event: string): DemuxedConsumableStream<U>;
 	listen<U>(event: string): DemuxedConsumableStream<ChannelEvent | U> {
 		return this._eventDemux.listen(`${this.name}/${event}`);

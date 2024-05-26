@@ -1,5 +1,5 @@
 import { ServerSocketState } from "../../server/server-socket-state.js";
-import { ChannelMap } from "../channels/channel-map.js";
+import { ChannelMap } from "../../channels/channel-map.js";
 import { ClientMap, ClientPrivateMap } from "./client-map.js";
 import { MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap } from "./method-map.js";
 import { BasicServerMap, ServerMap, ServerPrivateMap } from "./server-map.js";

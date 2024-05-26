@@ -1,9 +1,6 @@
-import { ChannelMap } from "../../client/channels/channel-map.js";
+import { ChannelMap } from "../../channels/channel-map.js";
+import { Channels } from "../../channels/channels.js";
 
-export interface Exchange<T extends ChannelMap> {
+export abstract class Exchange<T extends ChannelMap> extends Channels<T> {
 	id: string;
-
-	transmitPublish<U extends keyof T & string>(channelName: U, data: T[U]): Promise<void>;
-
-	invokePublish<U extends keyof T & string>(channelName: U, data: T[U]): Promise<void>;
 }

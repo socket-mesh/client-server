@@ -6,7 +6,7 @@ import { removeAuthTokenHandler } from "./handlers/remove-auth-token.js";
 import { SignedAuthToken } from "@socket-mesh/auth";
 import { hydrateError } from "@socket-mesh/errors";
 import { wait } from "../utils.js";
-import { Channels } from "./channels/channels.js";
+import { ClientChannels } from "./client-channels.js";
 import { SocketMapFromClient } from "./maps/socket-map.js";
 import { ClientMap } from "./maps/client-map.js";
 import { publishHandler } from "./handlers/publish.js";
@@ -37,7 +37,7 @@ function createSocket(options: ClientSocketOptions | string | URL): ws.WebSocket
 
 export class ClientSocket<T extends ClientMap> extends Socket<SocketMapFromClient<T>> {
 	private readonly _clientTransport: ClientTransport<T>;
-	public readonly channels: Channels<T>;
+	public readonly channels: ClientChannels<T>;
 
 	constructor(address: string | URL);
 	constructor(options: ClientSocketOptions<T>);
@@ -60,7 +60,7 @@ export class ClientSocket<T extends ClientMap> extends Socket<SocketMapFromClien
 		super(clientTransport);
 
 		this._clientTransport = clientTransport;
-		this.channels = new Channels<T>(this._clientTransport, options);
+		this.channels = new ClientChannels<T>(this._clientTransport, options);
 
 		if (options.autoConnect !== false) {
 			this.connect(options);
@@ -114,7 +114,7 @@ export class ClientSocket<T extends ClientMap> extends Socket<SocketMapFromClien
 
 	public async authenticate(signedAuthToken: SignedAuthToken): Promise<void> {
 		try {
-			await this._clientTransport.invoke('#authenticate', signedAuthToken);
+			await this._clientTransport.invoke('#authenticate', signedAuthToken)[0];
 
 			this._clientTransport.setAuthorization(signedAuthToken);
 

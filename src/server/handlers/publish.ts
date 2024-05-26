@@ -1,7 +1,7 @@
 import { RequestHandlerArgs } from "../../request-handler.js";
 import { BasicSocketMapServer } from "../../client/maps/socket-map.js";
 import { InvalidActionError } from "@socket-mesh/errors";
-import { PublishOptions } from "../../client/maps/client-map.js";
+import { PublishOptions } from "../../channels/channels.js";
 
 export async function publishHandler(
 	{ transport, options }: RequestHandlerArgs<PublishOptions, BasicSocketMapServer<{}, { [channel: string]: any }>>

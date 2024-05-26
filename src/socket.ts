@@ -2,7 +2,7 @@ import { CodecEngine } from "@socket-mesh/formatter";
 import { AnyMiddleware } from "./middleware/middleware.js";
 import { AnyPacket } from "./request";
 import { AsyncStreamEmitter } from "@socket-mesh/async-stream-emitter";
-import { SocketEvent, AuthenticationEvent, BadAuthTokenEvent, CloseEvent, ConnectEvent, DisconnectEvent, ErrorEvent, MessageEvent, PingEvent, PongEvent, RequestEvent, UnexpectedResponseEvent, UpgradeEvent, ResponseEvent, AuthStateChangeEvent, RemoveAuthTokenEvent, ConnectingEvent, SubscribeEvent, SubscribeStateChangeEvent, UnsubscribeEvent, SubscribeFailEvent } from "./socket-event.js";
+import { SocketEvent, AuthenticationEvent, BadAuthTokenEvent, CloseEvent, ConnectEvent, DisconnectEvent, ErrorEvent, MessageEvent, PingEvent, PongEvent, RequestEvent, UnexpectedResponseEvent, UpgradeEvent, ResponseEvent, AuthStateChangeEvent, RemoveAuthTokenEvent, ConnectingEvent } from "./socket-event.js";
 import { FunctionReturnType, MethodMap, ServiceMap } from "./client/maps/method-map.js";
 import { HandlerMap } from "./client/maps/handler-map.js";
 import { SocketTransport } from "./socket-transport.js";
@@ -84,11 +84,6 @@ export class Socket<T extends SocketMap> extends AsyncStreamEmitter<SocketEvent<
 	emit(eventName: 'removeAuthToken', data: RemoveAuthTokenEvent): void;
 	emit(eventName: 'request', data: RequestEvent<T['Service'], T['Incoming']>): void;
 	emit(eventName: 'response', data: ResponseEvent<T['Service'], T['Outgoing'], T['PrivateOutgoing']>): void;
-	emit(eventName: 'subscribe', data: SubscribeEvent): void;
-	emit(eventName: 'subscribeFail', data: SubscribeFailEvent): void;
-	emit(eventName: 'subscribeRequest', data: SubscribeEvent): void;
-	emit(eventName: 'subscribeStateChange', data: SubscribeStateChangeEvent): void;
-	emit(eventName: 'unsubscribe', data: UnsubscribeEvent): void;
 	emit(eventName: 'unexpectedResponse', data: UnexpectedResponseEvent): void;
 	emit(eventName: 'upgrade', data: UpgradeEvent): void;
 	emit(eventName: string, data: SocketEvent<T>): void {
@@ -112,11 +107,6 @@ export class Socket<T extends SocketMap> extends AsyncStreamEmitter<SocketEvent<
 	listen(eventName: 'removeAuthToken'): DemuxedConsumableStream<RemoveAuthTokenEvent>;
 	listen(eventName: 'request'): DemuxedConsumableStream<RequestEvent<T['Service'], T['Incoming']>>;
 	listen(eventName: 'response'): DemuxedConsumableStream<ResponseEvent<T['Service'], T['Outgoing'], T['PrivateOutgoing']>>;
-	listen(eventName: 'subscribe'): DemuxedConsumableStream<SubscribeEvent>;
-	listen(eventName: 'subscribeFail'): DemuxedConsumableStream<SubscribeFailEvent>;
-	listen(eventName: 'subscribeRequest'): DemuxedConsumableStream<SubscribeEvent>;
-	listen(eventName: 'subscribeStateChange'): DemuxedConsumableStream<SubscribeStateChangeEvent>;
-	listen(eventName: 'unsubscribe'): DemuxedConsumableStream<UnsubscribeEvent>;
 	listen(eventName: 'unexpectedResponse'): DemuxedConsumableStream<UnexpectedResponseEvent>;
 	listen(eventName: 'upgrade'): DemuxedConsumableStream<UpgradeEvent>;
 	listen<U extends SocketEvent<T>, V = U>(eventName: string): DemuxedConsumableStream<V>;
@@ -155,6 +145,6 @@ export class Socket<T extends SocketMap> extends AsyncStreamEmitter<SocketEvent<
 		methodOptions: TMethod | [TService, TServiceMethod, (number | false)?] | InvokeServiceOptions<T['Service'], TService, TServiceMethod> | InvokeMethodOptions<T['Outgoing'], TMethod>,
 		arg?: Parameters<T['Outgoing'][TMethod] | T['Service'][TService][TServiceMethod]>[0]): Promise<FunctionReturnType<T['Service'][TService][TServiceMethod] | T['Outgoing'][TMethod]>> {
 
-		return this._transport.invoke(methodOptions as TMethod, arg);
+		return this._transport.invoke(methodOptions as TMethod, arg)[0];
 	}
 }

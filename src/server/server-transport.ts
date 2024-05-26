@@ -53,7 +53,7 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 
 		if (auth.rejectOnFailedDelivery) {
 			try {
-				await this.invoke('#setAuthToken', signedAuthToken);
+				await this.invoke('#setAuthToken', signedAuthToken)[0];
 			} catch (err) {
 				let error: AuthError;
 

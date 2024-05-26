@@ -555,14 +555,14 @@ describe('Integration tests', function () {
 				isAuthenticated = !!client.signedAuthToken;
 			})();
 
-			await client.listen('subscribe').once(100);
+			await client.channels.listen('subscribe').once(100);
 			assert.strictEqual(privateChannel.state, 'subscribed');
 
 			client.disconnect();
 			assert.strictEqual(privateChannel.state, 'pending');
 
 			client.authenticate(validSignedAuthTokenBob);
-			await client.listen('subscribe').once(100);
+			await client.channels.listen('subscribe').once(100);
 			assert.strictEqual(privateChannel.state, 'subscribed');
 
 			assert.strictEqual(isAuthenticated, true);

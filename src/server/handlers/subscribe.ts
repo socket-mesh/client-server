@@ -38,14 +38,14 @@ export async function subscribeHandler(
 		}
 
 		try {
-			server.brokerEngine.subscribeSocket(transport, channel);
+			server.brokerEngine.subscribe(transport, channel);
 		} catch (error) {
 			delete state.channelSubscriptions[channel];
 			state.channelSubscriptionsCount--;
 			throw error;
 		}
 		
-		socket.emit('subscribe', { channel, options: channelOptions });
+		server.exchange.emit('subscribe', { channel, options: channelOptions });
 	} catch (err) {
 		throw new BrokerError(`Failed to subscribe socket to the ${options.channel} channel - ${err}`);
 	}

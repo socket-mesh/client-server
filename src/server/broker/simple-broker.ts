@@ -1,13 +1,12 @@
 import { Broker } from "./broker.js";
-import { ChannelMap } from "../../client/channels/channel-map.js";
-import { BasicSocketMapServer } from "../../client/maps/socket-map.js";
-import { PublishOptions } from "../../client/maps/client-map.js";
-import { SocketTransport } from "../../socket-transport.js";
+import { ChannelMap } from "../../channels/channel-map.js";
 import { SimpleExchange } from "./simple-exchange.js";
+import { ExchangeClient } from "./exchange-client.js";
+import { PublishOptions } from "../../channels/channels.js";
 
 export class SimpleBroker<T extends ChannelMap> extends Broker<T> {
 	readonly exchange: SimpleExchange<T>;
-	private readonly _clientSubscribers: { [channelName: string]: {[id: string]: SocketTransport<BasicSocketMapServer>} };
+	private readonly _clientSubscribers: { [channelName: string]: {[id: string]: ExchangeClient} };
 	private readonly _clientSubscribersCounter: {[ channelName: string ]: number};
 
 	constructor() {
@@ -18,23 +17,23 @@ export class SimpleBroker<T extends ChannelMap> extends Broker<T> {
 		this._clientSubscribersCounter = {};
 	}
 
-	subscribeSocket(transport: SocketTransport<BasicSocketMapServer>, channelName: string): void {
+	subscribe(client: ExchangeClient, channelName: string): void {
 		if (!this._clientSubscribers[channelName]) {
 			this._clientSubscribers[channelName] = {};
 			this._clientSubscribersCounter[channelName] = 0;
 			this.emit('subscribe', { channel: channelName });
 		}
-		if (!this._clientSubscribers[channelName][transport.id]) {
+		if (!this._clientSubscribers[channelName][client.id]) {
 			this._clientSubscribersCounter[channelName]++;
 		}
-		this._clientSubscribers[channelName][transport.id] = transport;
+		this._clientSubscribers[channelName][client.id] = client;
 	}
 
-	unsubscribeSocket(transport: SocketTransport<BasicSocketMapServer>, channelName: string): void {
+	unsubscribe(client: ExchangeClient, channelName: string): void {
 		if (this._clientSubscribers[channelName]) {
-			if (this._clientSubscribers[channelName][transport.id]) {
+			if (this._clientSubscribers[channelName][client.id]) {
 				this._clientSubscribersCounter[channelName]--;
-				delete this._clientSubscribers[channelName][transport.id];
+				delete this._clientSubscribers[channelName][client.id];
 
 				if (this._clientSubscribersCounter[channelName] <= 0) {
 					delete this._clientSubscribers[channelName];

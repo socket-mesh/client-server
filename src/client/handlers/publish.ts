@@ -1,7 +1,8 @@
+import { PublishOptions } from "../../channels/channels.js";
 import { RequestHandlerArgs } from "../../request-handler.js";
 import { ClientSocket } from "../client-socket.js";
 import { ClientTransport } from "../client-transport.js";
-import { ClientMap, PublishOptions } from "../maps/client-map.js";
+import { ClientMap } from "../maps/client-map.js";
 import { BasicSocketMapClient } from "../maps/socket-map.js";
 
 export async function publishHandler(

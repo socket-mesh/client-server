@@ -22,14 +22,14 @@ export async function unsubscribeHandler(
 	try {
 		const server = state.server;
 
-		server.brokerEngine.unsubscribeSocket(this, channel);
+		server.brokerEngine.unsubscribe(transport, channel);
 		delete state.channelSubscriptions[channel];
 
 		if (state.channelSubscriptionsCount != null) {
 			state.channelSubscriptionsCount--;
 		}
 
-		socket.emit('unsubscribe', { channel });
+		server.exchange.emit('unsubscribe', { channel });
 	} catch (err) {
 		throw new BrokerError(`Failed to unsubscribe socket from the ${channel} channel - ${err}`);
 	}

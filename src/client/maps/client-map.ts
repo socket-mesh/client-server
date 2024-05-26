@@ -1,7 +1,8 @@
 import { SignedAuthToken } from "@socket-mesh/auth"
-import { ChannelMap } from "../channels/channel-map.js"
+import { ChannelMap } from "../../channels/channel-map.js"
 import { MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap } from "./method-map.js"
 import { ServerMap } from "./server-map.js"
+import { PublishOptions } from "../../channels/channels.js"
 
 export interface ClientMap {
 	Channel: ChannelMap,
@@ -19,11 +20,6 @@ export interface ClientMapFromServer<T extends ServerMap> {
 	Outgoing: PublicMethodMap,
 	PrivateOutgoing: T['PrivateIncoming'],
 	State: object
-}
-
-export interface PublishOptions {
-	channel: string,
-	data: any
 }
 
 // Typescript automatically adds an index signature to type definitions (vs interfaces). 

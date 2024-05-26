@@ -726,17 +726,17 @@ export class SocketTransport<T extends SocketMap> {
 	}
 
 	public invoke<TMethod extends keyof T['Outgoing']>(
-		method: TMethod, arg?: Parameters<T['Outgoing'][TMethod]>[0], bypassMiddleware?: boolean): AbortablePromise<FunctionReturnType<T['Outgoing'][TMethod]>>;
+		method: TMethod, arg?: Parameters<T['Outgoing'][TMethod]>[0], bypassMiddleware?: boolean): [Promise<FunctionReturnType<T['Outgoing'][TMethod]>>, () => void];
 	public invoke<TService extends keyof T['Service'], TMethod extends keyof T['Service'][TService]>(
-		options: [TService, TMethod, (number | false)?], arg?: Parameters<T['Service'][TService][TMethod]>[0], bypassMiddleware?: boolean): AbortablePromise<FunctionReturnType<T['Service'][TService][TMethod]>>;
+		options: [TService, TMethod, (number | false)?], arg?: Parameters<T['Service'][TService][TMethod]>[0], bypassMiddleware?: boolean): [Promise<FunctionReturnType<T['Service'][TService][TMethod]>>, () => void];
 	public invoke<TService extends keyof T['Service'], TMethod extends keyof T['Service'][TService]>(
-		options: InvokeServiceOptions<T['Service'], TService, TMethod>, arg?: Parameters<T['Service'][TService][TMethod]>[0], bypassMiddleware?: boolean): AbortablePromise<FunctionReturnType<T['Service'][TService][TMethod]>>;
+		options: InvokeServiceOptions<T['Service'], TService, TMethod>, arg?: Parameters<T['Service'][TService][TMethod]>[0], bypassMiddleware?: boolean): [Promise<FunctionReturnType<T['Service'][TService][TMethod]>>, () => void];
 	public invoke<TMethod extends keyof T['Outgoing']>(
-		options: InvokeMethodOptions<T['Outgoing'], TMethod>, arg?: Parameters<T['Outgoing'][TMethod]>[0], bypassMiddleware?: boolean): AbortablePromise<FunctionReturnType<T['Outgoing'][TMethod]>>;
+		options: InvokeMethodOptions<T['Outgoing'], TMethod>, arg?: Parameters<T['Outgoing'][TMethod]>[0], bypassMiddleware?: boolean): [Promise<FunctionReturnType<T['Outgoing'][TMethod]>>, () => void];
 	public invoke<TMethod extends keyof T['PrivateOutgoing']>(
-		method: TMethod, arg: Parameters<T['PrivateOutgoing'][TMethod]>[0], bypassMiddleware?: boolean): AbortablePromise<FunctionReturnType<T['PrivateOutgoing'][TMethod]>>;
+		method: TMethod, arg: Parameters<T['PrivateOutgoing'][TMethod]>[0], bypassMiddleware?: boolean): [Promise<FunctionReturnType<T['PrivateOutgoing'][TMethod]>>, () => void];
 	public invoke<TMethod extends keyof T['PrivateOutgoing']>(
-		options: InvokeMethodOptions<T['PrivateOutgoing'], TMethod>, arg?: Parameters<T['PrivateOutgoing'][TMethod]>[0], bypassMiddleware?: boolean): AbortablePromise<FunctionReturnType<T['PrivateOutgoing'][TMethod]>>;
+		options: InvokeMethodOptions<T['PrivateOutgoing'], TMethod>, arg?: Parameters<T['PrivateOutgoing'][TMethod]>[0], bypassMiddleware?: boolean): [Promise<FunctionReturnType<T['PrivateOutgoing'][TMethod]>>, () => void];
 	public invoke<
 		TService extends keyof T['Service'],
 		TServiceMethod extends keyof T['Service'][TService],
@@ -746,7 +746,7 @@ export class SocketTransport<T extends SocketMap> {
 		methodOptions: TMethod | TPrivateMethod | [TService, TServiceMethod, (number | false)?] | InvokeServiceOptions<T['Service'], TService, TServiceMethod> | InvokeMethodOptions<T['Outgoing'], TMethod> | InvokeMethodOptions<T['PrivateOutgoing'], TPrivateMethod>,
 		arg?: (Parameters<T['Outgoing'][TMethod] | T['PrivateOutgoing'][TPrivateMethod] | T['Service'][TService][TServiceMethod]>)[0],
 		bypassMiddleware?: boolean
-	): AbortablePromise<FunctionReturnType<T['Service'][TService][TServiceMethod] | T['Outgoing'][TMethod] | T['PrivateOutgoing'][TPrivateMethod]>> {
+	): [Promise<FunctionReturnType<T['Service'][TService][TServiceMethod] | T['Outgoing'][TMethod] | T['PrivateOutgoing'][TPrivateMethod]>>, () => void] {
 
 		let service: TService;
 		let serviceMethod: TServiceMethod;
@@ -839,6 +839,6 @@ export class SocketTransport<T extends SocketMap> {
 
 		this.sendRequest([request as any]);
 
-		return Object.assign(promise, { abort });
+		return [promise, abort];
 	}
 }

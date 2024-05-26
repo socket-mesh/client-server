@@ -1,11 +1,9 @@
 import { AsyncStreamEmitter } from "@socket-mesh/async-stream-emitter";
 import { DemuxedConsumableStream, StreamEvent } from "@socket-mesh/stream-demux";
 import { BrokerEvent, ErrorEvent, PublishEvent, ReadyEvent, SubscribeEvent, UnsubscribeEvent } from "./broker-events.js";
-import { ChannelMap } from "../../client/channels/channel-map.js";
-import { Socket } from "../../socket.js";
-import { BasicSocketMapServer } from "../../client/maps/socket-map.js";
+import { ChannelMap } from "../../channels/channel-map.js";
 import { Exchange } from "./exchange.js";
-import { SocketTransport } from "../../socket-transport.js";
+import { ExchangeClient } from "./exchange-client.js";
 
 export abstract class Broker<T extends ChannelMap> extends AsyncStreamEmitter<BrokerEvent<T[keyof T]>>  {
 	isReady: boolean;
@@ -42,13 +40,13 @@ export abstract class Broker<T extends ChannelMap> extends AsyncStreamEmitter<Br
 
 	abstract readonly exchange: Exchange<T>;
 
-	abstract subscribeSocket(socket: SocketTransport<BasicSocketMapServer>, channelName: string): void;
+	abstract subscribe(socket: ExchangeClient, channelName: string): void;
 
 	abstract subscriptions(): string[];
 	
 	abstract isSubscribed(channelName: string): boolean;
 
-	abstract unsubscribeSocket(socket: SocketTransport<BasicSocketMapServer>, channelName: string): void;
+	abstract unsubscribe(socket: ExchangeClient, channelName: string): void;
 
 	abstract transmitPublish<U extends keyof T & string>(channelName: U, data: T[U], suppressEvent?: boolean): Promise<void>;
 

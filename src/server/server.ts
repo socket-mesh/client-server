@@ -191,13 +191,13 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 			onUnhandledRequest: this.onUnhandledRequest.bind(this)
 		});
 
-		this.bind(socket);
-
-		this._clients[socket.id] = {
-			type: 'server',
-			socket,
-			isAlive: true
-		}
+		this.bind(
+			this._clients[socket.id] = {
+				type: 'server',
+				socket,
+				isAlive: true
+			}
+		);
 
 //		ws.on('error', console.error);
 
@@ -228,17 +228,26 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 */
 	}
 
-	private bind(
-		socket: ClientSocket<ClientMapFromServer<T>> | ServerSocket<T>
-	) {
+	private bind(details: ClientSocketDetails<T> | ServerSocketDetails<T>) {
 		(async () => {
-			for await (let event of socket.listen()) {
+			for await (let event of details.socket.listen()) {
 				this.emit(
 					`socket${event.stream[0].toUpperCase()}${event.stream.substring(1)}` as any,
 					event.value
 				);
 			}
 		})();
+
+		if (details.type === 'client') {
+			(async () => {
+				for await (let event of details.socket.channels.listen()) {
+					this.emit(
+						`socket${event.stream[0].toUpperCase()}${event.stream.substring(1)}` as any,
+						event.value
+					);
+				}
+			})();	
+		}
 	}
 
 	private onError(error: Error | string): void {

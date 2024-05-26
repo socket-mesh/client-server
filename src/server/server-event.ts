@@ -6,14 +6,11 @@ import {
 	MessageEvent, PingEvent, PongEvent, RequestEvent, ResponseEvent, UnexpectedResponseEvent, UpgradeEvent,
 	AuthenticatedChangeEvent,
 	ConnectingEvent,
-	RemoveAuthTokenEvent,
-	UnsubscribeEvent,
-	SubscribeStateChangeEvent,
-	SubscribeEvent,
-	SubscribeFailEvent
+	RemoveAuthTokenEvent
 } from "../socket-event.js";
 import { ServerMap } from "../client/maps/server-map.js";
 import { ClientMapFromServer } from "../client/maps/client-map.js";
+import { SubscribeEvent, SubscribeFailEvent, SubscribeStateChangeEvent, UnsubscribeEvent } from "../channels/channel-events.js";
 
 export type ServerEvent<T extends ServerMap> =
 	ConnectionEvent<T> |

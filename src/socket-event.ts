@@ -4,8 +4,8 @@ import { MethodPacket, ServicePacket } from "./request.js";
 import { PublicMethodMap, ServiceMap, MethodMap, PrivateMethodMap } from "./client/maps/method-map.js";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
 import { AnyResponse } from "./response.js";
-import { ChannelState } from "./client/channels/channel-state.js";
-import { ChannelOptions } from "./client/channels/channel-options.js";
+import { ChannelState } from "./channels/channel-state.js";
+import { ChannelOptions } from "./channels/channel-options.js";
 import { SocketMap } from "./client/maps/socket-map.js";
 
 export type SocketEvent<T extends SocketMap> =
@@ -23,10 +23,6 @@ export type SocketEvent<T extends SocketMap> =
 	PongEvent |
 	RequestEvent<T['Service'], T['Incoming']> |
 	ResponseEvent<T['Service'], T['Outgoing'], T['PrivateOutgoing']> |
-	SubscribeEvent |
-	SubscribeFailEvent |
-	SubscribeStateChangeEvent |
-	UnsubscribeEvent |
 	UnexpectedResponseEvent |
 	UpgradeEvent;
 
@@ -106,30 +102,9 @@ export interface ResponseEvent<
 	response: AnyResponse<TServiceMap, TOutgoingMap, TPrivateOutgoingMap>
 }
 
-export interface SubscribeEvent {
-	channel: string,
-	options: ChannelOptions
-}
-
-export interface SubscribeFailEvent {
-	channel: string,
-	options: ChannelOptions,
-	error: Error
-}
-
-export interface SubscribeStateChangeEvent {
-	channel: string,
-	oldState: ChannelState,
-	newState: ChannelState
-}
-
 export interface UnexpectedResponseEvent {
 	request: ClientRequest,
 	response: IncomingMessage
-}
-
-export interface UnsubscribeEvent {
-	channel: string
 }
 
 export interface UpgradeEvent {
