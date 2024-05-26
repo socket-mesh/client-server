@@ -1,17 +1,16 @@
 import defaultCodec, { CodecEngine } from "@socket-mesh/formatter";
 import ws from "isomorphic-ws";
-import { AnyMiddleware, Middleware } from "./middleware/middleware.js";
+import { Middleware } from "./middleware/middleware.js";
 import { AnyPacket, AnyRequest, InvokeMethodRequest, InvokeServiceRequest, MethodPacket, TransmitMethodRequest, TransmitServiceRequest } from "./request.js";
 import { AbortError, BadConnectionError, InvalidActionError, InvalidArgumentsError, MiddlewareBlockedError, MiddlewareCaughtError, MiddlewareError, SocketProtocolError, TimeoutError, dehydrateError, socketProtocolErrorStatuses, socketProtocolIgnoreStatuses } from "@socket-mesh/errors";
 import { ClientRequest, IncomingMessage } from "http";
-import { PublicMethodMap, FunctionReturnType, MethodMap, ServiceMap } from "./client/maps/method-map.js";
+import { FunctionReturnType, MethodMap, ServiceMap } from "./client/maps/method-map.js";
 import { AnyResponse, MethodDataResponse } from "./response.js";
 import { HandlerMap } from "./client/maps/handler-map.js";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
 import { Socket, SocketStatus } from "./socket.js";
 import base64id from "base64id";
 import { RequestHandlerArgs } from "./request-handler.js";
-import { AbortablePromise } from "./utils.js";
 import { SocketMap } from "./client/maps/socket-map.js";
 
 export type CallIdGenerator = () => number;
@@ -23,7 +22,7 @@ export interface SocketOptions<T extends SocketMap, TSocket extends Socket<T> = 
 	handlers?: HandlerMap<T>;
 	onUnhandledRequest?: (socket: TSocket, packet: AnyPacket<T['Service'], T['Incoming']>) => boolean,
 	codecEngine?: CodecEngine,
-	middleware?: AnyMiddleware<T>[],
+	middleware?: Middleware<T>[],
 	state?: T['State']
 }
 
@@ -55,7 +54,7 @@ export class SocketTransport<T extends SocketMap> {
 	private _handlers: HandlerMap<T>;
 	private _onUnhandledRequest: (socket: this, packet: AnyPacket<T['Service'], T['Incoming']>) => boolean;
 	public readonly codecEngine: CodecEngine;
-	public readonly middleware: AnyMiddleware<T>[];
+	public readonly middleware: Middleware<T>[];
 	public readonly state: Partial<T['State']>;
 	public id: string;
 	public ackTimeoutMs: number;
@@ -421,7 +420,7 @@ export class SocketTransport<T extends SocketMap> {
 		}
 	}
 
-	public callMiddleware(middleware: Middleware, fn: () => void): void {
+	public callMiddleware(middleware: Middleware<T>, fn: () => void): void {
 		try {
 			fn();
 		} catch (err) {

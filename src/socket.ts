@@ -1,5 +1,4 @@
 import { CodecEngine } from "@socket-mesh/formatter";
-import { AnyMiddleware } from "./middleware/middleware.js";
 import { AnyPacket } from "./request";
 import { AsyncStreamEmitter } from "@socket-mesh/async-stream-emitter";
 import { SocketEvent, AuthenticationEvent, BadAuthTokenEvent, CloseEvent, ConnectEvent, DisconnectEvent, ErrorEvent, MessageEvent, PingEvent, PongEvent, RequestEvent, UnexpectedResponseEvent, UpgradeEvent, ResponseEvent, AuthStateChangeEvent, RemoveAuthTokenEvent, ConnectingEvent } from "./socket-event.js";
@@ -9,6 +8,7 @@ import { SocketTransport } from "./socket-transport.js";
 import { DemuxedConsumableStream, StreamEvent } from "@socket-mesh/stream-demux";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
 import { SocketMap } from "./client/maps/socket-map.js";
+import { Middleware } from "./middleware/middleware";
 
 export type CallIdGenerator = () => number;
 
@@ -19,7 +19,7 @@ export interface SocketOptions<T extends SocketMap, TSocket extends Socket<T> = 
 	handlers?: HandlerMap<T>;
 	onUnhandledRequest?: (socket: TSocket, packet: AnyPacket<T['Service'], T['Incoming']>) => boolean,
 	codecEngine?: CodecEngine,
-	middleware?: AnyMiddleware<T>[],
+	middleware?: Middleware<T>[],
 	state?: T['State']
 }
 

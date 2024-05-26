@@ -1,20 +1,25 @@
-import { SocketMap } from "../client/maps/socket-map.js";
+import { EmptySocketMap, SocketMap } from "../client/maps/socket-map.js";
+import { AnyRequest } from "../request.js";
+import { AnyResponse } from "../response.js";
 import { SocketStatus } from "../socket.js";
-import { RequestMiddleware } from "./request-middleware.js";
-import { ResponseMiddleware } from "./response-middleware.js";
 
 export type MiddlewareType = 'request' | 'response' | 'handshake';
 
-export type AnyMiddleware<T extends SocketMap> = 
-	RequestMiddleware<T['Service'], T['Outgoing'], T['PrivateOutgoing']> |
-	ResponseMiddleware<T['Service'], T['Incoming']> |
-	Middleware;
-
-export interface Middleware {
+export interface Middleware<T extends SocketMap = EmptySocketMap> {
 	type: string,
-	onAuthenticate?: () => void,
-	onClose?: () => void,
-	onDeauthenticate?: () => void,
-	onDisconnect?: (status: SocketStatus, code: number, reason?: string) => void,
-	onOpen?: () => void
+	publishIn?(): void,
+	publishOut?(): void,
+	onAuthenticate?() : void,
+	onClose?() : void,
+	onDeauthenticate?() : void,
+	onDisconnect?(status: SocketStatus, code: number, reason?: string): void,
+	onOpen?() : void,
+	sendRequest?(
+		requests: AnyRequest<T['Service'], T['PrivateOutgoing'], T['Outgoing']>[],
+		cont: (requests: AnyRequest<T['Service'], T['PrivateOutgoing'], T['Outgoing']>[]) => void
+	): void,
+	sendResponse?(
+		responses: AnyResponse<T['Service'], T['Incoming']>[],
+		cont: (requests: AnyResponse<T['Service'], T['Incoming']>[]) => void
+	): void
 }
