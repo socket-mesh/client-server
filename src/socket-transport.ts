@@ -2,7 +2,7 @@ import defaultCodec, { CodecEngine } from "@socket-mesh/formatter";
 import ws from "isomorphic-ws";
 import { Middleware } from "./middleware/middleware.js";
 import { AnyPacket, AnyRequest, InvokeMethodRequest, InvokeServiceRequest, MethodPacket, TransmitMethodRequest, TransmitServiceRequest } from "./request.js";
-import { AbortError, AuthError, BadConnectionError, InvalidActionError, InvalidArgumentsError, MiddlewareBlockedError, MiddlewareCaughtError, MiddlewareError, SocketProtocolError, TimeoutError, dehydrateError, socketProtocolErrorStatuses, socketProtocolIgnoreStatuses } from "@socket-mesh/errors";
+import { AbortError, BadConnectionError, InvalidActionError, InvalidArgumentsError, MiddlewareBlockedError, MiddlewareCaughtError, MiddlewareError, SocketProtocolError, TimeoutError, dehydrateError, socketProtocolErrorStatuses, socketProtocolIgnoreStatuses } from "@socket-mesh/errors";
 import { ClientRequest, IncomingMessage } from "http";
 import { FunctionReturnType, MethodMap, ServiceMap } from "./client/maps/method-map.js";
 import { AnyResponse, MethodDataResponse } from "./response.js";
@@ -12,6 +12,7 @@ import { Socket, SocketStatus } from "./socket.js";
 import base64id from "base64id";
 import { RequestHandlerArgs } from "./request-handler.js";
 import { SocketMap } from "./client/maps/socket-map.js";
+import { wait } from "./utils.js";
 
 export type CallIdGenerator = () => number;
 
@@ -167,24 +168,28 @@ export class SocketTransport<T extends SocketMap> {
 				authToken = this.extractAuthTokenData(signedAuthToken);
 			}
 
-			const wasAuthenticated = !!this._signedAuthToken;
-
 			this._authToken = authToken;
 			this._signedAuthToken = signedAuthToken;
-
-			this._socket.emit('authStateChange', { wasAuthenticated, isAuthenticated: true, authToken, signedAuthToken });
-			this._socket.emit('authenticate', { signedAuthToken, authToken });
-
-			for (const middleware of this.middleware) {
-				if (middleware.onAuthenticated) {
-					middleware.onAuthenticated();
-				}	
-			}
 
 			return true;
 		}
 
 		return false;
+	}
+
+	public triggerAuthenticationEvents(wasAuthenticated: boolean): void {
+		this._socket.emit(
+			'authStateChange',
+			{ wasAuthenticated, isAuthenticated: true, authToken: this._authToken, signedAuthToken: this._signedAuthToken }
+		);
+
+		this._socket.emit('authenticate', { signedAuthToken: this._signedAuthToken, authToken: this._authToken });
+
+		for (const middleware of this.middleware) {
+			if (middleware.onAuthenticated) {
+				middleware.onAuthenticated();
+			}
+		}
 	}
 
 	private extractAuthTokenData(signedAuthToken: SignedAuthToken): any {
@@ -215,7 +220,11 @@ export class SocketTransport<T extends SocketMap> {
 			this._authToken = null;
 			this._signedAuthToken = null;	
 
-			this._socket.emit('authStateChange', { wasAuthenticated: true, isAuthenticated: false, authToken, signedAuthToken });
+			this._socket.emit('authStateChange', { wasAuthenticated: true, isAuthenticated: false });
+
+			// Needs to be executed the auth state change event.
+			await wait(0);
+
 			this._socket.emit('deauthenticate', { signedAuthToken, authToken });
 
 			for (const middleware of this.middleware) {

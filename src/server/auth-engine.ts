@@ -3,6 +3,10 @@ import crypto from "crypto";
 import jwt from 'jsonwebtoken';
 import { InvalidArgumentsError } from '@socket-mesh/errors';
 
+export interface AuthTokenOptions {
+	rejectOnFailedDelivery?: boolean;
+}
+
 export interface AuthEngine {
 	readonly rejectOnFailedDelivery: boolean;
 

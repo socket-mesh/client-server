@@ -32,8 +32,16 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 	public override async setAuthorization(authToken: AuthToken, options?: jwt.SignOptions): Promise<boolean>;
 	public override async setAuthorization(signedAuthToken: SignedAuthToken, authToken?: AuthToken): Promise<boolean>;
 	public override async setAuthorization(authToken: AuthToken | SignedAuthToken, options?: AuthToken | jwt.SignOptions): Promise<boolean> {
+		const wasAuthenticated = !!this.signedAuthToken;
+
 		if (typeof authToken === 'string') {
-			return super.setAuthorization(authToken, options as AuthToken);
+			const changed = await super.setAuthorization(authToken, options as AuthToken);
+
+			if (changed && this.status === 'open') {
+				this.triggerAuthenticationEvents(wasAuthenticated);
+			}
+			
+			return changed;
 		}
 
 		const auth = this.state.server.auth;
@@ -47,8 +55,12 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 			throw err;
 		}
 
-		const result = super.setAuthorization(signedAuthToken, authToken);
+		const changed = super.setAuthorization(signedAuthToken, authToken);
 
+		if (changed && this.status === 'open') {
+			this.triggerAuthenticationEvents(wasAuthenticated);
+		}
+		
 		if (auth.rejectOnFailedDelivery) {
 			try {
 				await this.invoke('#setAuthToken', signedAuthToken)[0];
@@ -71,6 +83,6 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 
 		await this.transmit('#setAuthToken', signedAuthToken);
 
-		return result;
+		return changed;
 	}
 }

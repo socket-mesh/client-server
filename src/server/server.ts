@@ -233,7 +233,12 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 			for await (let event of details.socket.listen()) {
 				this.emit(
 					`socket${event.stream[0].toUpperCase()}${event.stream.substring(1)}` as any,
-					event.value
+					Object.assign(
+						{
+							socket: details.socket,
+						},
+						event.value
+					)
 				);
 			}
 		})();
@@ -243,7 +248,12 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 				for await (let event of details.socket.channels.listen()) {
 					this.emit(
 						`socket${event.stream[0].toUpperCase()}${event.stream.substring(1)}` as any,
-						event.value
+						Object.assign(
+							{
+								socket: details.socket,
+							},
+							event.value
+						)
 					);
 				}
 			})();	

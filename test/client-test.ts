@@ -758,7 +758,7 @@ describe('Integration tests', function () {
 				}
 			})();
 
-			await wait(10);
+			await wait(50);
 
 			assert.strictEqual(aborted, false);
 			assert.strictEqual(diconnected, true);
@@ -809,17 +809,15 @@ describe('Integration tests', function () {
 		beforeEach(async function () {
 			publisherClient = new ClientSocket(clientOptions);
 
-/*
-			server.removeMiddleware(MiddlewareType.MIDDLEWARE_INBOUND);
-			server.setMiddleware(MiddlewareType.MIDDLEWARE_INBOUND, async (middlewareStream) => {
-				for await (let action of middlewareStream) {
-					if (action.type === 'publishIn') {
-						lastServerMessage = (action as ActionPublishIn).data;
-					}
-					action.allow();
-				}
-			});
-*/
+//			server.removeMiddleware(MiddlewareType.MIDDLEWARE_INBOUND);
+//			server.setMiddleware(MiddlewareType.MIDDLEWARE_INBOUND, async (middlewareStream) => {
+//				for await (let action of middlewareStream) {
+//					if (action.type === 'publishIn') {
+//						lastServerMessage = (action as ActionPublishIn).data;
+//					}
+//					action.allow();
+//				}
+//			});
 		});
 
 		afterEach(async function () {

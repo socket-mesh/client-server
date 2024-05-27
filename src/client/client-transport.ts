@@ -269,9 +269,11 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 	override async setAuthorization(authToken: AuthToken): Promise<boolean>;
 	override async setAuthorization(signedAuthToken: string, authToken?: AuthToken): Promise<boolean>;
 	override async setAuthorization(signedAuthToken: string | AuthToken, authToken?: AuthToken): Promise<boolean> {
+		const wasAuthenticated = !!this.signedAuthToken;
 		const changed = await super.setAuthorization(signedAuthToken as string, authToken);
 
 		if (changed) {
+			this.triggerAuthenticationEvents(wasAuthenticated);
 			// Even if saving the auth token failes we do NOT want to throw an exception.
 			this.authEngine.saveToken(this.signedAuthToken)
 				.catch(err => {

@@ -3,6 +3,7 @@ import { HandshakeOptions, HandshakeStatus } from "../../client/maps/server-map.
 import { processAuthentication, validateAuthToken } from "./authenticate.js";
 import { dehydrateError } from "@socket-mesh/errors";
 import { BasicSocketMapServer } from "../../client/maps/socket-map.js";
+import { wait } from "../../utils.js";
 
 const HANDSHAKE_REJECTION_STATUS_CODE = 4008;
 
@@ -11,6 +12,7 @@ export async function handshakeHandler(
 ): Promise<HandshakeStatus> {
 	const state = transport.state;
 	const server = state.server;
+	const wasAuthenticated = !!transport.signedAuthToken;
 	const authInfo = await validateAuthToken(server.auth, options.authToken);
 
 	for (const middleware of server.middleware) {
@@ -54,6 +56,11 @@ export async function handshakeHandler(
 	}
 
 	transport.setOpenStatus(authError);
+
+	// Needs to be executed after the connection event to allow consumers to be setup.
+	await wait(0);
+
+	transport.triggerAuthenticationEvents(wasAuthenticated);
 
 	if (authError) {
 		return {

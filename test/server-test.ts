@@ -12,6 +12,9 @@ import { ServerTransport } from "../src/server/server-transport";
 import { AuthInfo } from "../src/server/handlers/authenticate";
 import assert from "node:assert";
 import localStorage from '@socket-mesh/local-storage';
+import { wait } from "../src/utils";
+import { AuthStateChangeEvent } from "../src/socket-event";
+import { SocketAuthenticatedChangeEvent } from "../src/server/server-event";
 
 // Add to the global scope like in browser.
 global.localStorage = localStorage;
@@ -188,7 +191,7 @@ describe('Integration tests', function () {
 			server.httpServer.close();
 			await server.close();
 		}
-		global.localStorage.removeItem('socketcluster.authToken');
+		global.localStorage.removeItem(authTokenName);
 	});
 
 	describe('Client authentication', function () {
@@ -251,8 +254,151 @@ describe('Integration tests', function () {
 			assert.strictEqual(event.authError!.name, 'AuthTokenInvalidError');
 		});
 
+		it('Should allow switching between users', async function () {
+			global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
 
+			const authenticateEvents: AuthToken[] = [];
+			const deauthenticateEvents: AuthToken[] = [];
+			const authenticationStateChangeEvents: SocketAuthenticatedChangeEvent<BasicServerMap<ServerIncomingMap, MyChannels>>[] = [];
+			const authStateChangeEvents: AuthStateChangeEvent[] = [];
 
+			(async () => {
+				for await (let stateChangePacket of server.listen('socketAuthStateChange')) {
+					authenticationStateChangeEvents.push(stateChangePacket);
+				}
+			})();
 
+			(async () => {
+				for await (let {socket} of server.listen('connection')) {
+					(async () => {
+						for await (let {authToken} of socket.listen('authenticate')) {
+							authenticateEvents.push(authToken);
+						}
+					})();
+					(async () => {
+						for await (let {authToken} of socket.listen('deauthenticate')) {
+							deauthenticateEvents.push(authToken);
+						}
+					})();
+					(async () => {
+						for await (let stateChangeData of socket.listen('authStateChange')) {
+							authStateChangeEvents.push(stateChangeData);
+						}
+					})();
+				}
+			})();
+
+			let clientSocketId: string | null;
+
+			client = new ClientSocket(clientOptions);
+			await client.listen('connect').once();
+			clientSocketId = client.id;
+			client.invoke('login', {username: 'alice'});
+
+			await wait(100);
+
+			assert.strictEqual(deauthenticateEvents.length, 0);
+			assert.strictEqual(authenticateEvents.length, 2);
+			assert.strictEqual(authenticateEvents[0].username, 'bob');
+			assert.strictEqual(authenticateEvents[1].username, 'alice');
+
+			assert.strictEqual(authenticationStateChangeEvents.length, 2);
+			assert.notEqual(authenticationStateChangeEvents[0].socket, null);
+			assert.strictEqual(authenticationStateChangeEvents[0].socket.id, clientSocketId);
+			assert.strictEqual(authenticationStateChangeEvents[0].wasAuthenticated, false);
+			assert.strictEqual(authenticationStateChangeEvents[0].isAuthenticated, true);
+			assert.notEqual(authenticationStateChangeEvents[0].authToken, null);
+			assert.strictEqual(authenticationStateChangeEvents[0].authToken!.username, 'bob');
+			assert.notEqual(authenticationStateChangeEvents[1].socket, null);
+			assert.strictEqual(authenticationStateChangeEvents[1].socket.id, clientSocketId);
+			assert.strictEqual(authenticationStateChangeEvents[1].wasAuthenticated, true);
+			assert.strictEqual(authenticationStateChangeEvents[1].isAuthenticated, true);
+			assert.notEqual(authenticationStateChangeEvents[1].authToken, null);
+			assert.strictEqual(authenticationStateChangeEvents[1].authToken!.username, 'alice');
+
+			assert.strictEqual(authStateChangeEvents.length, 2);
+			assert.strictEqual(authStateChangeEvents[0].wasAuthenticated, false);
+			assert.strictEqual(authStateChangeEvents[0].isAuthenticated, true);
+			assert.notEqual(authStateChangeEvents[0].authToken, null);
+			assert.strictEqual(authStateChangeEvents[0].authToken!.username, 'bob');
+			assert.strictEqual(authStateChangeEvents[1].wasAuthenticated, true);
+			assert.strictEqual(authStateChangeEvents[1].isAuthenticated, true);
+			assert.notEqual(authStateChangeEvents[1].authToken, null);
+			assert.strictEqual(authStateChangeEvents[1].authToken!.username, 'alice');
+		});
+
+		it('Should emit correct events/data when socket is deauthenticated', async function () {
+			global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
+
+			const authenticationStateChangeEvents: SocketAuthenticatedChangeEvent<BasicServerMap<ServerIncomingMap, MyChannels>>[] = [];
+			const authStateChangeEvents: AuthStateChangeEvent[] = [];
+
+			(async () => {
+				for await (let stateChangePacket of server.listen('socketAuthStateChange')) {
+					authenticationStateChangeEvents.push(stateChangePacket);
+				}
+			})();
+
+			client = new ClientSocket(clientOptions);
+
+			(async () => {
+				for await (let event of client.listen('connect')) {
+					client.deauthenticate();
+				}
+			})();
+
+			const { socket } = await server.listen('socketConnect').once(100);
+			const initialAuthToken = socket.authToken;
+
+			(async () => {
+				for await (let stateChangeData of socket.listen('authStateChange')) {
+					authStateChangeEvents.push(stateChangeData);
+				}
+			})();
+
+			const {authToken} = await socket.listen('deauthenticate').once(100);
+
+			assert.strictEqual(authToken, initialAuthToken);
+
+			assert.strictEqual(authStateChangeEvents.length, 2);
+			assert.strictEqual(authStateChangeEvents[0].wasAuthenticated, false);
+			assert.strictEqual(authStateChangeEvents[0].isAuthenticated, true);
+			assert.notEqual(authStateChangeEvents[0].authToken, undefined);
+			assert.strictEqual(authStateChangeEvents[0].authToken!.username, 'bob');
+			assert.strictEqual(authStateChangeEvents[1].wasAuthenticated, true);
+			assert.strictEqual(authStateChangeEvents[1].isAuthenticated, false);
+			assert.strictEqual('authToken' in authStateChangeEvents[1], false);
+
+			assert.strictEqual(authenticationStateChangeEvents.length, 2);
+			assert.notEqual(authenticationStateChangeEvents[0], null);
+			assert.strictEqual(authenticationStateChangeEvents[0].wasAuthenticated, false);
+			assert.strictEqual(authenticationStateChangeEvents[0].isAuthenticated, true);
+			assert.notEqual(authenticationStateChangeEvents[0].authToken, undefined);
+			assert.strictEqual(authenticationStateChangeEvents[0].authToken!.username, 'bob');
+			assert.notEqual(authenticationStateChangeEvents[1], null);
+			assert.strictEqual(authenticationStateChangeEvents[1].wasAuthenticated, true);
+			assert.strictEqual(authenticationStateChangeEvents[1].isAuthenticated, false);
+			assert.strictEqual(authenticationStateChangeEvents[1].authToken, undefined);
+		});
+
+/*
+		it('Should throw error if server socket deauthenticate is called after client disconnected and rejectOnFailedDelivery is true', async function () {
+			global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
+
+			client = new ClientSocket(clientOptions);
+
+			const { socket } = await server.listen('connection').once(100);
+
+			client.disconnect();
+			let error: Error | null = null;
+			try {
+				await socket.deauthenticate({rejectOnFailedDelivery: true});
+			} catch (err) {
+				error = err;
+			}
+			assert.notEqual(error, null);
+			assert.strictEqual(error!.name, 'BadConnectionError');
+		});
+*/
 	});
 });

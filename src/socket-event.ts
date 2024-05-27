@@ -60,9 +60,7 @@ export interface ConnectingEvent {
 
 export interface DeauthenticatedChangeEvent {
 	isAuthenticated: false,
-	wasAuthenticated: true,
-	signedAuthToken: SignedAuthToken,
-	authToken: AuthToken
+	wasAuthenticated: true
 }
 
 export interface DisconnectEvent {
