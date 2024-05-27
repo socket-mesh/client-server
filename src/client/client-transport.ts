@@ -10,30 +10,6 @@ import { AuthToken } from "@socket-mesh/auth";
 import { SocketMapFromClient } from "./maps/socket-map.js";
 import { ClientMap } from "./maps/client-map.js";
 
-/*
-export interface ClientSocketWsOptions extends BaseClientSocketOptions {
-	socket: ws.WebSocket
-}
-
-export type ClientSocketOptions = ClientSocketAddressOptions | ClientSocketWsOptions;
-
-function createSocket(options: ClientSocketOptions | string | URL): ws.WebSocket {
-	if (typeof options === 'string') {
-		return new ws.WebSocket(options);
-	}
-
-	if ('pathname' in options) {
-		return new ws.WebSocket(options);	
-	}
-
-	if ('address' in options) {
-		return new ws.WebSocket(options.address, options.protocols, options.wsOptions);
-	}
-
-	return options.socket;
-}
-*/
-
 export class ClientTransport<T extends ClientMap> extends SocketTransport<SocketMapFromClient<T>> {
 	public readonly authEngine: ClientAuthEngine;
 
@@ -76,6 +52,95 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 		this._connectAttempts = 0;
 		this._pendingReconnectTimeout = null;
 		this.autoReconnect = options.autoReconnect;
+	}
+
+	public get autoReconnect(): AutoReconnectOptions | false {
+		return this._autoReconnect;
+	}
+	
+	public set autoReconnect(value: Partial<AutoReconnectOptions> | boolean) {
+		if (value) {
+			this._autoReconnect = Object.assign<AutoReconnectOptions, Partial<AutoReconnectOptions>>(
+				{
+					initialDelay: 10000,
+					randomness: 10000,
+					multiplier: 1.5,
+					maxDelayMs: 60000
+				},
+				value === true ? {} : value
+			);
+		} else {
+			this._autoReconnect = false;
+		}
+	}
+
+	public connect(options?: ConnectOptions) {
+		let timeoutMs = this.connectTimeoutMs;
+
+		if (options) {
+			let changeOptions = false;
+
+			if (options.timeoutMs) {
+				timeoutMs = options.timeoutMs;
+			}
+
+			if (options.address) {
+				changeOptions = true;
+				this._uri = typeof options.address === 'string' ? new URL(options.address) : options.address;
+			}
+
+			if (options.wsOptions) {
+				changeOptions = true;
+				this._wsOptions = options.wsOptions;
+			}
+
+			if (changeOptions && this.status !== 'closed') {
+				this.disconnect(
+					1000,
+					'Socket was disconnected by the client to initiate a new connection'
+				);
+			}	
+		}
+
+		if (this.status === 'closed') {
+			this.webSocket = new ws.WebSocket(this._uri, this._wsOptions);
+
+			this.socket.emit('connecting', {});
+
+			this._connectTimeoutRef = setTimeout(() => {
+				this.disconnect(4007);
+			}, timeoutMs);
+		}
+	}
+
+	public get connectAttempts(): number {
+		return this._connectAttempts;
+	}
+
+	public override disconnect(code=1000, reason?: string) {
+		if (code !== 4007) {
+			this.resetReconnect();
+		}
+
+		super.disconnect(code, reason);
+	}
+
+	private async handshake(): Promise<HandshakeStatus> {
+		const token = await this.authEngine.loadToken();
+		// Don't wait for this.state to be 'open'.
+		// The underlying WebSocket (this.socket) is already open.
+		// The casting to HandshakeStatus has to be here or typescript freaks out
+		const status = await this.invoke(
+			'#handshake',
+			{ authToken: token },
+			true
+		)[0] as HandshakeStatus;
+
+		if ('authError' in status) {
+			status.authError = hydrateError(status.authError);
+		}
+
+		return status;
 	}
 
 	protected override onOpen() {
@@ -136,6 +201,58 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 		}		
 	}
 
+	public get pendingReconnect(): boolean {
+		return (this._pendingReconnectTimeout !== null);
+	}
+
+	public get pingTimeoutMs(): number {
+		return this._pingTimeoutMs;
+	}
+
+	public set pingTimeoutMs(value: number) {
+		this._pingTimeoutMs = value;
+		this.resetPingTimeout();
+	}
+
+	protected resetPingTimeout() {
+		if (this._pingTimeoutRef) {
+			clearTimeout(this._pingTimeoutRef);
+		}
+
+		if (!this.isPingTimeoutDisabled) {
+			// Use `WebSocket#terminate()`, which immediately destroys the connection,
+			// instead of `WebSocket#close()`, which waits for the close timer.
+			// Delay should be equal to the interval at which your server
+			// sends out pings plus a conservative assumption of the latency.
+			this._pingTimeoutRef = setTimeout(() => {
+				this.webSocket.close(4000);
+			}, this.pingTimeoutMs);
+		}
+	}
+
+	private resetReconnect() {
+		this._pendingReconnectTimeout = null;
+		this._connectAttempts = 0;
+	}
+
+	override async setAuthorization(authToken: AuthToken): Promise<boolean>;
+	override async setAuthorization(signedAuthToken: string, authToken?: AuthToken): Promise<boolean>;
+	override async setAuthorization(signedAuthToken: string | AuthToken, authToken?: AuthToken): Promise<boolean> {
+		const wasAuthenticated = !!this.signedAuthToken;
+		const changed = await super.setAuthorization(signedAuthToken as string, authToken);
+
+		if (changed) {
+			this.triggerAuthenticationEvents(wasAuthenticated);
+			// Even if saving the auth token failes we do NOT want to throw an exception.
+			this.authEngine.saveToken(this.signedAuthToken)
+				.catch(err => {
+					this.onError(err);
+				});
+		}
+
+		return changed;
+	}
+
 	public override get status(): SocketStatus {
 		if (this.pendingReconnect) {
 			return 'connecting';
@@ -144,36 +261,34 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 		return super.status;
 	}
 
+	private tryReconnect(initialDelay?: number): void {
+		if (!this.autoReconnect) {
+			return;
+		}
+
+		const exponent = this._connectAttempts++;
+		let reconnectOptions = this.autoReconnect;
+		let timeoutMs: number;
+
+		if (initialDelay == null || exponent > 0) {
+			const initialTimeout = Math.round(reconnectOptions.initialDelay + (reconnectOptions.randomness || 0) * Math.random());
+
+			timeoutMs = Math.round(initialTimeout * Math.pow(reconnectOptions.multiplier, exponent));
+		} else {
+			timeoutMs = initialDelay;
+		}
+
+		if (timeoutMs > reconnectOptions.maxDelayMs) {
+			timeoutMs = reconnectOptions.maxDelayMs;
+		}
+
+		this._pendingReconnectTimeout = timeoutMs;
+
+		this.connect({ timeoutMs });
+	}
+
 	public get uri(): URL {
 		return this._uri
-	}
-
-	public get pendingReconnect(): boolean {
-		return (this._pendingReconnectTimeout !== null);
-	}
-
-	public get autoReconnect(): AutoReconnectOptions | false {
-		return this._autoReconnect;
-	}
-	
-	public set autoReconnect(value: Partial<AutoReconnectOptions> | boolean) {
-		if (value) {
-			this._autoReconnect = Object.assign<AutoReconnectOptions, Partial<AutoReconnectOptions>>(
-				{
-					initialDelay: 10000,
-					randomness: 10000,
-					multiplier: 1.5,
-					maxDelayMs: 60000
-				},
-				value === true ? {} : value
-			);
-		} else {
-			this._autoReconnect = false;
-		}
-	}
-
-	public get connectAttempts(): number {
-		return this._connectAttempts;
 	}
 
 	protected get webSocket() {
@@ -207,153 +322,6 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 			this.webSocket.on('error', onOpenCloseError);
 			this.webSocket.on('ping', this.resetPingTimeout = this.resetPingTimeout.bind(this));
 		}
-	}
-
-	public connect(options?: ConnectOptions) {
-		let timeoutMs = this.connectTimeoutMs;
-
-		if (options) {
-			let changeOptions = false;
-
-			if (options.timeoutMs) {
-				timeoutMs = options.timeoutMs;
-			}
-
-			if (options.address) {
-				changeOptions = true;
-				this._uri = typeof options.address === 'string' ? new URL(options.address) : options.address;
-			}
-
-			if (options.wsOptions) {
-				changeOptions = true;
-				this._wsOptions = options.wsOptions;
-			}
-
-			if (changeOptions && this.status !== 'closed') {
-				this.disconnect(
-					1000,
-					'Socket was disconnected by the client to initiate a new connection'
-				);
-			}	
-		}
-
-		if (this.status === 'closed') {
-			this.webSocket = new ws.WebSocket(this._uri, this._wsOptions);
-
-			this.socket.emit('connecting', {});
-
-			this._connectTimeoutRef = setTimeout(() => {
-				this.disconnect(4007);
-			}, timeoutMs);
-		}
-	}
-
-	private async handshake(): Promise<HandshakeStatus> {
-		const token = await this.authEngine.loadToken();
-		// Don't wait for this.state to be 'open'.
-		// The underlying WebSocket (this.socket) is already open.
-		// The casting to HandshakeStatus has to be here or typescript freaks out
-		const status = await this.invoke(
-			'#handshake',
-			{ authToken: token },
-			true
-		)[0] as HandshakeStatus;
-
-		if ('authError' in status) {
-			status.authError = hydrateError(status.authError);
-		}
-
-		return status;
-	}
-	
-	override async setAuthorization(authToken: AuthToken): Promise<boolean>;
-	override async setAuthorization(signedAuthToken: string, authToken?: AuthToken): Promise<boolean>;
-	override async setAuthorization(signedAuthToken: string | AuthToken, authToken?: AuthToken): Promise<boolean> {
-		const wasAuthenticated = !!this.signedAuthToken;
-		const changed = await super.setAuthorization(signedAuthToken as string, authToken);
-
-		if (changed) {
-			this.triggerAuthenticationEvents(wasAuthenticated);
-			// Even if saving the auth token failes we do NOT want to throw an exception.
-			this.authEngine.saveToken(this.signedAuthToken)
-				.catch(err => {
-					this.onError(err);
-				});
-		}
-
-		return changed;
-	}
-
-/*
-	protected onRequest(packet: AnyPacket<TServiceMap, TPrivateIncomingMap, TIncomingMap>): boolean {
-		if (!('service' in packet) && packet.method === '#handshake') {
-			const data: HandshakeOptions = packet.data;
-		}
-	}
-
-*/
-	public override disconnect(code=1000, reason?: string) {
-		if (code !== 4007) {
-			this.resetReconnect();
-		}
-
-		super.disconnect(code, reason);
-	}
-
-	private tryReconnect(initialDelay?: number): void {
-		if (!this.autoReconnect) {
-			return;
-		}
-
-		const exponent = this._connectAttempts++;
-		let reconnectOptions = this.autoReconnect;
-		let timeoutMs: number;
-
-		if (initialDelay == null || exponent > 0) {
-			const initialTimeout = Math.round(reconnectOptions.initialDelay + (reconnectOptions.randomness || 0) * Math.random());
-
-			timeoutMs = Math.round(initialTimeout * Math.pow(reconnectOptions.multiplier, exponent));
-		} else {
-			timeoutMs = initialDelay;
-		}
-
-		if (timeoutMs > reconnectOptions.maxDelayMs) {
-			timeoutMs = reconnectOptions.maxDelayMs;
-		}
-
-		this._pendingReconnectTimeout = timeoutMs;
-
-		this.connect({ timeoutMs });
-	}
-
-	protected resetPingTimeout() {
-		if (this._pingTimeoutRef) {
-			clearTimeout(this._pingTimeoutRef);
-		}
-
-		if (!this.isPingTimeoutDisabled) {
-			// Use `WebSocket#terminate()`, which immediately destroys the connection,
-			// instead of `WebSocket#close()`, which waits for the close timer.
-			// Delay should be equal to the interval at which your server
-			// sends out pings plus a conservative assumption of the latency.
-			this._pingTimeoutRef = setTimeout(() => {
-				this.webSocket.close(4000);
-			}, this.pingTimeoutMs);
-		}
-	}
-
-	private resetReconnect() {
-		this._pendingReconnectTimeout = null;
-		this._connectAttempts = 0;
-	}
-
-	public get pingTimeoutMs(): number {
-		return this._pingTimeoutMs;
-	}
-
-	public set pingTimeoutMs(value: number) {
-		this._pingTimeoutMs = value;
-		this.resetPingTimeout();
 	}
 
 	override transmit<TMethod extends keyof SocketMapFromClient<T>['Outgoing']>(method: TMethod, arg?: Parameters<SocketMapFromClient<T>['Outgoing'][TMethod]>[0], bypassMiddleware?: boolean): Promise<void>;

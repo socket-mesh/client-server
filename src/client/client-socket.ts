@@ -12,30 +12,6 @@ import { ClientMap } from "./maps/client-map.js";
 import { publishHandler } from "./handlers/publish.js";
 import { kickOutHandler } from "./handlers/kickout.js";
 
-/*
-export interface ClientSocketWsOptions extends BaseClientSocketOptions {
-	socket: ws.WebSocket
-}
-
-export type ClientSocketOptions = ClientSocketAddressOptions | ClientSocketWsOptions;
-
-function createSocket(options: ClientSocketOptions | string | URL): ws.WebSocket {
-	if (typeof options === 'string') {
-		return new ws.WebSocket(options);
-	}
-
-	if ('pathname' in options) {
-		return new ws.WebSocket(options);	
-	}
-
-	if ('address' in options) {
-		return new ws.WebSocket(options.address, options.protocols, options.wsOptions);
-	}
-
-	return options.socket;
-}
-*/
-
 export class ClientSocket<T extends ClientMap> extends Socket<SocketMapFromClient<T>> {
 	private readonly _clientTransport: ClientTransport<T>;
 	public readonly channels: ClientChannels<T>;
@@ -69,51 +45,10 @@ export class ClientSocket<T extends ClientMap> extends Socket<SocketMapFromClien
 		}
 	}
 
-	public get uri(): URL {
-		return this._clientTransport.uri;
-	}
-
 	public get autoReconnect(): AutoReconnectOptions | false {
 		return this._clientTransport.autoReconnect;
 	}
 	
-	public set autoReconnect(value: Partial<AutoReconnectOptions> | boolean) {
-		this._clientTransport.autoReconnect = value;
-	}
-
-	public get connectTimeoutMs(): number {
-		return this._clientTransport.connectTimeoutMs;
-	}
-
-	public set connectTimeoutMs(timeoutMs: number) {
-		this._clientTransport.connectTimeoutMs = timeoutMs;
-	}
-
-	public get isPingTimeoutDisabled(): boolean {
-		return this._clientTransport.isPingTimeoutDisabled;
-	}
-
-	public set isPingTimeoutDisabled(isDisabled: boolean) {
-		this._clientTransport.isPingTimeoutDisabled = isDisabled;
-	}
-
-	public get pingTimeoutMs(): number {
-		return this._clientTransport.pingTimeoutMs;
-	}
-
-	public set pingTimeoutMs(timeoutMs: number) {
-		this._clientTransport.pingTimeoutMs = timeoutMs;
-	}
-
-	public connect(options?: ConnectOptions): void {
-		this._clientTransport.connect(options);
-	}
-
-	public reconnect(code?: number, reason?: string) {
-		this.disconnect(code, reason);
-		this.connect();
-	}
-
 	public async authenticate(signedAuthToken: SignedAuthToken): Promise<void> {
 		try {
 			await this._clientTransport.invoke('#authenticate', signedAuthToken)[0];
@@ -134,6 +69,22 @@ export class ClientSocket<T extends ClientMap> extends Socket<SocketMapFromClien
 
 			throw hydrateError(err);
 		}
+	}
+
+	public set autoReconnect(value: Partial<AutoReconnectOptions> | boolean) {
+		this._clientTransport.autoReconnect = value;
+	}
+
+	public connect(options?: ConnectOptions): void {
+		this._clientTransport.connect(options);
+	}
+
+	public get connectTimeoutMs(): number {
+		return this._clientTransport.connectTimeoutMs;
+	}
+
+	public set connectTimeoutMs(timeoutMs: number) {
+		this._clientTransport.connectTimeoutMs = timeoutMs;
 	}
 
 	async deauthenticate() {
@@ -158,11 +109,28 @@ export class ClientSocket<T extends ClientMap> extends Socket<SocketMapFromClien
 		await wait(0);
 	}
 
-/*
-	protected onRequest(packet: AnyPacket<TServiceMap, TPrivateIncomingMap, TIncomingMap>): boolean {
-		if (!('service' in packet) && packet.method === '#handshake') {
-			const data: HandshakeOptions = packet.data;
-		}
+	public get isPingTimeoutDisabled(): boolean {
+		return this._clientTransport.isPingTimeoutDisabled;
 	}
-*/
+
+	public set isPingTimeoutDisabled(isDisabled: boolean) {
+		this._clientTransport.isPingTimeoutDisabled = isDisabled;
+	}
+
+	public get pingTimeoutMs(): number {
+		return this._clientTransport.pingTimeoutMs;
+	}
+
+	public set pingTimeoutMs(timeoutMs: number) {
+		this._clientTransport.pingTimeoutMs = timeoutMs;
+	}
+
+	public reconnect(code?: number, reason?: string) {
+		this.disconnect(code, reason);
+		this.connect();
+	}
+
+	public get uri(): URL {
+		return this._clientTransport.uri;
+	}
 }
