@@ -148,6 +148,8 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 		this.resetReconnect();
 		this.resetPingTimeout();
 
+		let authError: Error;
+
 		this.handshake()
 			.then(status => {
 				this.id = status.id;
@@ -155,12 +157,16 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 				this.resetPingTimeout();
 
 				if ('authToken' in status && status.authToken) {
-					return [undefined, this.setAuthorization(status.authToken)];
+					return this.setAuthorization(status.authToken);
 				}
 
-				return ['authError' in status ? status.authError : undefined, this.deauthenticate()];
+				if ('authError' in status) {
+					authError = status.authError;
+				}
+
+				return this.changeToUnauthenticatedState();
 			})
-			.then(([authError]: [Error]) => {
+			.then(() => {
 				this.setOpenStatus(authError);
 				super.onOpen();
 			})

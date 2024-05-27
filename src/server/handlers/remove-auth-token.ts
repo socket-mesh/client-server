@@ -4,7 +4,7 @@ import { SocketTransport } from "../../socket-transport.js";
 export async function deauthenticate(
 	transport: SocketTransport<BasicSocketMapServer>
 ): Promise<boolean> {
-	if (await transport.deauthenticate()) {
+	if (await transport.changeToUnauthenticatedState()) {
 		await transport.transmit('#removeAuthToken');
 		return true;
 	}

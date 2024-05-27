@@ -61,7 +61,7 @@ export class ClientSocket<T extends ClientMap> extends Socket<SocketMapFromClien
 			if (err.name !== 'BadConnectionError' && err.name !== 'TimeoutError') {
 				// In case of a bad/closed connection or a timeout, we maintain the last
 				// known auth state since those errors don't mean that the token is invalid.
-				await this._clientTransport.deauthenticate();
+				await this._clientTransport.changeToUnauthenticatedState();
 
 				// In order for the events to trigger we need to wait for the next tick.
 				await wait(0);
@@ -87,7 +87,7 @@ export class ClientSocket<T extends ClientMap> extends Socket<SocketMapFromClien
 		this._clientTransport.connectTimeoutMs = timeoutMs;
 	}
 
-	async deauthenticate() {
+	async deauthenticate(): Promise<boolean> {
 		(async () => {
 			let oldAuthToken: SignedAuthToken;
 			try {
@@ -103,10 +103,7 @@ export class ClientSocket<T extends ClientMap> extends Socket<SocketMapFromClien
 			await this._clientTransport.transmit('#removeAuthToken');
 		}
 
-		await this._clientTransport.deauthenticate();
-
-		// In order for the events to trigger we need to wait for the next tick.
-		await wait(0);
+		return await super.deauthenticate();
 	}
 
 	public get isPingTimeoutDisabled(): boolean {

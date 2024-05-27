@@ -44,6 +44,10 @@ interface InvokeCallback<T> {
 	callback: (err: Error, result?: T) => void
 }
 
+interface WebSocketError extends Error {
+	code?: string
+}
+
 export class SocketTransport<T extends SocketMap> {
 	private _socket: Socket<T>;
 	private _webSocket: ws.WebSocket;
@@ -212,7 +216,7 @@ export class SocketTransport<T extends SocketMap> {
 		return null;
 	}
 	
-	public async deauthenticate(): Promise<boolean> {
+	public async changeToUnauthenticatedState(): Promise<boolean> {
 		if (this._signedAuthToken) {
 			const authToken = this._authToken;
 			const signedAuthToken = this._signedAuthToken;
@@ -222,7 +226,7 @@ export class SocketTransport<T extends SocketMap> {
 
 			this._socket.emit('authStateChange', { wasAuthenticated: true, isAuthenticated: false });
 
-			// Needs to be executed the auth state change event.
+			// In order for the events to trigger we need to wait for the next tick.
 			await wait(0);
 
 			this._socket.emit('deauthenticate', { signedAuthToken, authToken });
@@ -591,8 +595,15 @@ export class SocketTransport<T extends SocketMap> {
 
 		this._webSocket.send(
 			this.codecEngine.encode(encode.length === 1 ? encode[0] : encode),
-			(err) => {
+			(err: WebSocketError) => {
 				for (const req of requests) {
+					if (err?.code === 'ECONNRESET') {
+						err = new BadConnectionError(
+							`Socket ${req.sentCallback ? 'transmit' : 'invoke' } ${String(req.method)} event was aborted due to a bad connection`,
+							'connectAbort'
+						);
+					}
+
 					if (req.sentCallback) {
 						req.sentCallback(err);
 					}

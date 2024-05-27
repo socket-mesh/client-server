@@ -15,6 +15,7 @@ import localStorage from '@socket-mesh/local-storage';
 import { wait } from "../src/utils";
 import { AuthStateChangeEvent } from "../src/socket-event";
 import { SocketAuthenticatedChangeEvent } from "../src/server/server-event";
+import { MiddlewareBlockedError } from "@socket-mesh/errors";
 
 // Add to the global scope like in browser.
 global.localStorage = localStorage;
@@ -203,9 +204,7 @@ describe('Integration tests', function () {
 						middleware: [{
 							onAuthenticate: (authInfo: AuthInfo) => {
 								if (!('authToken' in authInfo) || authInfo.authToken.username === 'alice') {
-									const err = new Error('Blocked by MIDDLEWARE_INBOUND');
-									err.name = 'AuthenticateMiddlewareError';
-									throw err;
+									throw new MiddlewareBlockedError('Blocked by onAuthenticate', 'AuthenticateMiddlewareError');
 								}
 							}
 						}]
@@ -381,7 +380,6 @@ describe('Integration tests', function () {
 			assert.strictEqual(authenticationStateChangeEvents[1].authToken, undefined);
 		});
 
-/*
 		it('Should throw error if server socket deauthenticate is called after client disconnected and rejectOnFailedDelivery is true', async function () {
 			global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
 
@@ -396,9 +394,34 @@ describe('Integration tests', function () {
 			} catch (err) {
 				error = err;
 			}
+
 			assert.notEqual(error, null);
 			assert.strictEqual(error!.name, 'BadConnectionError');
 		});
-*/
+
+		it('Should not throw error if server socket deauthenticate is called after client disconnected and rejectOnFailedDelivery is not true', async function () {
+			global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
+
+			client = new ClientSocket(clientOptions);
+
+			let { socket } = await server.listen('connection').once();
+
+			client.disconnect();
+			socket.deauthenticate();
+		});
+
+		it('Should not authenticate the client if MIDDLEWARE_INBOUND blocks the authentication', async function () {
+			global.localStorage.setItem(authTokenName, validSignedAuthTokenAlice);
+
+			client = new ClientSocket(clientOptions);
+			// The previous test authenticated us as 'alice', so that token will be passed to the server as
+			// part of the handshake.
+			const event = await client.listen('connect').once();
+			// Any token containing the username 'alice' should be blocked by the MIDDLEWARE_INBOUND middleware.
+			// This will only affects token-based authentication, not the credentials-based login event.
+			assert.strictEqual(event.isAuthenticated, false);
+			assert.notEqual(event.authError, null);
+			assert.strictEqual((event.authError as MiddlewareBlockedError).type, 'AuthenticateMiddlewareError');
+		});
 	});
 });

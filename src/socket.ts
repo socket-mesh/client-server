@@ -60,6 +60,10 @@ export class Socket<T extends SocketMap> extends AsyncStreamEmitter<SocketEvent<
 		return this._transport.signedAuthToken;
 	}
 
+	public deauthenticate(): Promise<boolean> {
+		return this._transport.changeToUnauthenticatedState();
+	}
+
 	public disconnect(code=1000, reason?: string): void {
 		this._transport.disconnect(code, reason);
 	}

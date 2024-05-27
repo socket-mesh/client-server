@@ -66,7 +66,7 @@ export async function processAuthentication(
 	authInfo: AuthInfo
 ): Promise<void> {
 	if ('authError' in authInfo) {
-		await transport.deauthenticate();
+		await transport.changeToUnauthenticatedState();
 
 		// If the error is related to the JWT being badly formatted, then we will
 		// treat the error as a socket error.
@@ -82,7 +82,7 @@ export async function processAuthentication(
 	}
 
 	for (const middleware of transport.state.server.middleware) {
-		if ('authenticate' in middleware) {
+		if ('onAuthenticate' in middleware) {
 			try {
 				transport.callMiddleware(
 					middleware,
@@ -91,7 +91,7 @@ export async function processAuthentication(
 					}
 				);
 			} catch (err) {
-				await transport.deauthenticate();
+				await transport.changeToUnauthenticatedState();
 
 				if (err instanceof AuthTokenError) {
 					socket.emit('badAuthToken', { error: err, signedAuthToken: authInfo.signedAuthToken });
