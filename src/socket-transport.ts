@@ -83,6 +83,17 @@ export class SocketTransport<T extends SocketMap> {
 		this.middleware = options?.middleware || [];
 	}
 
+	protected abortAllPendingCallbacksDueToBadConnection(status: SocketStatus): void {
+		for (const cid in this._callbackMap) {
+			const map = this._callbackMap[cid];
+			const msg = `Event ${map.method} was aborted due to a bad connection`;
+
+			map.callback(
+				new BadConnectionError(msg, status === 'open' ? 'disconnect' : 'connectAbort')
+			);
+		}
+	}
+
 	public disconnect(code=1000, reason?: string): void {
 		if (this.webSocket) {
 			const status = this.status;
@@ -248,8 +259,11 @@ export class SocketTransport<T extends SocketMap> {
 	}
 
 	protected onClose(code: number, reason?: Buffer | string): void {
+		const prevStatus = this.status;
 		this.webSocket = null;
 		this._isOpen = false;
+
+		this.abortAllPendingCallbacksDueToBadConnection(prevStatus);
 
 		for (const middleware of this.middleware) {
 			if (middleware.onClose) {
@@ -417,19 +431,6 @@ export class SocketTransport<T extends SocketMap> {
 			if (middleware.onDisconnected) {
 				middleware.onDisconnected(status, code, reason);
 			}
-		}
-
-		this.abortAllPendingEventsDueToDisconnect(status);
-	}
-
-	private abortAllPendingEventsDueToDisconnect(status: SocketStatus): void {
-		for (const cid in this._callbackMap) {
-			const map = this._callbackMap[cid];
-			const msg = `Event ${map.method} was aborted due to a bad connection`;
-
-			map.callback(
-				new BadConnectionError(msg, status === 'open' ? 'disconnect' : 'connectAbort')
-			);
 		}
 	}
 

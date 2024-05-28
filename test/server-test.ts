@@ -13,7 +13,7 @@ import { AuthInfo } from "../src/server/handlers/authenticate";
 import assert from "node:assert";
 import localStorage from '@socket-mesh/local-storage';
 import { wait } from "../src/utils";
-import { AuthStateChangeEvent } from "../src/socket-event";
+import { AuthStateChangeEvent, CloseEvent } from "../src/socket-event";
 import { SocketAuthenticatedChangeEvent } from "../src/server/server-event";
 import { MiddlewareBlockedError } from "@socket-mesh/errors";
 
@@ -86,7 +86,7 @@ async function loginHandler({ transport, options: authToken }: RequestHandlerArg
 		throw err;
 	}
 
-	transport.setAuthorization(authToken);
+	await transport.setAuthorization(authToken);
 }
 
 async function loginWithTenDayExpiryHandler(
@@ -98,7 +98,7 @@ async function loginWithTenDayExpiryHandler(
 		throw err;
 	}
 
-	transport.setAuthorization(authToken, { expiresIn: TEN_DAYS_IN_SECONDS });
+	await transport.setAuthorization(authToken, { expiresIn: TEN_DAYS_IN_SECONDS });
 }
 
 async function loginWithTenDayExpHandler(
@@ -112,7 +112,7 @@ async function loginWithTenDayExpHandler(
 
 	authToken.exp = Math.round(Date.now() / 1000) + TEN_DAYS_IN_SECONDS;
 
-	transport.setAuthorization(authToken);
+	await transport.setAuthorization(authToken);
 }
 
 async function loginWithTenDayExpAndExpiryHandler(
@@ -126,7 +126,7 @@ async function loginWithTenDayExpAndExpiryHandler(
 
 	authToken.exp = Math.round(Date.now() / 1000) + TEN_DAYS_IN_SECONDS;
 
-	transport.setAuthorization(authToken, { expiresIn: TEN_DAYS_IN_SECONDS * 100 });
+	await transport.setAuthorization(authToken, { expiresIn: TEN_DAYS_IN_SECONDS * 100 });
 }
 
 async function loginWithIssAndIssuerHandler(
@@ -140,7 +140,7 @@ async function loginWithIssAndIssuerHandler(
 
 	authToken.iss = 'foo';
 
-	transport.setAuthorization(authToken, { issuer: 'bar' });
+	await transport.setAuthorization(authToken, { issuer: 'bar' });
 }
 
 async function setAuthKeyHandler(
@@ -422,6 +422,196 @@ describe('Integration tests', function () {
 			assert.strictEqual(event.isAuthenticated, false);
 			assert.notEqual(event.authError, null);
 			assert.strictEqual((event.authError as MiddlewareBlockedError).type, 'AuthenticateMiddlewareError');
+		});
+	});
+
+	describe('Server authentication', function () {
+		it('Token should be available after the authenticate listener resolves', async function () {
+			server = listen(PORT_NUMBER, serverOptions);
+
+			bindFailureHandlers(server);
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(clientOptions);
+
+			await client.listen('connect').once();
+
+			client.invoke('login', { username: 'bob' });
+			await client.listen('authenticate').once(100);
+
+			assert.strictEqual(!!client.signedAuthToken, true);
+			assert.notEqual(client.authToken, null);
+			assert.strictEqual(client.authToken!.username, 'bob');
+		});
+
+		it('Authentication can be captured using the authenticate listener', async function () {
+			server = listen(PORT_NUMBER, serverOptions);
+
+			bindFailureHandlers(server);
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(clientOptions);
+
+			await client.listen('connect').once(100);
+
+			client.invoke('login', { username: 'bob' });
+			await client.listen('authenticate').once(100);
+
+			assert.strictEqual(!!client.signedAuthToken, true);
+			assert.notEqual(client.authToken, null);
+			assert.strictEqual(client.authToken!.username, 'bob');
+		});
+
+		it('Previously authenticated client should still be authenticated after reconnecting', async function () {
+			server = listen(PORT_NUMBER, serverOptions);
+
+			bindFailureHandlers(server);
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(clientOptions);
+
+			await client.listen('connect').once(100);
+
+			client.invoke('login', {username: 'bob'});
+
+			await client.listen('authenticate').once(100);
+
+			client.disconnect();
+			client.connect();
+
+			const event = await client.listen('connect').once(100);
+
+			assert.strictEqual(event.isAuthenticated, true);
+			assert.notEqual(client.authToken, null);
+			assert.strictEqual(client.authToken!.username, 'bob');
+		});
+
+		it('Should set the correct expiry when using expiresIn option when creating a JWT with socket.setAuthToken', async function () {
+			server = listen(PORT_NUMBER, serverOptions);
+
+			bindFailureHandlers(server);
+
+			await server.listen('ready').once();
+
+			client = new ClientSocket(clientOptions);
+
+			await client.listen('connect').once(100);
+			client.invoke('loginWithTenDayExpiry', {username: 'bob'});
+			await client.listen('authenticate').once(100);
+
+			assert.notEqual(client.authToken, null);
+			assert.notEqual(client.authToken!.exp, null);
+
+			const dateMillisecondsInTenDays = Date.now() + TEN_DAYS_IN_SECONDS * 1000;
+			const dateDifference = Math.abs(dateMillisecondsInTenDays - client.authToken!.exp! * 1000);
+
+			// Expiry must be accurate within 1000 milliseconds.
+			assert.strictEqual(dateDifference < 1000, true);
+		});
+
+		it('Should set the correct expiry when adding exp claim when creating a JWT with socket.setAuthToken', async function () {
+			server = listen(PORT_NUMBER, serverOptions);
+
+			bindFailureHandlers(server);
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(clientOptions);
+
+			await client.listen('connect').once();
+			client.invoke('loginWithTenDayExp', {username: 'bob'});
+			await client.listen('authenticate').once();
+
+			assert.notEqual(client.authToken, null);
+			assert.notEqual(client.authToken!.exp, null);
+
+			const dateMillisecondsInTenDays = Date.now() + TEN_DAYS_IN_SECONDS * 1000;
+			const dateDifference = Math.abs(dateMillisecondsInTenDays - client.authToken!.exp! * 1000);
+
+			// Expiry must be accurate within 1000 milliseconds.
+			assert.strictEqual(dateDifference < 1000, true);
+		});
+
+		it('The exp claim should have priority over expiresIn option when using socket.setAuthToken', async function () {
+			server = listen(PORT_NUMBER, serverOptions);
+			bindFailureHandlers(server);
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(clientOptions);
+
+			await client.listen('connect').once(100);
+			client.invoke('loginWithTenDayExpAndExpiry', { username: 'bob' });
+			await client.listen('authenticate').once(100);
+
+			assert.notEqual(client.authToken, null);
+			assert.notEqual(client.authToken!.exp, null);
+
+			let dateMillisecondsInTenDays = Date.now() + TEN_DAYS_IN_SECONDS * 1000;
+			let dateDifference = Math.abs(dateMillisecondsInTenDays - client.authToken!.exp! * 1000);
+
+			// Expiry must be accurate within 1000 milliseconds.
+			assert.strictEqual(dateDifference < 1000, true);
+		});
+
+		it('Should send back error if socket.setAuthToken tries to set both iss claim and issuer option', async function () {
+			server = listen(PORT_NUMBER, serverOptions);
+			bindFailureHandlers(server);
+
+			const warningMap: {[name: string]: Error} = {};
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(clientOptions);
+
+			await client.listen('connect').once(100);
+
+			(async () => {
+				await client.listen('authenticate').once();
+				throw new Error('Should not pass authentication because the signature should fail');
+			})();
+
+			(async () => {
+				for await (let {error} of server.listen('socketError')) {
+					assert.notEqual(error, null);
+					warningMap[error.name] = error;
+				}
+			})();
+
+			(async () => {
+				for await (let {error} of server.listen('error')) {
+					assert.notEqual(error, null);
+					assert.strictEqual(error.name, 'SocketProtocolError');
+				}
+			})();
+
+			const closePackets: CloseEvent[] = [];
+
+			(async () => {
+				const event = await client.listen('close').once();
+				closePackets.push(event);
+			})();
+
+			let error: Error | null = null;
+
+			try {
+				await client.invoke('loginWithIssAndIssuer', { username: 'bob' });
+			} catch (err) {
+				error = err;
+			}
+
+			assert.notEqual(error, null);
+			assert.strictEqual(error!.name, 'BadConnectionError');
+
+			await wait(100);
+
+			assert.strictEqual(closePackets.length, 1);
+			assert.strictEqual(closePackets[0].code, 4002);
+			server.closeListeners('socketError');
+			assert.notEqual(warningMap['SocketProtocolError'], null);
 		});
 	});
 });

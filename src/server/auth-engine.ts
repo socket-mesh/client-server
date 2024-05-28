@@ -62,9 +62,7 @@ export class DefaultAuthEngine implements AuthEngine {
 			this._signOptions.algorithm = authAlgorithm;
 		}
 
-		if (defaultExpiry) {
-			this._signOptions.expiresIn = defaultExpiry;
-		}
+		this._signOptions.expiresIn = defaultExpiry || 86400;
 
 		if (verifyAlgorithms != null) {
 			this._verificationOptions.algorithms = verifyAlgorithms;
@@ -127,7 +125,7 @@ export class DefaultAuthEngine implements AuthEngine {
 		token = cloneDeep(token);
 
 		if (token) {
-			if ('exp' in token && token.exp == null) {
+			if (!('exp' in token) || token.exp == null) {
 				options.expiresIn = expiresIn;
 			} else {
 				delete options.expiresIn;

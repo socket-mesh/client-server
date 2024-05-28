@@ -204,7 +204,7 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 			} else if (code !== 1000 && code < 4500) {
 				this.tryReconnect();
 			}
-		}		
+		}
 	}
 
 	public get pendingReconnect(): boolean {
