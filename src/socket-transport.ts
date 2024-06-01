@@ -561,13 +561,19 @@ export class SocketTransport<T extends SocketMap> {
 		// If the socket is closed we need to call them back with an error.
 		if (this.status === 'closed') {
 			for (const request of requests) {
+				const err = new BadConnectionError(
+					`Socket invoke ${String(request.method)} event was aborted due to a bad connection`,
+					'connectAbort'
+				);
+
+				this.onError(err);
+
+				if ('sentCallback' in request && request.sentCallback) {
+					request.sentCallback(err);
+				}
+
 				if ('callback' in request && request.callback) {
-					const error = new BadConnectionError(
-						`Socket invoke ${String(request.method)} event was aborted due to a bad connection`,
-						'connectAbort'
-					);
-					this.onError(error);
-					request.callback(error);
+					request.callback(err);
 				}
 			}
 			return;

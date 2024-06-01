@@ -155,7 +155,7 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		if (changed && this.status === 'open') {
 			this.triggerAuthenticationEvents(true, wasAuthenticated);
 		}
-		
+
 		if (rejectOnFailedDelivery) {
 			try {
 				await this.invoke('#setAuthToken', signedAuthToken)[0];
@@ -177,7 +177,13 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 			return;
 		}
 
-		await this.transmit('#setAuthToken', signedAuthToken);
+		try {
+			await this.transmit('#setAuthToken', signedAuthToken);
+		} catch (err) {
+			if (err.name !== 'BadConnectionError') {
+				throw err;
+			}
+		}
 
 		return changed;
 	}

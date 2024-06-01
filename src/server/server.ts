@@ -229,6 +229,12 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 	}
 
 	private bind(details: ClientSocketDetails<T> | ServerSocketDetails<T>) {
+		(async () => {
+			for await (let event of details.socket.listen('disconnect')) {
+				delete this._clients[details.socket.id];
+			}
+		})();
+
 		if (details.type === 'client') {
 			(async () => {
 				for await (let event of details.socket.listen()) {

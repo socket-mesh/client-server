@@ -557,7 +557,7 @@ describe('Integration tests', function () {
 			assert.strictEqual(dateDifference < 1000, true);
 		});
 
-		it('Should send back error if socket.setAuthToken tries to set both iss claim and issuer option', async function () {
+		it('Should send back error if socket.setAuthToken tries to set both iss claim and issuer option', async function() {
 			server = listen(PORT_NUMBER, serverOptions);
 			bindFailureHandlers(server);
 
@@ -614,7 +614,7 @@ describe('Integration tests', function () {
 			assert.notEqual(warningMap['SocketProtocolError'], null);
 		});
 
-		it('Should trigger an authTokenSigned event and socket.signedAuthToken should be set after calling the socket.setAuthToken method', async function () {
+		it('Should trigger an authTokenSigned event and socket.signedAuthToken should be set after calling the socket.setAuthToken method', async function() {
 			server = listen(PORT_NUMBER, serverOptions);
 			bindFailureHandlers(server);
 
@@ -644,7 +644,7 @@ describe('Integration tests', function () {
 			assert.strictEqual(authTokenSignedEventEmitted, true);
 		});
 
-		it('The socket.setAuthToken call should reject if token delivery fails and rejectOnFailedDelivery option is true', async () => {
+		it('The socket.setAuthToken call should reject if token delivery fails and rejectOnFailedDelivery option is true', async function() {
 			let resolve: () => void;
 			let reject: (err: Error) => void;
 
@@ -684,6 +684,74 @@ describe('Integration tests', function () {
 										assert.strictEqual(serverWarnings[0].name, 'BadConnectionError');
 										assert.notEqual(serverWarnings[1], null);
 										assert.strictEqual(serverWarnings[1].name, 'AuthError');
+										resolve();
+									} catch (err) {
+										reject(err);
+									}	
+								})();								
+							}
+						}
+					}
+				)
+			);
+
+			bindFailureHandlers(server);
+
+			const serverWarnings: Error[] = [];
+
+			(async () => {
+				for await (let { error } of server.listen('socketError')) {
+					serverWarnings.push(error);
+				}
+			})();
+
+			await server.listen('ready').once(100);
+			client = new ClientSocket(clientOptions);
+			await client.listen('connect').once(100);
+			await client.invoke('login', { username: 'bob' });
+
+			await new Promise<void>((resolveFn, rejectFn) => {
+				resolve = resolveFn;
+				reject = rejectFn;
+			});
+		});
+
+		it('The socket.setAuthToken call should not reject if token delivery fails and rejectOnFailedDelivery option is not true', async function () {
+			let resolve: () => void;
+			let reject: (err: Error) => void;
+
+			server = listen(
+				PORT_NUMBER,
+				Object.assign(
+					{},
+					serverOptions,
+					{
+						handlers: {
+							login: async ({ socket, transport, options: authToken }: RequestHandlerArgs<AuthToken, BasicSocketMapServer, ServerSocket<BasicServerMap>, ServerTransport<BasicServerMap>>) => {
+								if (!allowedUsers[authToken.username]) {
+									const err = new Error('Failed to login');
+									err.name = 'FailedLoginError';
+									throw err;
+								}
+
+								(async () => {
+									await wait(0);
+
+									let error: Error | null = null;
+	
+									try {
+										socket.disconnect();
+										await transport.setAuthorization(authToken);
+									} catch (err) {
+										error = err;
+									}
+	
+									try {
+										assert.strictEqual(error, null);
+										await wait(0);
+										assert.notEqual(serverWarnings[0], null);
+										assert.strictEqual(serverWarnings[0].name, 'BadConnectionError');
+
 										resolve();
 									} catch (err) {
 										reject(err);
