@@ -1143,7 +1143,7 @@ describe('Integration tests', function () {
 
 			await wait(100);
 
-			const expectedEventList = ['connect', 'disconnect', 'close', 'connecting', 'connect'];
+			const expectedEventList = ['connect', 'close', 'disconnect', 'connecting', 'connect'];
 
 			assert.strictEqual(clientError, null);
 			assert.strictEqual(JSON.stringify(eventList), JSON.stringify(expectedEventList));
@@ -1240,12 +1240,12 @@ describe('Integration tests', function () {
 					event: 'connecting'
 				},
 				{
-					event: 'connectAbort',
+					event: 'close',
 					code: 4444,
 					reason: 'Two'
 				},
 				{
-					event: 'close',
+					event: 'connectAbort',
 					code: 4444,
 					reason: 'Two'
 				},
@@ -1256,15 +1256,15 @@ describe('Integration tests', function () {
 					event: 'connect'
 				},
 				{
-					event: 'disconnect',
-					code: 4455,
-					reason: 'Three'
-				},
-				{
 					event: 'close',
 					code: 4455,
 					reason: 'Three'
 				},
+				{
+					event: 'disconnect',
+					code: 4455,
+					reason: 'Three'
+				}
 			];
 			assert.strictEqual(JSON.stringify(eventList), JSON.stringify(expectedEventList));
 		});
@@ -1333,7 +1333,8 @@ describe('Integration tests', function () {
 
 			await wait(1000);
 
-			assert.strictEqual(disconnectEvent, null);
+			assert.strictEqual(disconnectEvent!.code, 4000);
+			assert.strictEqual(disconnectEvent!.reason, 'Server ping timed out');
 			assert.strictEqual(closeEvent!.code, 4000);
 			assert.strictEqual(closeEvent!.reason, 'Server ping timed out');
 			assert.notEqual(clientError, null);

@@ -2,11 +2,12 @@ import { IncomingMessage } from "http";
 import { ClientSocket } from "../client/client-socket.js";
 import { ServerSocket } from "./server-socket.js";
 import {
-	AuthenticationEvent, BadAuthTokenEvent, ConnectEvent, CloseEvent as SCloseEvent, DisconnectEvent, ErrorEvent as SErrorEvent,
+	AuthenticateEvent, BadAuthTokenEvent, ConnectEvent, CloseEvent as SCloseEvent, DisconnectEvent, ErrorEvent as SErrorEvent,
 	MessageEvent, PingEvent, PongEvent, RequestEvent, ResponseEvent, UnexpectedResponseEvent, UpgradeEvent,
-	AuthenticatedChangeEvent,
 	ConnectingEvent,
-	RemoveAuthTokenEvent
+	RemoveAuthTokenEvent,
+	DeauthenticateEvent,
+	AuthStateChangeEvent
 } from "../socket-event.js";
 import { ServerMap } from "../client/maps/server-map.js";
 import { ClientMapFromServer } from "../client/maps/client-map.js";
@@ -18,10 +19,11 @@ export type ServerEvent<T extends ServerMap> =
 	ErrorEvent |
 	HeadersEvent |
 	ListeningEvent |
-	SocketAuthenticatedChangeEvent<T> |
-	SocketAuthenticationEvent<T> |
+	SocketAuthStateChangeEvent<T> |
+	SocketAuthenticateEvent<T> |
 	SocketBadAuthTokenEvent<T> |
 	SocketCloseEvent<T> |
+	SocketDeauthenticateEvent<T> |
 	SocketErrorEvent<T> |
 	SocketMessageEvent<T> |
 	SocketConnectEvent<T> |
@@ -37,7 +39,7 @@ export type ServerEvent<T extends ServerMap> =
 	WarningEvent;
 
 export interface ConnectionEvent<T extends ServerMap> {
-	socket: ClientSocket<ClientMapFromServer<T>> | ServerSocket<T>,
+	socket: ServerSocket<T>,
 	upgradeReq: IncomingMessage
 }
 
@@ -63,13 +65,15 @@ export interface ServerSocketEvent<T extends ServerMap> {
 	socket: ClientSocket<ClientMapFromServer<T>> | ServerSocket<T>
 }
 
-export type SocketAuthenticatedChangeEvent<T extends ServerMap> = AuthenticatedChangeEvent & ServerSocketEvent<T>;
+export type SocketAuthStateChangeEvent<T extends ServerMap> = AuthStateChangeEvent & ServerSocketEvent<T>;
 
-export type SocketAuthenticationEvent<T extends ServerMap> = AuthenticationEvent & ServerSocketEvent<T>;
+export type SocketAuthenticateEvent<T extends ServerMap> = AuthenticateEvent & ServerSocketEvent<T>;
 
 export type SocketBadAuthTokenEvent<T extends ServerMap> = BadAuthTokenEvent & ServerSocketEvent<T>;
 
 export type SocketCloseEvent<T extends ServerMap> = SCloseEvent & ServerSocketEvent<T>;
+
+export type SocketDeauthenticateEvent<T extends ServerMap> = DeauthenticateEvent & ServerSocketEvent<T>;
 
 export type SocketErrorEvent<T extends ServerMap> = SErrorEvent & ServerSocketEvent<T>;
 

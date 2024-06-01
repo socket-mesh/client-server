@@ -13,8 +13,8 @@ import { AuthInfo } from "../src/server/handlers/authenticate";
 import assert from "node:assert";
 import localStorage from '@socket-mesh/local-storage';
 import { wait } from "../src/utils";
-import { AuthStateChangeEvent, CloseEvent } from "../src/socket-event";
-import { SocketAuthenticatedChangeEvent } from "../src/server/server-event";
+import { AuthStateChangeEvent, AuthenticatedChangeEvent, CloseEvent } from "../src/socket-event";
+import { SocketAuthStateChangeEvent } from "../src/server/server-event";
 import { MiddlewareBlockedError } from "@socket-mesh/errors";
 
 // Add to the global scope like in browser.
@@ -258,7 +258,7 @@ describe('Integration tests', function () {
 
 			const authenticateEvents: AuthToken[] = [];
 			const deauthenticateEvents: AuthToken[] = [];
-			const authenticationStateChangeEvents: SocketAuthenticatedChangeEvent<BasicServerMap<ServerIncomingMap, MyChannels>>[] = [];
+			const authenticationStateChangeEvents: SocketAuthStateChangeEvent<BasicServerMap<ServerIncomingMap, MyChannels>>[] = [];
 			const authStateChangeEvents: AuthStateChangeEvent[] = [];
 
 			(async () => {
@@ -329,7 +329,7 @@ describe('Integration tests', function () {
 		it('Should emit correct events/data when socket is deauthenticated', async function () {
 			global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
 
-			const authenticationStateChangeEvents: SocketAuthenticatedChangeEvent<BasicServerMap<ServerIncomingMap, MyChannels>>[] = [];
+			const authenticationStateChangeEvents: SocketAuthStateChangeEvent<BasicServerMap<ServerIncomingMap, MyChannels>>[] = [];
 			const authStateChangeEvents: AuthStateChangeEvent[] = [];
 
 			(async () => {
@@ -375,9 +375,9 @@ describe('Integration tests', function () {
 			assert.notEqual(authenticationStateChangeEvents[0].authToken, undefined);
 			assert.strictEqual(authenticationStateChangeEvents[0].authToken!.username, 'bob');
 			assert.notEqual(authenticationStateChangeEvents[1], null);
+			assert.strictEqual((authenticationStateChangeEvents[1] as AuthenticatedChangeEvent).authToken, undefined);
 			assert.strictEqual(authenticationStateChangeEvents[1].wasAuthenticated, true);
 			assert.strictEqual(authenticationStateChangeEvents[1].isAuthenticated, false);
-			assert.strictEqual(authenticationStateChangeEvents[1].authToken, undefined);
 		});
 
 		it('Should throw error if server socket deauthenticate is called after client disconnected and rejectOnFailedDelivery is true', async function () {
@@ -390,7 +390,7 @@ describe('Integration tests', function () {
 			client.disconnect();
 			let error: Error | null = null;
 			try {
-				await socket.deauthenticate({rejectOnFailedDelivery: true});
+				await socket.deauthenticate(true);
 			} catch (err) {
 				error = err;
 			}
@@ -591,7 +591,7 @@ describe('Integration tests', function () {
 			const closePackets: CloseEvent[] = [];
 
 			(async () => {
-				const event = await client.listen('close').once();
+				const event = await client.listen('close').once(100);
 				closePackets.push(event);
 			})();
 
@@ -606,12 +606,115 @@ describe('Integration tests', function () {
 			assert.notEqual(error, null);
 			assert.strictEqual(error!.name, 'BadConnectionError');
 
-			await wait(100);
+			await wait(0);
 
 			assert.strictEqual(closePackets.length, 1);
 			assert.strictEqual(closePackets[0].code, 4002);
 			server.closeListeners('socketError');
 			assert.notEqual(warningMap['SocketProtocolError'], null);
 		});
+
+		it('Should trigger an authTokenSigned event and socket.signedAuthToken should be set after calling the socket.setAuthToken method', async function () {
+			server = listen(PORT_NUMBER, serverOptions);
+			bindFailureHandlers(server);
+
+			let authTokenSignedEventEmitted = false;
+
+			(async () => {
+				for await (let { socket, wasSigned, signedAuthToken } of server.listen('socketAuthenticate')) {
+					if (wasSigned) {
+						authTokenSignedEventEmitted = true;
+						assert.notEqual(signedAuthToken, null);
+						assert.strictEqual(signedAuthToken, socket.signedAuthToken);
+					}
+				}
+			})();
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(clientOptions);
+
+			await client.listen('connect').once(100);
+
+			await Promise.all([
+				client.invoke('login', { username: 'bob' }),
+				client.listen('authenticate').once(100)
+			]);
+
+			assert.strictEqual(authTokenSignedEventEmitted, true);
+		});
+
+		it('The socket.setAuthToken call should reject if token delivery fails and rejectOnFailedDelivery option is true', async () => {
+			let resolve: () => void;
+			let reject: (err: Error) => void;
+
+			server = listen(
+				PORT_NUMBER,
+				Object.assign(
+					{},
+					serverOptions,
+					{
+						handlers: {
+							login: async ({ socket, transport, options: authToken }: RequestHandlerArgs<AuthToken, BasicSocketMapServer, ServerSocket<BasicServerMap>, ServerTransport<BasicServerMap>>) => {
+								if (!allowedUsers[authToken.username]) {
+									const err = new Error('Failed to login');
+									err.name = 'FailedLoginError';
+									throw err;
+								}
+
+								(async () => {
+									await wait(0);
+
+									let error: Error | null = null;
+	
+									try {
+										socket.disconnect();
+										await transport.setAuthorization(authToken, { rejectOnFailedDelivery: true });
+									} catch (err) {
+										error = err;
+									}
+	
+									try {
+										assert.notEqual(error, null);
+										assert.strictEqual(error!.name, 'AuthError');
+
+										await wait(0);
+										
+										assert.notEqual(serverWarnings[0], null);
+										assert.strictEqual(serverWarnings[0].name, 'BadConnectionError');
+										assert.notEqual(serverWarnings[1], null);
+										assert.strictEqual(serverWarnings[1].name, 'AuthError');
+										resolve();
+									} catch (err) {
+										reject(err);
+									}	
+								})();								
+							}
+						}
+					}
+				)
+			);
+
+			bindFailureHandlers(server);
+
+			const serverWarnings: Error[] = [];
+
+			(async () => {
+				for await (let { error } of server.listen('socketError')) {
+					serverWarnings.push(error);
+				}
+			})();
+
+			await server.listen('ready').once(100);
+			client = new ClientSocket(clientOptions);
+			await client.listen('connect').once(100);
+			await client.invoke('login', { username: 'bob' });
+
+			await new Promise<void>((resolveFn, rejectFn) => {
+				resolve = resolveFn;
+				reject = rejectFn;
+			});
+		});
+
 	});
 });

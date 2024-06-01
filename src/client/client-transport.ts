@@ -2,7 +2,7 @@ import { SocketStatus } from "../socket.js";
 import ws from "isomorphic-ws";
 import { ClientAuthEngine, LocalStorageAuthEngine, isAuthEngine } from "./client-auth-engine.js";
 import { FunctionReturnType } from "./maps/method-map.js";
-import { hydrateError } from "@socket-mesh/errors";
+import { hydrateError, socketProtocolErrorStatuses } from "@socket-mesh/errors";
 import { ServerPrivateMap, HandshakeStatus } from "./maps/server-map.js";
 import { InvokeMethodOptions, InvokeServiceOptions, SocketTransport } from "../socket-transport.js";
 import { AutoReconnectOptions, ClientSocketOptions, ConnectOptions } from "./client-socket-options.js";
@@ -180,6 +180,9 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 	}
 
 	protected override onClose(code: number, reason?: Buffer) {
+		const status = this.status;
+		let reconnecting = false;
+
 		super.onClose(code, reason);
 
 		clearTimeout(this._pingTimeoutRef);
@@ -197,13 +200,20 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 				// status, don't wait before trying to reconnect - These could happen
 				// if the client wakes up after a period of inactivity and in this case we
 				// want to re-establish the connection as soon as possible.
+				reconnecting = !!this.autoReconnect;
 				this.tryReconnect(0);
 
 				// Codes 4500 and above will be treated as permanent disconnects.
 				// Socket will not try to auto-reconnect.
 			} else if (code !== 1000 && code < 4500) {
+				reconnecting = !!this.autoReconnect;
 				this.tryReconnect();
 			}
+		}
+		if (!reconnecting) {
+			const strReason = reason?.toString() || socketProtocolErrorStatuses[code];
+
+			this.onDisconnect(status, code, strReason);
 		}
 	}
 
@@ -248,7 +258,7 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 		const changed = await super.setAuthorization(signedAuthToken as string, authToken);
 
 		if (changed) {
-			this.triggerAuthenticationEvents(wasAuthenticated);
+			this.triggerAuthenticationEvents(false, wasAuthenticated);
 			// Even if saving the auth token failes we do NOT want to throw an exception.
 			this.authEngine.saveToken(this.signedAuthToken)
 				.catch(err => {
@@ -273,7 +283,7 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 		}
 
 		const exponent = this._connectAttempts++;
-		let reconnectOptions = this.autoReconnect;
+		const reconnectOptions = this.autoReconnect;
 		let timeoutMs: number;
 
 		if (initialDelay == null || exponent > 0) {

@@ -12,7 +12,7 @@ import { handshakeHandler } from "./handlers/handshake.js";
 import { ServerMiddleware } from "./middleware/server-middleware.js";
 import { authenticateHandler } from "./handlers/authenticate.js";
 import { removeAuthTokenHandler } from "../client/handlers/remove-auth-token.js";
-import { CloseEvent, ConnectionEvent, ErrorEvent, HeadersEvent, ListeningEvent, ServerEvent, SocketAuthenticatedChangeEvent, SocketAuthenticationEvent, SocketBadAuthTokenEvent, SocketCloseEvent, SocketConnectEvent, SocketConnectingEvent, SocketDisconnectEvent, SocketErrorEvent, SocketMessageEvent, SocketPingEvent, SocketPongEvent, SocketRemoveAuthTokenEvent, SocketRequestEvent, SocketResponseEvent, SocketSubscribeEvent, SocketSubscribeFailEvent, SocketSubscribeStateChangeEvent, SocketUnexpectedResponseEvent, SocketUnsubscribeEvent, SocketUpgradeEvent, WarningEvent } from "./server-event.js";
+import { CloseEvent, ConnectionEvent, ErrorEvent, HeadersEvent, ListeningEvent, ServerEvent, SocketAuthenticateEvent, SocketAuthStateChangeEvent, SocketBadAuthTokenEvent, SocketCloseEvent, SocketConnectEvent, SocketConnectingEvent, SocketDeauthenticateEvent, SocketDisconnectEvent, SocketErrorEvent, SocketMessageEvent, SocketPingEvent, SocketPongEvent, SocketRemoveAuthTokenEvent, SocketRequestEvent, SocketResponseEvent, SocketSubscribeEvent, SocketSubscribeFailEvent, SocketSubscribeStateChangeEvent, SocketUnexpectedResponseEvent, SocketUnsubscribeEvent, SocketUpgradeEvent, WarningEvent } from "./server-event.js";
 import { AsyncStreamEmitter } from "@socket-mesh/async-stream-emitter";
 import { DemuxedConsumableStream, StreamEvent } from "@socket-mesh/stream-demux";
 import { ServerOptions } from "./server-options.js";
@@ -169,7 +169,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 		return this._isReady;
 	}
 
-	private onClose(): void {
+	private onClose(code: string, reason: Buffer): void {
 		this.emit('close', {});
 	}
 
@@ -229,21 +229,21 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 	}
 
 	private bind(details: ClientSocketDetails<T> | ServerSocketDetails<T>) {
-		(async () => {
-			for await (let event of details.socket.listen()) {
-				this.emit(
-					`socket${event.stream[0].toUpperCase()}${event.stream.substring(1)}` as any,
-					Object.assign(
-						{
-							socket: details.socket,
-						},
-						event.value
-					)
-				);
-			}
-		})();
-
 		if (details.type === 'client') {
+			(async () => {
+				for await (let event of details.socket.listen()) {
+					this.emit(
+						`socket${event.stream[0].toUpperCase()}${event.stream.substring(1)}` as any,
+						Object.assign(
+							{
+								socket: details.socket,
+							},
+							event.value
+						)
+					);
+				}
+			})();
+	
 			(async () => {
 				for await (let event of details.socket.channels.listen()) {
 					this.emit(
@@ -315,14 +315,14 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 	emit(event: "headers", data: HeadersEvent): void;
 	emit(event: "listening", data: ListeningEvent): void;
 	emit(event: "ready", data: {}): void;
-	emit(event: 'socketAuthStateChange', data: SocketAuthenticatedChangeEvent<T>): void;
-	emit(event: 'socketAuthenticate', data: SocketAuthenticationEvent<T>): void;
+	emit(event: 'socketAuthStateChange', data: SocketAuthStateChangeEvent<T>): void;
+	emit(event: 'socketAuthenticate', data: SocketAuthenticateEvent<T>): void;
 	emit(event: 'socketBadAuthToken', data: SocketBadAuthTokenEvent<T>): void;
 	emit(event: 'socketClose', data: SocketCloseEvent<T>): void;
 	emit(event: 'socketConnect', data: SocketConnectEvent<T>): void;
 	emit(event: 'socketConnectAbort', data: SocketDisconnectEvent<T>): void;
 	emit(event: 'socketConnecting', data: SocketConnectingEvent<T>): void;
-	emit(event: 'socketDeauthenticate', data: SocketAuthenticationEvent<T>): void;
+	emit(event: 'socketDeauthenticate', data: SocketDeauthenticateEvent<T>): void;
 	emit(event: 'socketDisconnect', data: SocketDisconnectEvent<T>): void;
 	emit(event: 'socketError', data: SocketErrorEvent<T>): void;
 	emit(event: 'socketMessage', data: SocketMessageEvent<T>): void;
@@ -350,14 +350,14 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 	listen(event: "headers"): DemuxedConsumableStream<HeadersEvent>;
 	listen(event: "listening"): DemuxedConsumableStream<ListeningEvent>;
 	listen(event: "ready"): DemuxedConsumableStream<{}>;
-	listen(event: 'socketAuthStateChange'): DemuxedConsumableStream<SocketAuthenticatedChangeEvent<T>>;
-	listen(event: 'socketAuthenticate'): DemuxedConsumableStream<SocketAuthenticationEvent<T>>;
+	listen(event: 'socketAuthStateChange'): DemuxedConsumableStream<SocketAuthStateChangeEvent<T>>;
+	listen(event: 'socketAuthenticate'): DemuxedConsumableStream<SocketAuthenticateEvent<T>>;
 	listen(event: 'socketBadAuthToken'): DemuxedConsumableStream<SocketBadAuthTokenEvent<T>>;
 	listen(event: 'socketClose'): DemuxedConsumableStream<SocketCloseEvent<T>>;
 	listen(event: 'socketConnect'): DemuxedConsumableStream<SocketConnectEvent<T>>;
 	listen(event: 'socketConnectAbort'): DemuxedConsumableStream<SocketDisconnectEvent<T>>;
 	listen(event: 'socketConnecting'): DemuxedConsumableStream<SocketConnectingEvent<T>>;
-	listen(event: 'socketDeauthenticate'): DemuxedConsumableStream<SocketAuthenticationEvent<T>>;
+	listen(event: 'socketDeauthenticate'): DemuxedConsumableStream<SocketDeauthenticateEvent<T>>;
 	listen(event: 'socketDisconnect'): DemuxedConsumableStream<SocketDisconnectEvent<T>>;
 	listen(event: 'socketError'): DemuxedConsumableStream<SocketErrorEvent<T>>;
 	listen(event: 'socketMessage'): DemuxedConsumableStream<SocketMessageEvent<T>>;

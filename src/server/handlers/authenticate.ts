@@ -20,11 +20,11 @@ export interface ValidAuthInfo {
 }
 
 export async function authenticateHandler(
-	{ socket, transport, options }: RequestHandlerArgs<string, BasicSocketMapServer>
+	{ socket, transport, options: signedAuthToken }: RequestHandlerArgs<string, BasicSocketMapServer>
 ): Promise<void> {
 	const state = transport.state;
 	const server = state.server;
-	const authInfo = await validateAuthToken(server.auth, options);
+	const authInfo = await validateAuthToken(server.auth, signedAuthToken);
 
 	await processAuthentication(socket, transport, authInfo);
 }
@@ -64,7 +64,7 @@ export async function processAuthentication(
 	socket: Socket<BasicSocketMapServer>,
 	transport: SocketTransport<BasicSocketMapServer>,
 	authInfo: AuthInfo
-): Promise<void> {
+): Promise<boolean> {
 	if ('authError' in authInfo) {
 		await transport.changeToUnauthenticatedState();
 
@@ -101,5 +101,5 @@ export async function processAuthentication(
 		}
 	}
 
-	await transport.setAuthorization(authInfo.signedAuthToken, authInfo.authToken);
+	return await transport.setAuthorization(authInfo.signedAuthToken, authInfo.authToken);
 }

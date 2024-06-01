@@ -8,24 +8,13 @@ import { FunctionReturnType, MethodMap, ServiceMap } from "./client/maps/method-
 import { AnyResponse, MethodDataResponse } from "./response.js";
 import { HandlerMap } from "./client/maps/handler-map.js";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
-import { Socket, SocketStatus } from "./socket.js";
+import { Socket, SocketOptions, SocketStatus, StreamCleanupMode } from "./socket.js";
 import base64id from "base64id";
 import { RequestHandlerArgs } from "./request-handler.js";
 import { SocketMap } from "./client/maps/socket-map.js";
 import { wait } from "./utils.js";
 
 export type CallIdGenerator = () => number;
-
-export interface SocketOptions<T extends SocketMap, TSocket extends Socket<T> = Socket<T>> {
-	ackTimeoutMs?: number,
-	id?: string,
-	callIdGenerator?: CallIdGenerator,
-	handlers?: HandlerMap<T>;
-	onUnhandledRequest?: (socket: TSocket, packet: AnyPacket<T['Service'], T['Incoming']>) => boolean,
-	codecEngine?: CodecEngine,
-	middleware?: Middleware<T>[],
-	state?: T['State']
-}
 
 export interface InvokeMethodOptions<TMethodMap extends MethodMap, TMethod extends keyof TMethodMap> {
 	method: TMethod,
@@ -61,6 +50,7 @@ export class SocketTransport<T extends SocketMap> {
 	public readonly codecEngine: CodecEngine;
 	public readonly middleware: Middleware<T>[];
 	public readonly state: Partial<T['State']>;
+	public streamCleanupMode: StreamCleanupMode;
 	public id: string;
 	public ackTimeoutMs: number;
 
@@ -75,6 +65,7 @@ export class SocketTransport<T extends SocketMap> {
 		this._callbackMap = {};
 		this._handlers = options?.handlers || {};
 		this.state = options?.state || {};
+		this.streamCleanupMode = options?.streamCleanupMode || 'kill';
 
 		this._callIdGenerator = options?.callIdGenerator || (() => {
 			return cid++;
@@ -96,10 +87,7 @@ export class SocketTransport<T extends SocketMap> {
 
 	public disconnect(code=1000, reason?: string): void {
 		if (this.webSocket) {
-			const status = this.status;
-
 			this.webSocket.close(code);
-			this.onDisconnect(status, code, reason);
 			this.onClose(code, reason);
 		}
 	}
@@ -192,13 +180,16 @@ export class SocketTransport<T extends SocketMap> {
 		return false;
 	}
 
-	public triggerAuthenticationEvents(wasAuthenticated: boolean): void {
+	public triggerAuthenticationEvents(wasSigned: boolean, wasAuthenticated: boolean): void {
 		this._socket.emit(
 			'authStateChange',
 			{ wasAuthenticated, isAuthenticated: true, authToken: this._authToken, signedAuthToken: this._signedAuthToken }
 		);
 
-		this._socket.emit('authenticate', { signedAuthToken: this._signedAuthToken, authToken: this._authToken });
+		this._socket.emit(
+			'authenticate',
+			{ wasSigned, signedAuthToken: this._signedAuthToken, authToken:this._authToken }
+		);
 
 		for (const middleware of this.middleware) {
 			if (middleware.onAuthenticated) {
@@ -275,9 +266,9 @@ export class SocketTransport<T extends SocketMap> {
 			let closeMessage: string;
 
 			if (typeof reason === 'string') {
-				closeMessage = 'Socket connection closed with status code ' + code + ' and reason: ' + reason;
+				closeMessage = `Socket connection closed with status code ${code} and reason: ${reason}`;
 			} else {
-				closeMessage = 'Socket connection closed with status code ' + code;
+				closeMessage = `Socket connection closed with status code ${code}`;
 			}
 
 			this.onError(new SocketProtocolError(socketProtocolErrorStatuses[code] || closeMessage, code));
@@ -321,7 +312,6 @@ export class SocketTransport<T extends SocketMap> {
 					this.onResponse(curPacket);
 				} else {
 					this.onRequest(curPacket);
-					this._socket.emit('request', { request: curPacket });
 				}
 			}
 		} else {
@@ -329,7 +319,6 @@ export class SocketTransport<T extends SocketMap> {
 				this.onResponse(packet);
 			} else {
 				this.onRequest(packet);
-				this._socket.emit('request',  { request: packet });
 			}
 		}
 	}
@@ -344,6 +333,8 @@ export class SocketTransport<T extends SocketMap> {
 
 	protected onRequest(packet: AnyPacket<T['Service'], T['Incoming']>): boolean {
 		packet.requestedAt = new Date();
+
+		this._socket.emit('request', { request: packet });
 		
 		const timeoutAt = typeof packet.ackTimeoutMs === 'number' ? new Date(packet.requestedAt.valueOf() + packet.ackTimeoutMs) : null;
 		let wasHandled = false;
@@ -571,8 +562,12 @@ export class SocketTransport<T extends SocketMap> {
 		if (this.status === 'closed') {
 			for (const request of requests) {
 				if ('callback' in request && request.callback) {
-					//TODO:
-					request.callback(new Error('socket closed'));
+					const error = new BadConnectionError(
+						`Socket invoke ${String(request.method)} event was aborted due to a bad connection`,
+						'connectAbort'
+					);
+					this.onError(error);
+					request.callback(error);
 				}
 			}
 			return;

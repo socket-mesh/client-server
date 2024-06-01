@@ -40,9 +40,10 @@ export async function handshakeHandler(
 	}
 
 	let authError: Error | undefined = undefined;
+	let changed: boolean;
 
 	try {
-		await processAuthentication(socket, transport, authInfo);
+		changed = await processAuthentication(socket, transport, authInfo);
 
 		if (socket.status === 'closed') {
 			return;
@@ -60,7 +61,7 @@ export async function handshakeHandler(
 	// Needs to be executed after the connection event to allow consumers to be setup.
 	await wait(0);
 
-	transport.triggerAuthenticationEvents(wasAuthenticated);
+	transport.triggerAuthenticationEvents(false, wasAuthenticated);
 
 	if (authError) {
 		return {

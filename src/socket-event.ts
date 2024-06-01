@@ -11,14 +11,15 @@ import { SocketMap } from "./client/maps/socket-map.js";
 export type SocketEvent<T extends SocketMap> =
 	AuthStateChangeEvent |
 	RemoveAuthTokenEvent |
-	AuthenticationEvent |
+	AuthenticateEvent |
 	BadAuthTokenEvent |
 	CloseEvent |
-	ErrorEvent |
-	MessageEvent |
 	ConnectEvent |
 	ConnectingEvent |
+	DeauthenticateEvent |
 	DisconnectEvent | 
+	ErrorEvent |
+	MessageEvent |
 	PingEvent |
 	PongEvent |
 	RequestEvent<T['Service'], T['Incoming']> |
@@ -35,7 +36,8 @@ export interface AuthenticatedChangeEvent {
 	authToken: AuthToken
 }
 
-export interface AuthenticationEvent {
+export interface AuthenticateEvent {
+	wasSigned: boolean,
 	signedAuthToken: SignedAuthToken,
 	authToken: AuthToken
 }
@@ -56,6 +58,11 @@ export interface ConnectEvent {
 }
 
 export interface ConnectingEvent {
+}
+
+export interface DeauthenticateEvent {
+	signedAuthToken: SignedAuthToken,
+	authToken: AuthToken
 }
 
 export interface DeauthenticatedChangeEvent {

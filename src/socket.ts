@@ -1,7 +1,7 @@
 import { CodecEngine } from "@socket-mesh/formatter";
 import { AnyPacket } from "./request";
 import { AsyncStreamEmitter } from "@socket-mesh/async-stream-emitter";
-import { SocketEvent, AuthenticationEvent, BadAuthTokenEvent, CloseEvent, ConnectEvent, DisconnectEvent, ErrorEvent, MessageEvent, PingEvent, PongEvent, RequestEvent, UnexpectedResponseEvent, UpgradeEvent, ResponseEvent, AuthStateChangeEvent, RemoveAuthTokenEvent, ConnectingEvent } from "./socket-event.js";
+import { SocketEvent, AuthenticateEvent, BadAuthTokenEvent, CloseEvent, ConnectEvent, DisconnectEvent, ErrorEvent, MessageEvent, PingEvent, PongEvent, RequestEvent, UnexpectedResponseEvent, UpgradeEvent, ResponseEvent, AuthStateChangeEvent, RemoveAuthTokenEvent, ConnectingEvent, DeauthenticateEvent } from "./socket-event.js";
 import { FunctionReturnType, MethodMap, ServiceMap } from "./client/maps/method-map.js";
 import { HandlerMap } from "./client/maps/handler-map.js";
 import { SocketTransport } from "./socket-transport.js";
@@ -12,6 +12,8 @@ import { Middleware } from "./middleware/middleware";
 
 export type CallIdGenerator = () => number;
 
+export type StreamCleanupMode = 'kill' | 'close' | 'none';
+
 export interface SocketOptions<T extends SocketMap, TSocket extends Socket<T> = Socket<T>> {
 	ackTimeoutMs?: number,
 	id?: string,
@@ -20,7 +22,17 @@ export interface SocketOptions<T extends SocketMap, TSocket extends Socket<T> = 
 	onUnhandledRequest?: (socket: TSocket, packet: AnyPacket<T['Service'], T['Incoming']>) => boolean,
 	codecEngine?: CodecEngine,
 	middleware?: Middleware<T>[],
-	state?: T['State']
+	state?: T['State'],
+
+	// Lets you specify the default cleanup behaviour for
+	// when a socket becomes disconnected.
+	// Can be either 'kill' or 'close'. Kill mode means
+	// that all of the socket's streams will be killed and
+	// so consumption will stop immediately.
+	// Close mode means that consumers on the socket will
+	// be able to finish processing their stream backlogs
+	// bebfore they are ended.
+	streamCleanupMode?: StreamCleanupMode
 }
 
 export type SocketStatus = 'connecting' | 'open' | 'closing' | 'closed';
@@ -39,9 +51,7 @@ export interface InvokeServiceOptions<TServiceMap extends ServiceMap, TService e
 export class Socket<T extends SocketMap> extends AsyncStreamEmitter<SocketEvent<T>> {
 	private readonly _transport: SocketTransport<T>;
 
-	protected constructor(
-		transport: SocketTransport<T>
-	) {
+	protected constructor(transport: SocketTransport<T>) {
 		super();
 
 		transport.socket = this;
@@ -72,50 +82,52 @@ export class Socket<T extends SocketMap> extends AsyncStreamEmitter<SocketEvent<
 		return this._transport.ping();
 	}
 
-	emit(eventName: 'authStateChange', data: AuthStateChangeEvent): void;
-	emit(eventName: 'authenticate', data: AuthenticationEvent): void;
-	emit(eventName: 'badAuthToken', data: BadAuthTokenEvent): void;
-	emit(eventName: 'close', data: CloseEvent): void;
-	emit(eventName: 'connect', data: ConnectEvent): void;
-	emit(eventName: 'connectAbort', data: DisconnectEvent): void;
-	emit(eventName: 'connecting', data: ConnectingEvent): void;
-	emit(eventName: 'deauthenticate', data: AuthenticationEvent): void;
-	emit(eventName: 'disconnect', data: DisconnectEvent): void;
-	emit(eventName: 'error', data: ErrorEvent): void;
-	emit(eventName: 'message', data: MessageEvent): void;
-	emit(eventName: 'ping', data: PingEvent): void;
-	emit(eventName: 'pong', data: PongEvent): void;
-	emit(eventName: 'removeAuthToken', data: RemoveAuthTokenEvent): void;
-	emit(eventName: 'request', data: RequestEvent<T['Service'], T['Incoming']>): void;
-	emit(eventName: 'response', data: ResponseEvent<T['Service'], T['Outgoing'], T['PrivateOutgoing']>): void;
-	emit(eventName: 'unexpectedResponse', data: UnexpectedResponseEvent): void;
-	emit(eventName: 'upgrade', data: UpgradeEvent): void;
-	emit(eventName: string, data: SocketEvent<T>): void {
-		super.emit(eventName, data);
+	emit(event: 'authStateChange', data: AuthStateChangeEvent): void;
+	emit(event: 'authenticate', data: AuthenticateEvent): void;
+	emit(event: 'badAuthToken', data: BadAuthTokenEvent): void;
+	emit(event: 'close', data: CloseEvent): void;
+	emit(event: 'connect', data: ConnectEvent): void;
+	emit(event: 'connectAbort', data: DisconnectEvent): void;
+	emit(event: 'connecting', data: ConnectingEvent): void;
+	emit(event: 'deauthenticate', data: DeauthenticateEvent): void;
+	emit(event: 'disconnect', data: DisconnectEvent): void;
+	emit(event: 'end'): void;
+	emit(event: 'error', data: ErrorEvent): void;
+	emit(event: 'message', data: MessageEvent): void;
+	emit(event: 'ping', data: PingEvent): void;
+	emit(event: 'pong', data: PongEvent): void;
+	emit(event: 'removeAuthToken', data: RemoveAuthTokenEvent): void;
+	emit(event: 'request', data: RequestEvent<T['Service'], T['Incoming']>): void;
+	emit(event: 'response', data: ResponseEvent<T['Service'], T['Outgoing'], T['PrivateOutgoing']>): void;
+	emit(event: 'unexpectedResponse', data: UnexpectedResponseEvent): void;
+	emit(event: 'upgrade', data: UpgradeEvent): void;
+	emit(event: string, data?: SocketEvent<T>): void {
+		super.emit(event, data);
 	}
 	
 	listen(): DemuxedConsumableStream<StreamEvent<SocketEvent<T>>>;
-	listen(eventName: 'authStateChange'): DemuxedConsumableStream<AuthStateChangeEvent>;
-	listen(eventName: 'authenticate'): DemuxedConsumableStream<AuthenticationEvent>;
-	listen(eventName: 'badAuthToken'): DemuxedConsumableStream<BadAuthTokenEvent>;
-	listen(eventName: 'close'): DemuxedConsumableStream<CloseEvent>;
-	listen(eventName: 'connect'): DemuxedConsumableStream<ConnectEvent>;
-	listen(eventName: 'connectAbort'): DemuxedConsumableStream<DisconnectEvent>;
-	listen(eventName: 'connecting'): DemuxedConsumableStream<ConnectingEvent>;
-	listen(eventName: 'deauthenticate'): DemuxedConsumableStream<AuthenticationEvent>;
-	listen(eventName: 'disconnect'): DemuxedConsumableStream<DisconnectEvent>;
-	listen(eventName: 'error'): DemuxedConsumableStream<ErrorEvent>;
-	listen(eventName: 'message'): DemuxedConsumableStream<MessageEvent>;
-	listen(eventName: 'ping'): DemuxedConsumableStream<PingEvent>;
-	listen(eventName: 'pong'): DemuxedConsumableStream<PongEvent>;
-	listen(eventName: 'removeAuthToken'): DemuxedConsumableStream<RemoveAuthTokenEvent>;
-	listen(eventName: 'request'): DemuxedConsumableStream<RequestEvent<T['Service'], T['Incoming']>>;
-	listen(eventName: 'response'): DemuxedConsumableStream<ResponseEvent<T['Service'], T['Outgoing'], T['PrivateOutgoing']>>;
-	listen(eventName: 'unexpectedResponse'): DemuxedConsumableStream<UnexpectedResponseEvent>;
-	listen(eventName: 'upgrade'): DemuxedConsumableStream<UpgradeEvent>;
-	listen<U extends SocketEvent<T>, V = U>(eventName: string): DemuxedConsumableStream<V>;
-	listen<U extends SocketEvent<T>, V = U>(eventName?: string): DemuxedConsumableStream<V> {
-		return super.listen(eventName);
+	listen(event: 'authStateChange'): DemuxedConsumableStream<AuthStateChangeEvent>;
+	listen(event: 'authenticate'): DemuxedConsumableStream<AuthenticateEvent>;
+	listen(event: 'badAuthToken'): DemuxedConsumableStream<BadAuthTokenEvent>;
+	listen(event: 'close'): DemuxedConsumableStream<CloseEvent>;
+	listen(event: 'connect'): DemuxedConsumableStream<ConnectEvent>;
+	listen(event: 'connectAbort'): DemuxedConsumableStream<DisconnectEvent>;
+	listen(event: 'connecting'): DemuxedConsumableStream<ConnectingEvent>;
+	listen(event: 'deauthenticate'): DemuxedConsumableStream<AuthenticateEvent>;
+	listen(event: 'disconnect'): DemuxedConsumableStream<DisconnectEvent>;
+	listen(event: 'end'): DemuxedConsumableStream<void>;
+	listen(event: 'error'): DemuxedConsumableStream<ErrorEvent>;
+	listen(event: 'message'): DemuxedConsumableStream<MessageEvent>;
+	listen(event: 'ping'): DemuxedConsumableStream<PingEvent>;
+	listen(event: 'pong'): DemuxedConsumableStream<PongEvent>;
+	listen(event: 'removeAuthToken'): DemuxedConsumableStream<RemoveAuthTokenEvent>;
+	listen(event: 'request'): DemuxedConsumableStream<RequestEvent<T['Service'], T['Incoming']>>;
+	listen(event: 'response'): DemuxedConsumableStream<ResponseEvent<T['Service'], T['Outgoing'], T['PrivateOutgoing']>>;
+	listen(event: 'unexpectedResponse'): DemuxedConsumableStream<UnexpectedResponseEvent>;
+	listen(event: 'upgrade'): DemuxedConsumableStream<UpgradeEvent>;
+	listen<U extends SocketEvent<T>, V = U>(event: string): DemuxedConsumableStream<V>;
+	listen<U extends SocketEvent<T>, V = U>(event?: string): DemuxedConsumableStream<V> {
+		return super.listen(event);
 	}
 
 	public get url(): string {

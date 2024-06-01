@@ -7,6 +7,7 @@ import { ServerMiddleware } from "./middleware/server-middleware.js";
 import { EmptySocketMap } from "../client/maps/socket-map.js";
 import { ServerMap } from "../client/maps/server-map.js";
 import { Broker } from "./broker/broker.js";
+import { StreamCleanupMode } from "../socket.js";
 
 export interface ServerOptions<T extends ServerMap> extends ws.ServerOptions {
 	// In milliseconds, the timeout for receiving a response
@@ -39,5 +40,15 @@ export interface ServerOptions<T extends ServerMap> extends ws.ServerOptions {
 	pingTimeoutMs?: number | false,
 
 	// The maximum number of unique channels which a single socket can subscribe to.
-	socketChannelLimit?: number
+	socketChannelLimit?: number,
+
+	// Lets you specify the default cleanup behaviour for
+	// when a socket becomes disconnected.
+	// Can be either 'kill' or 'close'. Kill mode means
+	// that all of the socket's streams will be killed and
+	// so consumption will stop immediately.
+	// Close mode means that consumers on the socket will
+	// be able to finish processing their stream backlogs
+	// bebfore they are ended.
+	socketStreamCleanupMode?: StreamCleanupMode
 }

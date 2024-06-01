@@ -4,11 +4,8 @@ import ws from "ws";
 import { ServerTransport } from "./server-transport.js";
 import { SocketMapFromServer } from "../client/maps/socket-map.js";
 import { ServerMap } from "../client/maps/server-map.js";
-import { AuthTokenOptions } from "./auth-engine.js";
 
-export interface ServerSocketOptions<
-	T extends ServerMap
-> extends SocketOptions<SocketMapFromServer<T>> {
+export interface ServerSocketOptions<T extends ServerMap> extends SocketOptions<SocketMapFromServer<T>> {
 	handlers: HandlerMap<SocketMapFromServer<T>>,
 	service?: string,
 	socket: ws.WebSocket
@@ -25,17 +22,15 @@ export class ServerSocket<T extends ServerMap> extends Socket<SocketMapFromServe
 		this._serverTransport = transport;
 	}
 
-	async deauthenticate(options?: AuthTokenOptions): Promise<boolean> {
+	async deauthenticate(rejectOnFailedDelivery?: boolean): Promise<boolean> {
 		await super.deauthenticate();
 		
-		if (options && options.rejectOnFailedDelivery) {
+		if (rejectOnFailedDelivery) {
 			try {
 				await this._serverTransport.invoke('#removeAuthToken', undefined, true)[0];
 			} catch (error) {
 				this._serverTransport.onError(error);
-				if (options && options.rejectOnFailedDelivery) {
-					throw error;
-				}
+				throw error;
 			}
 			return;
 		}

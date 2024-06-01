@@ -3,13 +3,11 @@ import crypto from "crypto";
 import jwt from 'jsonwebtoken';
 import { InvalidArgumentsError } from '@socket-mesh/errors';
 
-export interface AuthTokenOptions {
+export interface AuthTokenOptions extends jwt.SignOptions {
 	rejectOnFailedDelivery?: boolean;
 }
 
 export interface AuthEngine {
-	readonly rejectOnFailedDelivery: boolean;
-
 	signatureKey: jwt.Secret;
 	verificationKey: jwt.Secret;
 
@@ -40,8 +38,6 @@ export interface AuthEngineOptions {
 	// The default expiry for auth tokens in seconds
 	defaultExpiry?: number,
 
-	rejectOnFailedDelivery?: boolean,
-
 	verifyAlgorithms?: jwt.Algorithm[]
 }
 
@@ -53,8 +49,7 @@ export class DefaultAuthEngine implements AuthEngine {
 	public signatureKey: jwt.Secret;
 	public verificationKey: jwt.Secret;
 
-	constructor({ authAlgorithm, authKey, defaultExpiry, rejectOnFailedDelivery, verifyAlgorithms }: AuthEngineOptions = {}) {
-		this.rejectOnFailedDelivery = !!rejectOnFailedDelivery;
+	constructor({ authAlgorithm, authKey, defaultExpiry, verifyAlgorithms }: AuthEngineOptions = {}) {
 		this._signOptions = {};
 		this._verificationOptions = {};
 
