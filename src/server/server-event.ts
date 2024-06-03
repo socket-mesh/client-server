@@ -18,6 +18,7 @@ export type ServerEvent<T extends ServerMap> =
 	CloseEvent |
 	ErrorEvent |
 	HeadersEvent |
+	HandshakeEvent<T> |
 	ListeningEvent |
 	SocketAuthStateChangeEvent<T> |
 	SocketAuthenticateEvent<T> |
@@ -48,6 +49,10 @@ export interface CloseEvent {}
 
 export interface ErrorEvent {
 	error: Error
+}
+
+export interface HandshakeEvent<T extends ServerMap> {
+	socket: ServerSocket<T>
 }
 
 export interface WarningEvent {
