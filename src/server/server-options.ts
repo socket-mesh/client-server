@@ -1,5 +1,5 @@
 import ws from "ws";
-import { AuthEngine, AuthEngineOptions } from "./auth-engine.js";
+import { AuthEngine, AuthOptions } from "./auth-engine.js";
 import { CallIdGenerator } from "../socket-transport.js";
 import { CodecEngine } from "@socket-mesh/formatter";
 import { HandlerMap } from "../client/maps/handler-map.js";
@@ -17,7 +17,7 @@ export interface ServerOptions<T extends ServerMap> extends ws.ServerOptions {
 	// Whether or not clients are allowed to publish messages to channels.
 	allowClientPublish?: boolean,
 
-	authEngine?: AuthEngine | AuthEngineOptions,
+	authEngine?: AuthEngine | AuthOptions,
 
 	brokerEngine?: Broker<T['Channel']>,
 

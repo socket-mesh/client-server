@@ -39,8 +39,6 @@ export interface ClientSocketOptions<T extends ClientMap> extends SocketOptions<
 
 	// (milliseconds)
 	connectTimeoutMs?: number;
-	
-	isPingTimeoutDisabled?: boolean;
 }
 
 export function parseClientOptions<T extends ClientMap>(options: ClientSocketOptions<T> | string | URL): ClientSocketOptions<T> {

@@ -44,10 +44,6 @@ export class ClientSocket<T extends ClientMap> extends Socket<SocketMapFromClien
 			this.connect(options);
 		}
 	}
-
-	public get autoReconnect(): AutoReconnectOptions | false {
-		return this._clientTransport.autoReconnect;
-	}
 	
 	public async authenticate(signedAuthToken: SignedAuthToken): Promise<void> {
 		try {
@@ -69,6 +65,10 @@ export class ClientSocket<T extends ClientMap> extends Socket<SocketMapFromClien
 
 			throw hydrateError(err);
 		}
+	}
+
+	public get autoReconnect(): AutoReconnectOptions | false {
+		return this._clientTransport.autoReconnect;
 	}
 
 	public set autoReconnect(value: Partial<AutoReconnectOptions> | boolean) {
@@ -125,6 +125,10 @@ export class ClientSocket<T extends ClientMap> extends Socket<SocketMapFromClien
 	public reconnect(code?: number, reason?: string) {
 		this.disconnect(code, reason);
 		this.connect();
+	}
+
+	get type(): 'client' {
+		return this._clientTransport.type;
 	}
 
 	public get uri(): URL {

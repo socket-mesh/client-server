@@ -16,6 +16,7 @@ import { wait } from "../src/utils";
 import { AuthStateChangeEvent, AuthenticatedChangeEvent, CloseEvent } from "../src/socket-event";
 import { SocketAuthStateChangeEvent } from "../src/server/server-event";
 import { MiddlewareBlockedError } from "@socket-mesh/errors";
+import { AuthOptions } from "../src/server/auth-engine";
 
 // Add to the global scope like in browser.
 global.localStorage = localStorage;
@@ -148,8 +149,7 @@ async function setAuthKeyHandler(
 ): Promise<void> {
 	const server = transport.state.server;
 
-	server!.auth.signatureKey = secret;
-	server!.auth.verificationKey = secret;
+	server!.auth.authKey = secret;
 }
 
 async function procHandler(
@@ -782,6 +782,100 @@ describe('Integration tests', function () {
 				resolve = resolveFn;
 				reject = rejectFn;
 			});
+		});
+
+		it('The verifyToken method of the authEngine receives correct params', async function () {
+			let resolve: () => void;
+			let reject: (err: Error) => void;
+
+			global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
+
+			server = listen(PORT_NUMBER,
+				Object.assign(
+					{},
+					serverOptions,
+					{
+						authEngine: {
+							authKey: SERVER_AUTH_KEY,
+							signToken: async() => {
+								return '';
+							},
+							verifyToken: async (signedToken: string, authOptions: AuthOptions, verifyOptions?: jwt.VerifyOptions) => {
+								try {
+									await wait(10);
+									assert.strictEqual(signedToken, validSignedAuthTokenBob);
+									assert.strictEqual(authOptions.authKey, SERVER_AUTH_KEY);
+									//assert.notEqual(verifyOptions, null);
+									//assert.notEqual(options.socket, null);
+								} catch (err) {
+									reject(err);
+								}
+								resolve();
+								return {};
+							}
+						}
+					}
+				)
+			);
+			bindFailureHandlers(server);
+
+			(async () => {
+				await server.listen('ready').once(100);
+				client = new ClientSocket(clientOptions);
+			})();
+
+			await new Promise<void>((resolveFn, rejectFn) => {
+				resolve = resolveFn;
+				reject = rejectFn;
+			});
+		});
+
+		it('Should remove client data from the server when client disconnects before authentication process finished', async function () {
+			server = listen(PORT_NUMBER,
+				Object.assign(
+					{},
+					serverOptions,
+					{
+						authEngine: {
+							authKey: SERVER_AUTH_KEY,
+							signToken: async() => {
+								return '';
+							},
+							verifyToken: async () => {
+								await wait(500);
+								return {};
+							}
+						}
+					}
+				)
+			);
+
+			bindFailureHandlers(server);
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(clientOptions);
+
+			let serverSocket: ServerSocket<BasicServerMap<ServerIncomingMap, MyChannels, {}>> | null = null;
+
+			(async () => {
+				for await (let {socket} of server.listen('handshake')) {
+					serverSocket = socket;
+				}
+			})();
+
+			await wait(0);
+			assert.strictEqual(server.clientCount, 0);
+			assert.strictEqual(server.pendingClientCount, 1);
+			assert.notEqual(serverSocket, null);
+			assert.strictEqual(Object.keys(server.pendingClients)[0], serverSocket!.id);
+			client.disconnect();
+
+			await wait(100);
+			assert.strictEqual(Object.keys(server.clients).length, 0);
+			assert.strictEqual(server.clientCount, 0);
+			assert.strictEqual(server.pendingClientCount, 0);
+			assert.strictEqual(JSON.stringify(server.pendingClients), '{}');
 		});
 
 	});

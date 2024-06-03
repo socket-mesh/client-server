@@ -7,12 +7,12 @@ import { IncomingMessage, Server as HttpServer } from 'http';
 import defaultCodec, { CodecEngine } from "@socket-mesh/formatter";
 import { HandlerMap } from "../client/maps/handler-map.js";
 import { AnyPacket } from "../request.js";
-import { AuthEngine, DefaultAuthEngine, isAuthEngine } from "./auth-engine.js";
+import { AuthEngine, defaultAuthEngine, isAuthEngine } from "./auth-engine.js";
 import { handshakeHandler } from "./handlers/handshake.js";
 import { ServerMiddleware } from "./middleware/server-middleware.js";
 import { authenticateHandler } from "./handlers/authenticate.js";
 import { removeAuthTokenHandler } from "../client/handlers/remove-auth-token.js";
-import { CloseEvent, ConnectionEvent, ErrorEvent, HeadersEvent, ListeningEvent, ServerEvent, SocketAuthenticateEvent, SocketAuthStateChangeEvent, SocketBadAuthTokenEvent, SocketCloseEvent, SocketConnectEvent, SocketConnectingEvent, SocketDeauthenticateEvent, SocketDisconnectEvent, SocketErrorEvent, SocketMessageEvent, SocketPingEvent, SocketPongEvent, SocketRemoveAuthTokenEvent, SocketRequestEvent, SocketResponseEvent, SocketSubscribeEvent, SocketSubscribeFailEvent, SocketSubscribeStateChangeEvent, SocketUnexpectedResponseEvent, SocketUnsubscribeEvent, SocketUpgradeEvent, WarningEvent } from "./server-event.js";
+import { CloseEvent, ConnectionEvent, ErrorEvent, HandshakeEvent, HeadersEvent, ListeningEvent, ServerEvent, ServerSocketEvent, SocketAuthenticateEvent, SocketAuthStateChangeEvent, SocketBadAuthTokenEvent, SocketCloseEvent, SocketConnectEvent, SocketConnectingEvent, SocketDeauthenticateEvent, SocketDisconnectEvent, SocketErrorEvent, SocketMessageEvent, SocketPingEvent, SocketPongEvent, SocketRemoveAuthTokenEvent, SocketRequestEvent, SocketResponseEvent, SocketSubscribeEvent, SocketSubscribeFailEvent, SocketSubscribeStateChangeEvent, SocketUnexpectedResponseEvent, SocketUnsubscribeEvent, SocketUpgradeEvent, WarningEvent } from "./server-event.js";
 import { AsyncStreamEmitter } from "@socket-mesh/async-stream-emitter";
 import { DemuxedConsumableStream, StreamEvent } from "@socket-mesh/stream-demux";
 import { ServerOptions } from "./server-options.js";
@@ -26,22 +26,9 @@ import { SimpleBroker } from "./broker/simple-broker.js";
 import { Exchange } from "./broker/exchange.js";
 import { publishHandler } from "./handlers/publish.js";
 
-interface ClientSocketDetails<T extends ServerMap> {
-	type: 'client',
-	socket: ClientSocket<ClientMapFromServer<T>>
-}
-
-interface ServerSocketDetails<T extends ServerMap> {
-	type: 'server',
-	socket: ServerSocket<T>,
-	isAlive: boolean
-}
-
 export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<T>> {
 	private readonly _callIdGenerator: CallIdGenerator;
-	private readonly _clients: { [ id: string ]: ClientSocketDetails<T> | ServerSocketDetails<T> };
 	private readonly _wss: ws.WebSocketServer;
-	private _pingIntervalId: NodeJS.Timeout | null;
 	private _isReady: boolean;
 	private _isListening: boolean;
 	private _handlers: HandlerMap<SocketMapFromServer<T>>;
@@ -56,7 +43,11 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 
 	public readonly auth: AuthEngine;
 	public readonly brokerEngine: Broker<T['Channel']>;
+	public readonly clients: { [ id: string ]: ClientSocket<ClientMapFromServer<T>> | ServerSocket<T> };
+	public clientCount: number;
 	public readonly codecEngine: CodecEngine;
+	public readonly pendingClients: { [ id: string ]: ClientSocket<ClientMapFromServer<T>> | ServerSocket<T> };	
+	public pendingClientCount: number;
 	public readonly httpServer: HttpServer;
 
 	public readonly middleware: ServerMiddleware<T>[];
@@ -72,19 +63,21 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 
 		options.clientTracking = true;
 
-		this._clients = {};
+		this.clients = {};
+		this.clientCount = 0;
+		this.pendingClients = {};
+		this.pendingClientCount = 0;
 		this.ackTimeoutMs = options.ackTimeoutMs || 10000;
 		this.allowClientPublish = options.allowClientPublish ?? true;
 		this.pingIntervalMs = options.pingIntervalMs || 8000;
 		this.isPingTimeoutDisabled = (options.pingTimeoutMs === false);
 		this.pingTimeoutMs = options.pingTimeoutMs || 20000;
-		this._pingIntervalId = null;
 
 		this._callIdGenerator = options.callIdGenerator || (() => {
 			return cid++;
 		});
 
-		this.auth = isAuthEngine(options.authEngine) ? options.authEngine : new DefaultAuthEngine(options.authEngine);
+		this.auth = isAuthEngine(options.authEngine) ? options.authEngine : defaultAuthEngine(options.authEngine);
 		this.brokerEngine = options.brokerEngine || new SimpleBroker<T['Channel']>();
 		this.codecEngine = options.codecEngine || defaultCodec;
 		this.middleware = options.middleware || [];
@@ -146,13 +139,9 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 			});
 
 			if (!keepSocketsOpen) {
-				for (let socketDetails of Object.values(this._clients)) {
-					socketDetails.socket.disconnect();
+				for (let socket of Object.values(this.clients)) {
+					socket.disconnect();
 				}
-
-				// Stop the ping interval.
-				clearInterval(this._pingIntervalId);
-				this._pingIntervalId = null;
 			}
 		});
 	}
@@ -191,13 +180,8 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 			onUnhandledRequest: this.onUnhandledRequest.bind(this)
 		});
 
-		this.bind(
-			this._clients[socket.id] = {
-				type: 'server',
-				socket,
-				isAlive: true
-			}
-		);
+		this.pendingClientCount++;
+		this.bind(this.pendingClients[socket.id] = socket);
 
 //		ws.on('error', console.error);
 
@@ -222,28 +206,27 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 		if (outboundMiddleware) {
 			outboundMiddleware(socket.middlewareOutboundStream);
 		}
-
-		// Emit event to signal that a socket handshake has been initiated.
-		this.emit('handshake', { socket: socket });
 */
+		// Emit event to signal that a socket handshake has been initiated.
+		this.emit('handshake', { socket });
 	}
 
-	private bind(details: ClientSocketDetails<T> | ServerSocketDetails<T>) {
-		(async () => {
-			for await (let event of details.socket.listen('disconnect')) {
-				delete this._clients[details.socket.id];
-			}
-		})();
-
-		if (details.type === 'client') {
+	private bind(socket: ClientSocket<ClientMapFromServer<T>> | ServerSocket<T>) {
+		if (socket.type === 'client') {
 			(async () => {
-				for await (let event of details.socket.listen()) {
+				for await (let event of socket.listen()) {
+					if (event.stream === 'connectAbort') {
+						delete this.clients[socket.id];
+					}
+
+					if (event.stream === 'disconnect') {
+						delete this.clients[socket.id];
+					}
+
 					this.emit(
 						`socket${event.stream[0].toUpperCase()}${event.stream.substring(1)}` as any,
 						Object.assign(
-							{
-								socket: details.socket,
-							},
+							{ socket },
 							event.value
 						)
 					);
@@ -251,13 +234,11 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 			})();
 	
 			(async () => {
-				for await (let event of details.socket.channels.listen()) {
+				for await (let event of socket.channels.listen()) {
 					this.emit(
 						`socket${event.stream[0].toUpperCase()}${event.stream.substring(1)}` as any,
 						Object.assign(
-							{
-								socket: details.socket,
-							},
+							{ socket },
 							event.value
 						)
 					);
@@ -281,30 +262,6 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 	private onListening(): void {
 		this._isListening = true;
 
-		this._pingIntervalId = setInterval(() => {
-			let hasServerSockets = false;
-
-			for (const id in this._clients) {
-				const socket = this._clients[id];
-
-				if ('isAlive' in socket) {
-					if (socket.isAlive === false) {
-						socket.socket.disconnect();
-					} else {
-						hasServerSockets = true;
-						socket.isAlive = false;
-						socket.socket.ping();
-					}
-				}
-
-				// if the server is not open and we don't have any server sockets we need to stop the pinginging
-				if (!hasServerSockets && !this.isListening) {
-					clearInterval(this._pingIntervalId);
-					this._pingIntervalId = null;
-				}
-			}
-		}, this.pingIntervalMs);
-
 		this.emit('listening', {});
 	}
 
@@ -319,6 +276,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 	emit(event: "connection", data: ConnectionEvent<T>): void;
 	emit(event: "error", data: ErrorEvent): void;
 	emit(event: "headers", data: HeadersEvent): void;
+	emit(event: "handshake", data: HandshakeEvent<T>): void;
 	emit(event: "listening", data: ListeningEvent): void;
 	emit(event: "ready", data: {}): void;
 	emit(event: 'socketAuthStateChange', data: SocketAuthStateChangeEvent<T>): void;
@@ -353,6 +311,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 	listen(event: "close"): DemuxedConsumableStream<CloseEvent>;
 	listen(event: "connection"): DemuxedConsumableStream<ConnectionEvent<T>>;
 	listen(event: "error"): DemuxedConsumableStream<ErrorEvent>;
+	listen(event: "handshake"): DemuxedConsumableStream<HandshakeEvent<T>>;
 	listen(event: "headers"): DemuxedConsumableStream<HeadersEvent>;
 	listen(event: "listening"): DemuxedConsumableStream<ListeningEvent>;
 	listen(event: "ready"): DemuxedConsumableStream<{}>;

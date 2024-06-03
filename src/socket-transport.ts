@@ -7,7 +7,7 @@ import { ClientRequest, IncomingMessage } from "http";
 import { FunctionReturnType, MethodMap, ServiceMap } from "./client/maps/method-map.js";
 import { AnyResponse, MethodDataResponse } from "./response.js";
 import { HandlerMap } from "./client/maps/handler-map.js";
-import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
+import { AuthToken, extractAuthTokenData, SignedAuthToken } from "@socket-mesh/auth";
 import { Socket, SocketOptions, SocketStatus, StreamCleanupMode } from "./socket.js";
 import base64id from "base64id";
 import { RequestHandlerArgs } from "./request-handler.js";
@@ -54,9 +54,9 @@ export class SocketTransport<T extends SocketMap> {
 	public id: string;
 	public ackTimeoutMs: number;
 
-	protected constructor(
-		options?: SocketOptions<T>
-	) {
+	private _pingTimeoutRef: NodeJS.Timeout;
+
+	protected constructor(options?: SocketOptions<T>) {
 		let cid = 1;
 
 		this.id = (options?.id || base64id.generateId());
@@ -168,7 +168,13 @@ export class SocketTransport<T extends SocketMap> {
 
 		if (signedAuthToken !== this._signedAuthToken) {
 			if (!authToken) {
-				authToken = this.extractAuthTokenData(signedAuthToken);
+				const extractedAuthToken = extractAuthTokenData(signedAuthToken);
+			
+				if (typeof extractedAuthToken === 'string') {
+					throw new InvalidArgumentsError('Invalid authToken.');
+				}
+	
+				authToken = extractedAuthToken;
 			}
 
 			this._authToken = authToken;
@@ -197,27 +203,25 @@ export class SocketTransport<T extends SocketMap> {
 			}
 		}
 	}
-
-	private extractAuthTokenData(signedAuthToken: SignedAuthToken): any {
-		if (typeof signedAuthToken !== 'string') return null;
-
-		let tokenParts = signedAuthToken.split('.');
-		let encodedTokenData = tokenParts[1];
-
-		if (encodedTokenData != null) {
-			let tokenData = encodedTokenData;
-
-			try {
-				tokenData = Buffer.from(tokenData, 'base64').toString('utf8')
-				return JSON.parse(tokenData);
-			} catch (e) {
-				return tokenData;
-			}
-		}
-
-		return null;
-	}
 	
+	public callMiddleware(middleware: Middleware<T>, fn: () => void): void {
+		try {
+			fn();
+		} catch (err) {
+			if (err instanceof MiddlewareBlockedError) {
+				throw err;
+			}
+
+			if (err instanceof MiddlewareCaughtError) {
+				throw err.innerError;
+			}
+
+			this.onError(err);
+
+			throw new MiddlewareError(`An unexpected error occurred in the ${middleware.type} middleware.`, middleware.type);
+		}
+	}
+
 	public async changeToUnauthenticatedState(): Promise<boolean> {
 		if (this._signedAuthToken) {
 			const authToken = this._authToken;
@@ -253,6 +257,8 @@ export class SocketTransport<T extends SocketMap> {
 		const prevStatus = this.status;
 		this.webSocket = null;
 		this._isOpen = false;
+
+		clearTimeout(this._pingTimeoutRef);
 
 		this.abortAllPendingCallbacksDueToBadConnection(prevStatus);
 
@@ -425,26 +431,36 @@ export class SocketTransport<T extends SocketMap> {
 		}
 	}
 
-	public callMiddleware(middleware: Middleware<T>, fn: () => void): void {
-		try {
-			fn();
-		} catch (err) {
-			if (err instanceof MiddlewareBlockedError) {
-				throw err;
-			}
+	protected resetPingTimeout(timeoutMs: number | false, code: number) {
+		if (this._pingTimeoutRef) {
+			clearTimeout(this._pingTimeoutRef);
+		}
 
-			if (err instanceof MiddlewareCaughtError) {
-				throw err.innerError;
-			}
-
-			this.onError(err);
-
-			throw new MiddlewareError(`An unexpected error occurred in the ${middleware.type} middleware.`, middleware.type);
+		if (timeoutMs !== false) {
+			// Use `WebSocket#terminate()`, which immediately destroys the connection,
+			// instead of `WebSocket#close()`, which waits for the close timer.
+			// Delay should be equal to the interval at which your server
+			// sends out pings plus a conservative assumption of the latency.
+			this._pingTimeoutRef = setTimeout(() => {
+				this.webSocket.close(code);
+			}, timeoutMs);
 		}
 	}
 
-	public get url(): string {
-		return this._webSocket.url;
+	public setOpenStatus(authError?: Error): void {
+		if (this._webSocket?.readyState !== ws.OPEN) {
+			throw new InvalidActionError('Cannot set status to OPEN before socket is connected.');
+		}
+
+		this._isOpen = true;
+
+		for (const middleware of this.middleware) {
+			if (middleware.onOpen) {
+				middleware.onOpen();
+			}
+		}
+
+		this._socket.emit('connect', { isAuthenticated: !!this.signedAuthToken, authError });
 	}
 
 	public get status(): SocketStatus {
@@ -466,22 +482,6 @@ export class SocketTransport<T extends SocketMap> {
 			default:
 				return 'closed';
 		}
-	}
-
-	public setOpenStatus(authError?: Error): void {
-		if (this._webSocket?.readyState !== ws.OPEN) {
-			throw new InvalidActionError('Cannot set status to OPEN before socket is connected.');
-		}
-
-		this._isOpen = true;
-
-		for (const middleware of this.middleware) {
-			if (middleware.onOpen) {
-				middleware.onOpen();
-			}
-		}
-
-		this._socket.emit('connect', { isAuthenticated: !!this.signedAuthToken, authError });
 	}
 
 	protected sendRequest(requests: (AnyRequest<T['Service'], T['PrivateOutgoing'], T['Outgoing']>)[]): void;
@@ -861,5 +861,9 @@ export class SocketTransport<T extends SocketMap> {
 		this.sendRequest([request as any]);
 
 		return [promise, abort];
+	}
+
+	public get url(): string {
+		return this._webSocket.url;
 	}
 }

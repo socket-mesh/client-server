@@ -19,13 +19,11 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 	public connectTimeoutMs: number;
 	private _connectTimeoutRef: NodeJS.Timeout;
 
-	private _pingTimeoutRef: NodeJS.Timeout;
-	private _pingTimeoutMs: number;
-	public isPingTimeoutDisabled: boolean;
-
+	private _autoReconnect: AutoReconnectOptions | false;
 	private _connectAttempts: number;
 	private _pendingReconnectTimeout: number | null;
-	private _autoReconnect: AutoReconnectOptions | false;
+	private _pingTimeoutMs: number;
+	public isPingTimeoutDisabled: boolean;
 
 	constructor(options: ClientSocketOptions<T>) {
 		super(options);
@@ -41,7 +39,6 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 				)
 			);
 
-		this.isPingTimeoutDisabled = (options.isPingTimeoutDisabled === false);
 		this.connectTimeoutMs = options.connectTimeoutMs ?? 20000;
 		this._pingTimeoutMs = this.connectTimeoutMs;
 
@@ -52,6 +49,7 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 		this._connectAttempts = 0;
 		this._pendingReconnectTimeout = null;
 		this.autoReconnect = options.autoReconnect;
+		this.isPingTimeoutDisabled = (options.isPingTimeoutDisabled === false);
 	}
 
 	public get autoReconnect(): AutoReconnectOptions | false {
@@ -146,15 +144,14 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 	protected override onOpen() {
 		clearTimeout(this._connectTimeoutRef);		
 		this.resetReconnect();
-		this.resetPingTimeout();
+		this.resetPingTimeout(this.isPingTimeoutDisabled ? false : this.pingTimeoutMs, 4000);
 
 		let authError: Error;
 
 		this.handshake()
 			.then(status => {
 				this.id = status.id;
-				this._pingTimeoutMs = status.pingTimeoutMs;
-				this.resetPingTimeout();
+				this.pingTimeoutMs = status.pingTimeoutMs;
 
 				if ('authToken' in status && status.authToken) {
 					return this.setAuthorization(status.authToken);
@@ -179,13 +176,16 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 			});
 	}
 
+	protected override onPing(data: Buffer) {
+		this.resetPingTimeout(this.isPingTimeoutDisabled ? false : this.pingTimeoutMs, 4000);
+		super.onPing(data);
+	}
+
 	protected override onClose(code: number, reason?: Buffer) {
 		const status = this.status;
 		let reconnecting = false;
 
 		super.onClose(code, reason);
-
-		clearTimeout(this._pingTimeoutRef);
 
 		// Try to reconnect
 		// on server ping timeout (4000)
@@ -227,23 +227,7 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 
 	public set pingTimeoutMs(value: number) {
 		this._pingTimeoutMs = value;
-		this.resetPingTimeout();
-	}
-
-	protected resetPingTimeout() {
-		if (this._pingTimeoutRef) {
-			clearTimeout(this._pingTimeoutRef);
-		}
-
-		if (!this.isPingTimeoutDisabled) {
-			// Use `WebSocket#terminate()`, which immediately destroys the connection,
-			// instead of `WebSocket#close()`, which waits for the close timer.
-			// Delay should be equal to the interval at which your server
-			// sends out pings plus a conservative assumption of the latency.
-			this._pingTimeoutRef = setTimeout(() => {
-				this.webSocket.close(4000);
-			}, this.pingTimeoutMs);
-		}
+		this.resetPingTimeout(this.isPingTimeoutDisabled ? false : this.pingTimeoutMs, 4000);
 	}
 
 	private resetReconnect() {
@@ -303,6 +287,8 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 		this.connect({ timeoutMs });
 	}
 
+	public type: 'client'
+
 	public get uri(): URL {
 		return this._uri
 	}
@@ -313,13 +299,9 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 
 	protected set webSocket(value: ws.WebSocket | null) {
 		if (this.webSocket) {
-			this.webSocket.off('ping', this.resetPingTimeout);
-
 			if (this._connectTimeoutRef) {
 				clearTimeout(this._connectTimeoutRef);
 			}
-
-			delete this.resetPingTimeout;
 		}
 
 		super.webSocket = value;
@@ -336,7 +318,6 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 			this.webSocket.on('open', onOpenCloseError);
 			this.webSocket.on('close', onOpenCloseError);
 			this.webSocket.on('error', onOpenCloseError);
-			this.webSocket.on('ping', this.resetPingTimeout = this.resetPingTimeout.bind(this));
 		}
 	}
 

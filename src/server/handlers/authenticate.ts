@@ -32,10 +32,11 @@ export async function authenticateHandler(
 export async function validateAuthToken(
 	auth: AuthEngine, authToken: SignedAuthToken, verificationOptions?: jwt.VerifyOptions
 ): Promise<AuthInfo> {
+
 	try {
 		return {
 			signedAuthToken: authToken,
-			authToken: await auth.verifyToken(authToken, verificationOptions)
+			authToken: await auth.verifyToken(authToken, auth, verificationOptions)
 		};
 	} catch (error) {
 		return {

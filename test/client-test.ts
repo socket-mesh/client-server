@@ -86,8 +86,7 @@ async function setAuthKeyHandler(
 ): Promise<void> {
 	const server = transport.state.server;
 
-	server!.auth.signatureKey = secret;
-	server!.auth.verificationKey = secret;
+	server!.auth.authKey = secret;
 }
 
 const clientOptions: ClientSocketOptions<MyClientMap> = {

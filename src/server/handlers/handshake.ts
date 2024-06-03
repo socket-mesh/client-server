@@ -1,15 +1,17 @@
 import { RequestHandlerArgs } from "../../request-handler.js";
-import { HandshakeOptions, HandshakeStatus } from "../../client/maps/server-map.js";
+import { BasicServerMap, HandshakeOptions, HandshakeStatus, ServerMap } from "../../client/maps/server-map.js";
 import { processAuthentication, validateAuthToken } from "./authenticate.js";
 import { dehydrateError } from "@socket-mesh/errors";
 import { BasicSocketMapServer } from "../../client/maps/socket-map.js";
 import { wait } from "../../utils.js";
+import { ServerSocket } from "../server-socket.js";
 
 const HANDSHAKE_REJECTION_STATUS_CODE = 4008;
 
 export async function handshakeHandler(
-	{ options, socket, transport }: RequestHandlerArgs<HandshakeOptions, BasicSocketMapServer>
+	{ options, socket, transport }: RequestHandlerArgs<HandshakeOptions, BasicSocketMapServer, ServerSocket<BasicServerMap>>
 ): Promise<HandshakeStatus> {
+
 	const state = transport.state;
 	const server = state.server;
 	const wasAuthenticated = !!transport.signedAuthToken;
@@ -55,6 +57,14 @@ export async function handshakeHandler(
 			authError = dehydrateError(err);
 		}
 	}
+
+	if (server.pendingClients[socket.id]) {
+		delete server.pendingClients[socket.id];
+		server.pendingClientCount--;
+	}
+
+	server.clients[socket.id] = socket;
+	server.clientCount++;
 
 	transport.setOpenStatus(authError);
 

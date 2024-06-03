@@ -47,4 +47,8 @@ export class ServerSocket<T extends ServerMap> extends Socket<SocketMapFromServe
 	get service(): string {
 		return this._serverTransport.service;
 	}
+
+	get type(): 'server' {
+		return this._serverTransport.type;
+	}
 }

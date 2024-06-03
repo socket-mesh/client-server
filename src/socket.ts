@@ -16,12 +16,13 @@ export type StreamCleanupMode = 'kill' | 'close' | 'none';
 
 export interface SocketOptions<T extends SocketMap, TSocket extends Socket<T> = Socket<T>> {
 	ackTimeoutMs?: number,
-	id?: string,
 	callIdGenerator?: CallIdGenerator,
-	handlers?: HandlerMap<T>;
-	onUnhandledRequest?: (socket: TSocket, packet: AnyPacket<T['Service'], T['Incoming']>) => boolean,
 	codecEngine?: CodecEngine,
+	handlers?: HandlerMap<T>;
+	id?: string,
+	isPingTimeoutDisabled?: boolean;
 	middleware?: Middleware<T>[],
+	onUnhandledRequest?: (socket: TSocket, packet: AnyPacket<T['Service'], T['Incoming']>) => boolean,
 	state?: T['State'],
 
 	// Lets you specify the default cleanup behaviour for

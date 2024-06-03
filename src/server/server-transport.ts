@@ -18,8 +18,10 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 	constructor(options: ServerSocketOptions<T>) {
 		super(options);
 
+		this.type = 'server';
 		this.service = options.service;
 		this.webSocket = options.socket;
+		this.resetPingTimeout(this.state.server.isPingTimeoutDisabled ? false : this.state.server.pingTimeoutMs, 4001);
 	}
 
 	public override async changeToUnauthenticatedState(): Promise<boolean> {
@@ -58,6 +60,16 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		}
 
 		super.onDisconnect(status, code, reason);
+
+		if (!!this.state.server.clients[this.id]) {
+			delete this.state.server.clients[this.id];
+			this.state.server.clientCount--;
+		}
+
+		if (!!this.state.server.pendingClients[this.id]) {
+			delete this.state.server.pendingClients[this.id];
+			this.state.server.pendingClientCount--;
+		}
 
 		if (this.streamCleanupMode === 'kill') {
 			(async () => {
@@ -101,7 +113,8 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		this.state.server.emit('socketPing', { socket: this.socket, data });	
 	}
 
-	protected onPong(data: Buffer): void {
+	protected override onPong(data: Buffer): void {
+		this.resetPingTimeout(this.state.server.isPingTimeoutDisabled ? false : this.state.server.pingTimeoutMs, 4001);
 		super.onPong(data);
 		this.state.server.emit('socketPong', { socket: this.socket, data });
 	}
@@ -143,7 +156,7 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		delete options?.rejectOnFailedDelivery;
 
 		try {
-			signedAuthToken = await auth.signToken(authToken, options as jwt.SignOptions);
+			signedAuthToken = await auth.signToken(authToken, auth, options as jwt.SignOptions);
 		} catch (err) {
 			this.onError(err);
 			this.disconnect(4002, err.toString());
@@ -216,4 +229,5 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 
 	}
 
+	public type: 'server'
 }
