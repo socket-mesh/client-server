@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, it } from "node:test";
 import { ClientSocketOptions } from "../src/client/client-socket-options";
 import { ClientSocket } from "../src/client/client-socket";
 import { Server, ServerSocket, listen } from "../src";
-import { BasicServerMap } from "../src/client/maps/server-map";
+import { BasicServerMap, ServerPrivateMap } from "../src/client/maps/server-map";
 import { ServerOptions } from "../src/server/server-options";
 import { AuthToken } from "@socket-mesh/auth";
 import { RequestHandlerArgs } from "../src/request-handler";
 import jwt from "jsonwebtoken";
-import { BasicSocketMapServer } from "../src/client/maps/socket-map";
+import { BasicSocketMapServer, EmptySocketMap, SocketMapFromClient } from "../src/client/maps/socket-map";
 import { ServerTransport } from "../src/server/server-transport";
 import { AuthInfo } from "../src/server/handlers/authenticate";
 import assert from "node:assert";
@@ -17,6 +17,9 @@ import { AuthStateChangeEvent, AuthenticatedChangeEvent, CloseEvent } from "../s
 import { SocketAuthStateChangeEvent } from "../src/server/server-event";
 import { MiddlewareBlockedError } from "@socket-mesh/errors";
 import { AuthOptions } from "../src/server/auth-engine";
+import { OfflineMiddleware } from "../src/middleware/offline-middleware";
+import { removeAuthTokenHandler } from "../src/client/handlers/remove-auth-token";
+import { AnyPacket, MethodRequest, ServiceRequest, TransmitMethodRequest } from "../src/request";
 
 // Add to the global scope like in browser.
 global.localStorage = localStorage;
@@ -864,7 +867,7 @@ describe('Integration tests', function () {
 				}
 			})();
 
-			await wait(0);
+			await wait(100);
 			assert.strictEqual(server.clientCount, 0);
 			assert.strictEqual(server.pendingClientCount, 1);
 			assert.notEqual(serverSocket, null);
@@ -878,5 +881,56 @@ describe('Integration tests', function () {
 			assert.strictEqual(JSON.stringify(server.pendingClients), '{}');
 		});
 
+		it('Should close the connection if the client tries to send a malformatted authenticate packet', async function () {
+			server = listen(PORT_NUMBER, serverOptions);
+
+			await server.listen('ready').once();
+
+			client = new ClientSocket(
+				Object.assign(
+					{},
+					clientOptions,
+					{
+						autoConnect: false,
+						middleware: [
+							new OfflineMiddleware(),
+							{
+								type: 'Authenticate Interceptor',
+								sendRequest: (
+									requests: MethodRequest<ServerPrivateMap>[], cont: (requests: MethodRequest<ServerPrivateMap>[]) => void
+								) => {
+									cont(
+										requests.map(
+											req => {
+												if (req.method === '#authenticate' && 'cid' in req) {
+													delete (req as any).cid;
+												}
+
+												return req;
+											}
+										)
+									);
+								}
+							}
+						]
+					}
+				)
+			);
+
+			const results = await Promise.allSettled([
+				server.listen('socketClose').once(500),
+				client.listen('close').once(100),
+				client.authenticate(validSignedAuthTokenBob)
+			]);
+
+			assert.strictEqual(results[0].status, 'fulfilled');
+			assert.strictEqual(results[0].value.code, 4008);
+			assert.strictEqual(results[0].value.reason, 'Server rejected handshake from client');
+			assert.strictEqual(results[1].status, 'fulfilled');
+			assert.strictEqual(results[1].value.code, 4008);
+			assert.strictEqual(results[1].value.reason, 'Server rejected handshake from client');
+			assert.strictEqual(results[2].status, 'rejected');
+			assert.strictEqual(results[2].reason.name, 'BadConnectionError');
+		});
 	});
 });

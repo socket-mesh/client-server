@@ -352,6 +352,7 @@ export class SocketTransport<T extends SocketMap> {
 
 			handler(
 				new RequestHandlerArgs({
+					isRpc: !!packet.cid,
 					method: packet.method.toString(),
 					timeoutMs: packet.ackTimeoutMs,
 					socket: this._socket,
@@ -359,21 +360,25 @@ export class SocketTransport<T extends SocketMap> {
 					options: packet.data
 				})
 			).then(data => {
-				this.sendResponse([
-					{
-						rid: packet.cid,
-						timeoutAt,
-						data
-					} as MethodDataResponse<T['Incoming']>
-				])
+				if (packet.cid) {
+					this.sendResponse([
+						{
+							rid: packet.cid,
+							timeoutAt,
+							data
+						} as MethodDataResponse<T['Incoming']>
+					]);
+				}
 			}).catch(error => {
-				this.sendResponse([
-					{
-						rid: packet.cid,
-						timeoutAt,
-						error
-					}
-				]);
+				if (packet.cid) {
+					this.sendResponse([
+						{
+							rid: packet.cid,
+							timeoutAt,
+							error
+						}
+					]);
+				}
 
 				this.onError(error);
 			});
@@ -715,7 +720,6 @@ export class SocketTransport<T extends SocketMap> {
 		const request: TransmitMethodRequest<T['Outgoing'], TMethod> | TransmitServiceRequest<T['Service'], TService, TServiceMethod> = 
 			Object.assign(
 				{
-					cid: this._callIdGenerator(),
 					bypassMiddleware: !!bypassMiddleware
 				},
 				service ? {

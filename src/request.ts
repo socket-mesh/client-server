@@ -20,7 +20,6 @@ export type MethodRequest<TMethodMap extends MethodMap> =
 
 
 export interface Request {
-	cid: number,
 	bypassMiddleware: boolean,
 	sentCallback?: (err?: Error) => void
 }
@@ -37,12 +36,14 @@ export interface TransmitMethodRequest<TMethodMap extends MethodMap, TMethod ext
 }
 
 export interface InvokeServiceRequest<TServiceMap extends ServiceMap, TService extends keyof TServiceMap, TMethod extends keyof TServiceMap[TService]> extends TransmitServiceRequest<TServiceMap, TService, TMethod> {
+	cid: number,
 	ackTimeoutMs: number | false,
 	timeoutId?: NodeJS.Timeout;
 	callback: (err: Error, result?: TServiceMap[TService][TMethod]) => void | null
 }
 
 export interface InvokeMethodRequest<TMethodMap extends MethodMap, TMethod extends keyof TMethodMap> extends TransmitMethodRequest<TMethodMap, TMethod> {
+	cid: number,
 	ackTimeoutMs: number | false,
 	timeoutId?: NodeJS.Timeout;
 	callback: (err: Error, result?: TMethodMap[TMethod]) => void | null
@@ -62,7 +63,7 @@ export type ServicePacket<TServiceMap extends ServiceMap> =
 	}[keyof TServiceMap]
 
 export interface RequestPacket {
-	cid: number,
+	cid?: number,
 	requestedAt: Date
 }
 
@@ -78,12 +79,12 @@ export interface ServiceRequestPacket<
 > extends RequestPacket {
 	service: TService,
 	method: TMethod,
-	ackTimeoutMs: number | boolean,
+	ackTimeoutMs?: number | boolean,
 	data?: Parameters<TServiceMap[TService][TMethod]>[0]
 }
 
 export interface MethodRequestPacket<TMethodMap extends MethodMap, TMethod extends keyof TMethodMap> extends RequestPacket {
 	method: TMethod,
 	data?: Parameters<TMethodMap[TMethod]>[0],
-	ackTimeoutMs: number | boolean
+	ackTimeoutMs?: number | boolean
 }

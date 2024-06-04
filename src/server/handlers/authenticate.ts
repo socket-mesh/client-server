@@ -1,11 +1,13 @@
 import { RequestHandlerArgs } from "../../request-handler.js";
 import jwt from "jsonwebtoken";
-import { AuthTokenError, AuthTokenExpiredError, AuthTokenInvalidError, AuthTokenNotBeforeError } from "@socket-mesh/errors";
+import { AuthTokenError, AuthTokenExpiredError, AuthTokenInvalidError, AuthTokenNotBeforeError, InvalidActionError } from "@socket-mesh/errors";
 import { AuthEngine } from "../auth-engine.js";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
 import { Socket } from "../../socket.js";
 import { SocketTransport } from "../../socket-transport.js";
 import { BasicSocketMapServer } from "../../client/maps/socket-map.js";
+
+const HANDSHAKE_REJECTION_STATUS_CODE = 4008;
 
 export type AuthInfo = ValidAuthInfo | InvalidAuthInfo;
 
@@ -20,8 +22,14 @@ export interface ValidAuthInfo {
 }
 
 export async function authenticateHandler(
-	{ socket, transport, options: signedAuthToken }: RequestHandlerArgs<string, BasicSocketMapServer>
+	{ isRpc, options: signedAuthToken, socket, transport }: RequestHandlerArgs<string, BasicSocketMapServer>
 ): Promise<void> {
+	if (!isRpc) {
+		socket.disconnect(HANDSHAKE_REJECTION_STATUS_CODE);
+		
+		throw new InvalidActionError('Handshake request was malformatted');
+	}
+
 	const state = transport.state;
 	const server = state.server;
 	const authInfo = await validateAuthToken(server.auth, signedAuthToken);

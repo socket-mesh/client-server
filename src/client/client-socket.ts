@@ -21,17 +21,16 @@ export class ClientSocket<T extends ClientMap> extends Socket<SocketMapFromClien
 	constructor(options: ClientSocketOptions<T> | string | URL) {
 		options = parseClientOptions(options);
 
-		options.handlers = options.handlers || {};
-
-		Object.assign(
-			options.handlers,
-			{
-				"#kickOut": kickOutHandler,
-				"#publish": publishHandler,
-				"#setAuthToken": setAuthTokenHandler,
-				"#removeAuthToken": removeAuthTokenHandler
-			}
-		);
+		options.handlers = 
+			Object.assign(
+				{
+					"#kickOut": kickOutHandler,
+					"#publish": publishHandler,
+					"#setAuthToken": setAuthTokenHandler,
+					"#removeAuthToken": removeAuthTokenHandler
+				},
+				options.handlers
+			);
 
 		const clientTransport = new ClientTransport(options);
 

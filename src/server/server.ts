@@ -83,10 +83,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 		this.middleware = options.middleware || [];
 		this.socketChannelLimit = options.socketChannelLimit;
 		this.httpServer = options.server;
-		this._handlers = options.handlers || {};
-
-		Object.assign(
-			this._handlers,
+		this._handlers = Object.assign(
 			{
 				"#authenticate": authenticateHandler,
 				"#handshake": handshakeHandler,
@@ -94,7 +91,8 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 				"#removeAuthToken": removeAuthTokenHandler,
 				"#subscribe": subscribeHandler,
 				"#unsubscribe": unsubscribeHandler
-			}
+			},
+			options.handlers
 		);
 
 		this._wss = new ws.WebSocketServer(options);

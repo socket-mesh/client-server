@@ -9,6 +9,7 @@ export interface RequestHandlerArgsOptions<
 	TSocket extends Socket<T> = Socket<T>,
 	TTransport extends SocketTransport<T> = SocketTransport<T>
 > {
+	isRpc: boolean,
 	method: string,
 	socket: TSocket,
 	transport: TTransport,
@@ -22,20 +23,28 @@ export class RequestHandlerArgs<
 	TSocket extends Socket<T> = Socket<T>,
 	TTransport extends SocketTransport<T> = SocketTransport<T>
 > {
-	public requestedAt: Date;
-	public timeoutMs?: number | boolean;
-	public socket: TSocket;
-	public transport: TTransport;
+	public isRpc: boolean;
 	public method: string;
 	public options: TOptions;
+	public requestedAt: Date;
+	public socket: TSocket;
+	public timeoutMs?: number | boolean;
+	public transport: TTransport;
 
 	constructor(options: RequestHandlerArgsOptions<TOptions, T, TSocket, TTransport>) {
-		this.requestedAt = new Date();
+		this.isRpc = options.isRpc;
 		this.method = options.method;
+		this.options = options.options;
+		this.requestedAt = new Date();
 		this.socket = options.socket;
 		this.transport = options.transport;
-		this.options = options.options;
 		this.timeoutMs = options.timeoutMs;
+	}
+
+	checkTimeout(timeLeftMs = 0): void {
+		if (typeof this.timeoutMs === 'number' && this.getRemainingTimeMs() <= timeLeftMs) {
+			throw new TimeoutError(`Method \'${this.method}\' timed out.`);
+		}
 	}
 
 	getRemainingTimeMs(): number {
@@ -44,12 +53,6 @@ export class RequestHandlerArgs<
 		}
 
 		return Infinity;
-	}
-
-	checkTimeout(timeLeftMs = 0): void {
-		if (typeof this.timeoutMs === 'number' && this.getRemainingTimeMs() <= timeLeftMs) {
-			throw new TimeoutError(`Method \'${this.method}\' timed out.`);
-		}
 	}
 }
 
