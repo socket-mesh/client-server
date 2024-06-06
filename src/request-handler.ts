@@ -1,45 +1,50 @@
 import { TimeoutError } from "@socket-mesh/errors";
-import { MethodMap, PublicMethodMap, ServiceMap } from "./client/maps/method-map.js";
 import { Socket } from "./socket.js";
 import { SocketTransport } from "./socket-transport.js";
+import { EmptySocketMap, SocketMap } from "./client/maps/socket-map.js";
 
 export interface RequestHandlerArgsOptions<
 	TOptions,
-	TIncomingMap extends MethodMap<TIncomingMap>,
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>,
-	TSocketState extends object
+	T extends SocketMap,
+	TSocket extends Socket<T> = Socket<T>,
+	TTransport extends SocketTransport<T> = SocketTransport<T>
 > {
+	isRpc: boolean,
 	method: string,
-	socket: Socket<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>,
-	transport: SocketTransport<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>,
+	socket: TSocket,
+	transport: TTransport,
 	timeoutMs?: number | boolean,
 	options?: TOptions
 }
 
 export class RequestHandlerArgs<
 	TOptions,
-	TSocketState extends object = {},
-	TIncomingMap extends MethodMap<TIncomingMap> = {},
-	TServiceMap extends ServiceMap<TServiceMap> = {},
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap> = {},
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> = {}
+	T extends SocketMap = EmptySocketMap,
+	TSocket extends Socket<T> = Socket<T>,
+	TTransport extends SocketTransport<T> = SocketTransport<T>
 > {
-	public requestedAt: Date;
-	public timeoutMs?: number | boolean;
-	public socket: Socket<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>;
-	public transport: SocketTransport<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>;
+	public isRpc: boolean;
 	public method: string;
 	public options: TOptions;
+	public requestedAt: Date;
+	public socket: TSocket;
+	public timeoutMs?: number | boolean;
+	public transport: TTransport;
 
-	constructor(options: RequestHandlerArgsOptions<TOptions, TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>) {
-		this.requestedAt = new Date();
+	constructor(options: RequestHandlerArgsOptions<TOptions, T, TSocket, TTransport>) {
+		this.isRpc = options.isRpc;
 		this.method = options.method;
+		this.options = options.options;
+		this.requestedAt = new Date();
 		this.socket = options.socket;
 		this.transport = options.transport;
-		this.options = options.options;
 		this.timeoutMs = options.timeoutMs;
+	}
+
+	checkTimeout(timeLeftMs = 0): void {
+		if (typeof this.timeoutMs === 'number' && this.getRemainingTimeMs() <= timeLeftMs) {
+			throw new TimeoutError(`Method \'${this.method}\' timed out.`);
+		}
 	}
 
 	getRemainingTimeMs(): number {
@@ -49,20 +54,11 @@ export class RequestHandlerArgs<
 
 		return Infinity;
 	}
-
-	checkTimeout(timeLeftMs = 0): void {
-		if (typeof this.timeoutMs === 'number' && this.getRemainingTimeMs() <= timeLeftMs) {
-			throw new TimeoutError(`Method \'${this.method}\' timed out.`);
-		}
-	}
 }
 
 export type RequestHandler<
-	TOptions,
-	U,
-	TIncomingMap extends MethodMap<TIncomingMap>,
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>,
-	TSocketState extends object
-> = (args: RequestHandlerArgs<TOptions, TSocketState, TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap>) => Promise<U>;
+	TOptions, U,
+	T extends SocketMap,
+	TSocket extends Socket<T> = Socket<T>,
+	TTransport extends SocketTransport<T> = SocketTransport<T>
+> = (args: RequestHandlerArgs<TOptions, T, TSocket, TTransport>) => Promise<U>;

@@ -1,16 +1,12 @@
-import { MethodMap, PublicMethodMap, ServiceMap } from "../client/maps/method-map.js";
+import { EmptySocketMap, SocketMap } from "../client/maps/socket-map.js";
 import { MethodRequest, ServiceRequest } from "../request.js";
-import { RequestMiddleware } from "./request-middleware.js";
+import { Middleware } from "./middleware.js";
 
-export class OfflineMiddleware<
-	TServiceMap extends ServiceMap<TServiceMap> = {},
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap> = {},
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> = {}
-> implements RequestMiddleware<TServiceMap, TOutgoingMap, TPrivateOutgoingMap> {
+export class OfflineMiddleware<T extends SocketMap = EmptySocketMap> implements Middleware<T> {
 
 	private _isOpen: boolean;
-	private _requests: (MethodRequest<TOutgoingMap> | ServiceRequest<TServiceMap>)[];
-	private _continue: (requests: (MethodRequest<TOutgoingMap> | ServiceRequest<TServiceMap>)[]) => void | null;
+	private _requests: (MethodRequest<T['Outgoing']> | ServiceRequest<T['Service']>)[];
+	private _continue: (requests: (MethodRequest<T['Outgoing']> | ServiceRequest<T['Service']>)[]) => void | null;
 
 	constructor() {
 		this._isOpen = false;
@@ -18,11 +14,11 @@ export class OfflineMiddleware<
 		this._continue = null;
 	}
 
-	type: "request";
+	type: "offline";
 
 	public sendRequest(
-		requests: (MethodRequest<TOutgoingMap> | ServiceRequest<TServiceMap>)[],
-		cont: (requests: (MethodRequest<TOutgoingMap> | ServiceRequest<TServiceMap>)[]) => void
+		requests: (MethodRequest<T['Outgoing']> | ServiceRequest<T['Service']>)[],
+		cont: (requests: (MethodRequest<T['Outgoing']> | ServiceRequest<T['Service']>)[]) => void
 	): void {
 		if (this._isOpen) {
 			cont(requests);
@@ -42,7 +38,7 @@ export class OfflineMiddleware<
 		this._isOpen = false;
 	}
 
-	public onDisconnect(): void {
+	public onDisconnected(): void {
 		this._requests = [];
 		this._continue = null;
 	}

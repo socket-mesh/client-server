@@ -1,9 +1,8 @@
 import ws from "isomorphic-ws";
-import { MethodMap, PublicMethodMap, ServiceMap } from "./maps/method-map";
 import { SocketOptions } from "../socket.js";
 import { ClientAuthEngine, LocalStorageAuthEngineOptions } from "./client-auth-engine";
-import { ServerPrivateMap } from "./maps/server-private-map";
-import { ClientPrivateMap } from "./maps/client-private-map";
+import { SocketMapFromClient } from "./maps/socket-map";
+import { ClientMap } from "./maps/client-map.js";
 
 export interface AutoReconnectOptions {
 	initialDelay: number,
@@ -18,13 +17,7 @@ export interface ConnectOptions {
 	wsOptions?: ws.ClientOptions
 }
 
-export interface ClientSocketOptions<
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap & ServerPrivateMap>,
-	TServiceMap extends ServiceMap<TServiceMap> = {},
-	TSocketState extends object = {},
-	TIncomingMap extends MethodMap<TIncomingMap> = {},
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> = {}
-> extends SocketOptions<TIncomingMap & ClientPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap & ServerPrivateMap, TSocketState>, ConnectOptions {
+export interface ClientSocketOptions<T extends ClientMap> extends SocketOptions<SocketMapFromClient<T>>, ConnectOptions {
 	// Whether or not to automatically connect the socket as soon as it is created. Default is true.
 	autoConnect?: boolean,
 
@@ -46,26 +39,11 @@ export interface ClientSocketOptions<
 
 	// (milliseconds)
 	connectTimeoutMs?: number;
-	
-	isPingTimeoutDisabled?: boolean;
 }
 
-export function parseClientOptions<
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap & ServerPrivateMap>,
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TSocketState extends object,
-	TIncomingMap extends MethodMap<TIncomingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>
->(options: ClientSocketOptions<TOutgoingMap, TServiceMap, TSocketState, TIncomingMap, TPrivateOutgoingMap> | string | URL):
-	ClientSocketOptions<
-		TOutgoingMap,
-		TServiceMap,
-		TSocketState,
-		TIncomingMap,
-		TPrivateOutgoingMap
-	> {
+export function parseClientOptions<T extends ClientMap>(options: ClientSocketOptions<T> | string | URL): ClientSocketOptions<T> {
 	if (typeof options === 'string' || 'pathname' in options) {
-		options = { address: options } as ClientSocketOptions<TOutgoingMap, TServiceMap, TSocketState, TIncomingMap, TPrivateOutgoingMap>;
+		options = { address: options } as ClientSocketOptions<T>;
 	}
 	
 	return options;

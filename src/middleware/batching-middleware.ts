@@ -1,6 +1,6 @@
-import { MethodMap, PublicMethodMap, ServiceMap } from "../client/maps/method-map.js";
+import { EmptySocketMap, SocketMap } from "../client/maps/socket-map.js";
 import { MethodRequest, ServiceRequest } from "../request.js";
-import { RequestMiddleware } from "./request-middleware.js";
+import { Middleware } from "./middleware.js";
 
 export interface BatchingMiddlewareOptions {
 	// Whether or not to start batching messages immediately after the connection handshake completes. This is useful for handling
@@ -12,18 +12,13 @@ export interface BatchingMiddlewareOptions {
 	batchInterval?: number
 }
 
-export class BatchingMiddleware<
-	TServiceMap extends ServiceMap<TServiceMap> = {},
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap> = {},
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap> = {}
-> implements RequestMiddleware<TServiceMap, TOutgoingMap, TPrivateOutgoingMap> {
-
+export class BatchingMiddleware<T extends SocketMap = EmptySocketMap> implements Middleware<T> {
 	public batchOnHandshakeDuration: number | boolean;
 	public batchInterval: number;
 	
 	private _isBatching: boolean;
-	private _requests: (MethodRequest<TOutgoingMap> | ServiceRequest<TServiceMap>)[];
-	private _continue: (requests: (MethodRequest<TOutgoingMap> | ServiceRequest<TServiceMap>)[]) => void | null;
+	private _requests: (MethodRequest<T['Outgoing']> | ServiceRequest<T['Service']>)[];
+	private _continue: (requests: (MethodRequest<T['Outgoing']> | ServiceRequest<T['Service']>)[]) => void | null;
 	private _handshakeTimeoutId: NodeJS.Timeout | null;
 	private _batchingIntervalId: NodeJS.Timeout | null;
 
@@ -37,7 +32,7 @@ export class BatchingMiddleware<
 		this.batchOnHandshakeDuration = options?.batchOnHandshakeDuration ?? false;
 	}
 
-	type: 'request'
+	type: 'batching'
 
 	public get isBatching(): boolean {
 		return this._isBatching || this._batchingIntervalId !== null;
@@ -54,7 +49,7 @@ export class BatchingMiddleware<
 		}
 	}
 
-	public onDisconnect(): void {
+	public onDisconnected(): void {
 		this.cancelBatching();
 	}
 	
@@ -114,8 +109,8 @@ export class BatchingMiddleware<
 	}
 
 	public sendRequest(
-		requests: (MethodRequest<TOutgoingMap> | ServiceRequest<TServiceMap>)[],
-		cont: (requests: (MethodRequest<TOutgoingMap> | ServiceRequest<TServiceMap>)[]) => void
+		requests: (MethodRequest<T['Outgoing']> | ServiceRequest<T['Service']>)[],
+		cont: (requests: (MethodRequest<T['Outgoing']> | ServiceRequest<T['Service']>)[]) => void
 	): void {
 		if (!this.isBatching) {
 			cont(requests);

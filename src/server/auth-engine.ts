@@ -3,23 +3,13 @@ import crypto from "crypto";
 import jwt from 'jsonwebtoken';
 import { InvalidArgumentsError } from '@socket-mesh/errors';
 
-export interface AuthEngine {
-	readonly rejectOnFailedDelivery: boolean;
-
-	verifyToken(signedToken: string, options?: jwt.VerifyOptions): Promise<jwt.JwtPayload>;
-
-	signToken(token: object, options?: jwt.SignOptions): Promise<string>;
-}
-
-export function isAuthEngine(auth: AuthEngine | AuthEngineOptions): auth is AuthEngine {
-	return (typeof auth === 'object' && 'verifyToken' in auth && 'signToken' in auth);
-}
+const DEFAULT_EXPIRY = 86400;
 
 export interface AuthTokenOptions extends jwt.SignOptions {
 	rejectOnFailedDelivery?: boolean;
 }
 
-export interface AuthEngineOptions {
+export interface AuthOptions {
 	// The algorithm to use to sign and verify JWT tokens.
 	authAlgorithm?: jwt.Algorithm,
 
@@ -37,115 +27,122 @@ export interface AuthEngineOptions {
 	// The default expiry for auth tokens in seconds
 	defaultExpiry?: number,
 
-	rejectOnFailedDelivery?: boolean,
-
 	verifyAlgorithms?: jwt.Algorithm[]
 }
 
-export class DefaultAuthEngine implements AuthEngine {
-	private readonly _signOptions: jwt.SignOptions;
-	private readonly _verificationOptions: jwt.VerifyOptions;
-	private readonly _signatureKey: jwt.Secret;
-	private readonly _verificationKey: jwt.Secret;
+export interface AuthEngine extends AuthOptions {
+	signToken(token: object, authOptions: AuthOptions, signOptions?: jwt.SignOptions): Promise<string>,
 
-	readonly rejectOnFailedDelivery: boolean;
+	verifyToken(signedToken: string, authOptions: AuthOptions, verifyOptions?: jwt.VerifyOptions): Promise<jwt.JwtPayload>
+}
 
-	constructor({ authAlgorithm, authKey, defaultExpiry, rejectOnFailedDelivery, verifyAlgorithms }: AuthEngineOptions = {}) {
-		this.rejectOnFailedDelivery = !!rejectOnFailedDelivery;
-		this._signOptions = {};
-		this._verificationOptions = {};
+export function isAuthEngine(auth: AuthEngine | AuthOptions): auth is AuthEngine {
+	return (typeof auth === 'object' && 'verifyToken' in auth && 'signToken' in auth);
+}
 
-		if (authAlgorithm != null) {
-			this._signOptions.algorithm = authAlgorithm;
-		}
+function generateAuthKey(): string {
+	return crypto.randomBytes(32).toString('hex');
+}
 
-		if (defaultExpiry) {
-			this._signOptions.expiresIn = defaultExpiry;
-		}
+export function defaultAuthEngine(options?: AuthOptions): AuthEngine {
+	return {
+		authAlgorithm: options?.authAlgorithm,
 
-		if (verifyAlgorithms != null) {
-			this._verificationOptions.algorithms = verifyAlgorithms;
-		} else if (authAlgorithm != null) {
-			this._verificationOptions.algorithms = [authAlgorithm];
-		}
-
-		if (typeof authKey === 'object' && 'private' in authKey) {
-			this._signatureKey = authKey.private;
-			this._verificationKey = authKey.public;
-		} else {
-			if (!authKey == null) {
-				authKey = crypto.randomBytes(32).toString('hex');
+		authKey: options?.authKey,
+	
+		defaultExpiry: options?.defaultExpiry,
+	
+		signToken(token: object, authOptions: AuthOptions, signOptions?: jwt.SignOptions): Promise<string> {
+			signOptions = Object.assign({}, signOptions || {});
+	
+			if (signOptions.algorithm != null) {
+				delete signOptions.algorithm;
+	
+				throw new InvalidArgumentsError(
+					'Cannot change auth token algorithm at runtime - It must be specified as a config option on launch'
+				);
+			}
+	
+			signOptions.mutatePayload = true;
+	
+			// We cannot have the exp claim on the token and the expiresIn option
+			// set at the same time or else auth.signToken will throw an error.
+			const expiresIn = signOptions.expiresIn || authOptions.defaultExpiry || DEFAULT_EXPIRY;
+	
+			token = cloneDeep(token);
+	
+			if (token) {
+				if (!('exp' in token) || token.exp == null) {
+					signOptions.expiresIn = expiresIn;
+				} else {
+					delete signOptions.expiresIn;
+				}
+			} else {
+				signOptions.expiresIn = expiresIn;
+			}
+	
+			// Always use the default algorithm since it cannot be changed at runtime.
+			if (authOptions.authAlgorithm != null) {
+				signOptions.algorithm = authOptions.authAlgorithm;
 			}
 
-			this._signatureKey = authKey;
-			this._verificationKey = authKey;
-		}
-	}
+			let privateKey: jwt.Secret;
 
-	verifyToken(signedToken: string, options?: jwt.VerifyOptions): Promise<jwt.JwtPayload> {
-		const jwtOptions = Object.assign({}, options || {});
-
-		if (typeof signedToken === 'string' || signedToken == null) {
-			return new Promise((resolve, reject) => {
-				const cb: jwt.VerifyCallback<jwt.JwtPayload> = (err, token) => {
+			if (typeof authOptions.authKey === 'object' && 'private' in authOptions.authKey) {
+				privateKey = authOptions.authKey.private;
+			} else {
+				if (!authOptions.authKey == null) {
+					authOptions.authKey = generateAuthKey();
+				}
+	
+				privateKey = authOptions.authKey;
+			}
+	
+			return new Promise<string>((resolve, reject) => {
+				jwt.sign(token, privateKey, signOptions, (err, signedToken) => {
 					if (err) {
 						reject(err);
 						return;
 					}
-					resolve(token);
-				};
-				
-				jwt.verify(signedToken || '', this._verificationKey, jwtOptions, cb); 
+					resolve(signedToken);
+				});
 			});
-		}
+		},
 
-		return Promise.reject(
-			new InvalidArgumentsError('Invalid token format - Token must be a string')
-		);
-	}
+		verifyAlgorithms: options?.verifyAlgorithms,
 
-	signToken(token: object, options?: jwt.SignOptions): Promise<string> {
-		options = Object.assign({}, options || {});
+		verifyToken(signedToken: string, authOptions: AuthOptions, verifyOptions?: jwt.VerifyOptions): Promise<jwt.JwtPayload> {
+			const jwtOptions = Object.assign({}, verifyOptions || {});
+	
+			if (typeof signedToken === 'string' || signedToken == null) {
+				let publicKey: jwt.Secret;
 
-		if (options.algorithm != null) {
-			delete options.algorithm;
-
-			throw new InvalidArgumentsError(
-				'Cannot change auth token algorithm at runtime - It must be specified as a config option on launch'
+				if (typeof authOptions.authKey === 'object' && 'public' in authOptions.authKey) {
+					publicKey = authOptions.authKey.public;
+				} else {
+					if (!authOptions.authKey == null) {
+						authOptions.authKey = generateAuthKey();
+					}
+		
+					publicKey = authOptions.authKey;
+				}
+						
+				return new Promise((resolve, reject) => {
+					const cb: jwt.VerifyCallback<jwt.JwtPayload> = (err, token) => {
+						if (err) {
+							reject(err);
+							return;
+						}
+						resolve(token);
+					};
+					
+					jwt.verify(signedToken || '', publicKey, jwtOptions, cb); 
+				});
+			}
+	
+			return Promise.reject(
+				new InvalidArgumentsError('Invalid token format - Token must be a string')
 			);
 		}
-
-		options.mutatePayload = true;
-
-		// We cannot have the exp claim on the token and the expiresIn option
-		// set at the same time or else auth.signToken will throw an error.
-		const expiresIn = options.expiresIn || this._signOptions.expiresIn;
-
-		token = cloneDeep(token);
-
-		if (token) {
-			if ('exp' in token && token.exp == null) {
-				options.expiresIn = expiresIn;
-			} else {
-				delete options.expiresIn;
-			}
-		} else {
-			options.expiresIn = expiresIn;
-		}
-
-		// Always use the default algorithm since it cannot be changed at runtime.
-		if (this._signOptions.algorithm != null) {
-			options.algorithm = this._signOptions.algorithm;
-		}
-
-		return new Promise<string>((resolve, reject) => {
-			jwt.sign(token, this._signatureKey, options, (err, signedToken) => {
-				if (err) {
-					reject(err);
-					return;
-				}
-				resolve(signedToken);
-			});
-		});
-	}
+	};
 }

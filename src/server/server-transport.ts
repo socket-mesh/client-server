@@ -1,45 +1,102 @@
-import { MethodMap, PublicMethodMap, ServiceMap } from "../client/maps/method-map.js";
 import { AnyPacket } from "../request.js";
-import { ServerPrivateMap } from "../client/maps/server-private-map.js";
-import { ServerSocketState } from "./server-socket-state.js";
-import { ClientPrivateMap } from "../client/maps/client-private-map.js";
+import { ServerMap } from "../client/maps/server-map.js";
 import { ServerSocket, ServerSocketOptions } from "./server-socket.js";
 import { SocketTransport } from "../socket-transport.js";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
-import { AuthError } from "@socket-mesh/errors";
-import { ChannelMap } from "../client/channels/channel-map.js";
+import { AuthError, socketProtocolErrorStatuses } from "@socket-mesh/errors";
+import { SocketMapFromServer } from "../client/maps/socket-map.js";
+import jwt from 'jsonwebtoken';
+import { AuthTokenOptions } from "./auth-engine.js";
+import { SocketStatus } from "../socket.js";
+import { RawData } from "ws";
+import { AnyResponse } from "../response.js";
+import { ClientRequest, IncomingMessage } from "http";
 
-export class ServerTransport<
-	TIncomingMap extends PublicMethodMap<TIncomingMap, TPrivateIncomingMap>,
-	TChannelMap extends ChannelMap<TChannelMap>,
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>,
-	TServerState extends object,
-	TSocketState extends object
-> extends SocketTransport<TIncomingMap & TPrivateIncomingMap & ServerPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap & ClientPrivateMap, TSocketState & ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>> {
+export class ServerTransport<T extends ServerMap> extends SocketTransport<SocketMapFromServer<T>> {
 	readonly service?: string;
 
-	constructor(
-		options:
-			ServerSocketOptions<
-				TIncomingMap,
-				TServiceMap,
-				TOutgoingMap,
-				TPrivateIncomingMap,
-				TPrivateOutgoingMap,
-				TSocketState & ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>,
-				ServerSocket<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TSocketState>
-			>
-	) {
+	constructor(options: ServerSocketOptions<T>) {
 		super(options);
 
+		this.type = 'server';
 		this.service = options.service;
 		this.webSocket = options.socket;
+		this.resetPingTimeout(this.state.server.isPingTimeoutDisabled ? false : this.state.server.pingTimeoutMs, 4001);
 	}
 
-	protected override onRequest(packet: AnyPacket<TServiceMap, TIncomingMap & TPrivateIncomingMap & ServerPrivateMap>): boolean {
+	public override async changeToUnauthenticatedState(): Promise<boolean> {
+		if (this.signedAuthToken) {
+			const authToken = this.authToken;
+			const signedAuthToken = this.signedAuthToken;
+
+			this.state.server.emit('socketAuthStateChange', { socket: this.socket, wasAuthenticated: true, isAuthenticated: false });
+
+			await super.changeToUnauthenticatedState();
+
+			this.state.server.emit('socketDeauthenticate', { socket: this.socket, signedAuthToken, authToken });
+
+			return true;
+		}
+
+		return false;
+	}
+
+	protected override onClose(code: number, reason?: string | Buffer): void {
+		const status = this.status;
+		const strReason = reason?.toString() || socketProtocolErrorStatuses[code];
+
+		super.onClose(code, reason);
+
+		this.state.server.emit('socketClose', { socket: this.socket, code, reason: strReason });
+
+		this.onDisconnect(status, code, strReason);
+	}
+	
+	protected override onDisconnect(status: SocketStatus, code: number, reason?: string): void {
+		if (status === 'open') {
+			this.state.server.emit('socketDisconnect', { socket: this.socket, code, reason });
+		} else {
+			this.state.server.emit('socketConnectAbort', { socket: this.socket, code, reason });
+		}
+
+		super.onDisconnect(status, code, reason);
+
+		if (!!this.state.server.clients[this.id]) {
+			delete this.state.server.clients[this.id];
+			this.state.server.clientCount--;
+		}
+
+		if (!!this.state.server.pendingClients[this.id]) {
+			delete this.state.server.pendingClients[this.id];
+			this.state.server.pendingClientCount--;
+		}
+
+		if (this.streamCleanupMode === 'kill') {
+			(async () => {
+				await this.socket.listen('end').once();
+				this.socket.killListeners();
+			})();
+		} else if (this.streamCleanupMode === 'close') {
+			(async () => {
+				await this.socket.listen('end').once();
+				this.socket.closeListeners();
+			})();
+		}
+		
+		this.socket.emit('end');		
+	}
+
+	public override onError(error: Error): void {
+		super.onError(error);
+		this.state.server.emit('socketError', { socket: this.socket, error });
+	}
+	
+	protected override onMessage(data: RawData, isBinary: boolean): void {
+		this.state.server.emit('socketMessage', { socket: this.socket, data, isBinary });
+		super.onMessage(data, isBinary);
+	}
+
+	protected override onRequest(packet: AnyPacket<T['Service'], SocketMapFromServer<T>['Incoming']>): boolean {
 		let wasHandled = false;
 
 		if (!this.service || !('service' in packet) || packet.service === this.service) {
@@ -51,30 +108,72 @@ export class ServerTransport<
 		return wasHandled;
 	}
 
-	public override async setAuthorization(authToken: AuthToken): Promise<boolean>;
+	protected override onPing(data: Buffer): void {
+		super.onPing(data);
+		this.state.server.emit('socketPing', { socket: this.socket, data });	
+	}
+
+	protected override onPong(data: Buffer): void {
+		this.resetPingTimeout(this.state.server.isPingTimeoutDisabled ? false : this.state.server.pingTimeoutMs, 4001);
+		super.onPong(data);
+		this.state.server.emit('socketPong', { socket: this.socket, data });
+	}
+	
+	protected override onResponse(response: AnyResponse<T["Service"], SocketMapFromServer<T>['Outgoing']>): void {
+		super.onResponse(response);
+		this.state.server.emit('socketResponse', { socket: this.socket, response });
+	}
+
+	protected override onUpgrade(request: IncomingMessage): void {
+		super.onUpgrade(request);
+		this.state.server.emit('socketUpgrade', { socket: this.socket, request });
+	}
+	
+	protected override onUnexpectedResponse(request: ClientRequest, response: IncomingMessage): void {
+		super.onUnexpectedResponse(request, response);
+		this.state.server.emit('socketUnexpectedResponse', { socket: this.socket, request, response });
+	}
+
+	public override async setAuthorization(authToken: AuthToken, options?: AuthTokenOptions): Promise<boolean>;
 	public override async setAuthorization(signedAuthToken: SignedAuthToken, authToken?: AuthToken): Promise<boolean>;
-	public override async setAuthorization(signedAuthToken: AuthToken | SignedAuthToken, authToken?: AuthToken): Promise<boolean> {
-		if (typeof signedAuthToken === 'string') {
-			return super.setAuthorization(signedAuthToken, authToken);
+	public override async setAuthorization(authToken: AuthToken | SignedAuthToken, options?: AuthToken | AuthTokenOptions): Promise<boolean> {
+		const wasAuthenticated = !!this.signedAuthToken;
+
+		if (typeof authToken === 'string') {
+			const changed = await super.setAuthorization(authToken, options as AuthToken);
+
+			if (changed && this.status === 'open') {
+				this.triggerAuthenticationEvents(false, wasAuthenticated);
+			}
+			
+			return changed;
 		}
 
 		const auth = this.state.server.auth;
+		const rejectOnFailedDelivery = options?.rejectOnFailedDelivery;
+		let signedAuthToken: string;
+
+		delete options?.rejectOnFailedDelivery;
 
 		try {
-			authToken = signedAuthToken;
-			signedAuthToken = await auth.signToken(authToken);
+			signedAuthToken = await auth.signToken(authToken, auth, options as jwt.SignOptions);
 		} catch (err) {
 			this.onError(err);
 			this.disconnect(4002, err.toString());
 			throw err;
 		}
 
-		const result = super.setAuthorization(signedAuthToken, authToken);
+		const changed = super.setAuthorization(signedAuthToken, authToken);
 
-		if (auth.rejectOnFailedDelivery) {
+		if (changed && this.status === 'open') {
+			this.triggerAuthenticationEvents(true, wasAuthenticated);
+		}
+
+		if (rejectOnFailedDelivery) {
 			try {
-				await this.invoke('#setAuthToken', signedAuthToken);
+				await this.invoke('#setAuthToken', signedAuthToken)[0];
 			} catch (err) {
+
 				let error: AuthError;
 
 				if (err && typeof err.message === 'string') {
@@ -91,8 +190,44 @@ export class ServerTransport<
 			return;
 		}
 
-		await this.transmit('#setAuthToken', signedAuthToken);
+		try {
+			await this.transmit('#setAuthToken', signedAuthToken);
+		} catch (err) {
+			if (err.name !== 'BadConnectionError') {
+				throw err;
+			}
+		}
 
-		return result;
+		return changed;
 	}
+
+	public override setOpenStatus(authError?: Error): void {
+		super.setOpenStatus(authError);
+		this.state.server.emit('socketConnect', { socket: this.socket, isAuthenticated: !!this.signedAuthToken, authError });
+	}
+
+	public override get socket(): ServerSocket<T> {
+		return super.socket as ServerSocket<T>;
+	}
+
+	public override set socket(value: ServerSocket<T>) {
+		super.socket = value;
+	}
+
+	public override triggerAuthenticationEvents(wasSigned: boolean, wasAuthenticated: boolean): void {
+		super.triggerAuthenticationEvents(wasSigned, wasAuthenticated);
+
+		this.state.server.emit(
+			'socketAuthStateChange',
+			{ socket: this.socket, wasAuthenticated, isAuthenticated: true, authToken: this.authToken, signedAuthToken: this.signedAuthToken }
+		);
+
+		this.state.server.emit(
+			'socketAuthenticate',
+			{ socket: this.socket, wasSigned, signedAuthToken: this.signedAuthToken, authToken: this.authToken }
+		);
+
+	}
+
+	public type: 'server'
 }

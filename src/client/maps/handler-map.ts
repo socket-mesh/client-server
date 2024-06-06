@@ -1,23 +1,13 @@
-import { MethodMap, PublicMethodMap, ServiceMap } from "./method-map.js";
 import { RequestHandler } from "../../request-handler.js";
+import { SocketMap } from "./socket-map.js";
 
-export type HandlerMap<
-	TIncomingMap extends MethodMap<TIncomingMap>,
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>,
-	TSocketState extends object
-> = Partial<
+export type HandlerMap<T extends SocketMap> = Partial<
 	{
-		[K in keyof TIncomingMap]:
+		[K in keyof T['Incoming']]:
 			RequestHandler<
-				Parameters<TIncomingMap[K]>[0],
-				ReturnType<TIncomingMap[K]>,
-				TIncomingMap,
-				TServiceMap,
-				TOutgoingMap,
-				TPrivateOutgoingMap,
-				TSocketState
+				Parameters<T['Incoming'][K]>[0],
+				ReturnType<T['Incoming'][K]>,
+				T
 			>
 	}
 >

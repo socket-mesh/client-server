@@ -1,60 +1,54 @@
-import { MethodMap, PublicMethodMap, ServiceMap } from "../client/maps/method-map.js";
 import { HandlerMap } from "../client/maps/handler-map.js";
 import { Socket, SocketOptions } from "../socket.js";
 import ws from "ws";
-import { ServerPrivateMap } from "../client/maps/server-private-map.js";
-import { ServerSocketState } from "./server-socket-state.js";
-import { ClientPrivateMap } from "../client/maps/client-private-map.js";
 import { ServerTransport } from "./server-transport.js";
-import { ChannelMap } from "../client/channels/channel-map.js";
+import { SocketMapFromServer } from "../client/maps/socket-map.js";
+import { ServerMap } from "../client/maps/server-map.js";
 
-export interface ServerSocketOptions<
-	TIncomingMap extends PublicMethodMap<TIncomingMap, TPrivateIncomingMap>,
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>,
-	TSocketState extends object,
-	TSocket extends Socket<TIncomingMap & TPrivateIncomingMap & ServerPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap & ClientPrivateMap, TSocketState>
-> extends SocketOptions<TIncomingMap & TPrivateIncomingMap & ServerPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap & ClientPrivateMap, TSocketState> {
-	handlers: HandlerMap<TIncomingMap & TPrivateIncomingMap & ServerPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap & ClientPrivateMap, TSocketState>,
+export interface ServerSocketOptions<T extends ServerMap> extends SocketOptions<SocketMapFromServer<T>> {
+	handlers: HandlerMap<SocketMapFromServer<T>>,
 	service?: string,
 	socket: ws.WebSocket
 }
 
-export class ServerSocket<
-	TIncomingMap extends PublicMethodMap<TIncomingMap, TPrivateIncomingMap>,
-	TChannelMap extends ChannelMap<TChannelMap>,
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateIncomingMap extends MethodMap<TPrivateIncomingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>,
-	TServerState extends object,
-	TSocketState extends object
-> extends Socket<TIncomingMap & TPrivateIncomingMap & ServerPrivateMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap & ClientPrivateMap, TSocketState & ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>> {
+export class ServerSocket<T extends ServerMap> extends Socket<SocketMapFromServer<T>> {
+	private _serverTransport: ServerTransport<T>;
 
-	private _serverTransport: ServerTransport<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TSocketState & ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>>;
-
-	constructor(
-		options:
-			ServerSocketOptions<
-				TIncomingMap,
-				TServiceMap,
-				TOutgoingMap,
-				TPrivateIncomingMap,
-				TPrivateOutgoingMap,
-				TSocketState & ServerSocketState<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState>,
-				ServerSocket<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TSocketState>
-			>
-	) {
-		const transport = new ServerTransport<TIncomingMap, TChannelMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TSocketState>(options);
+	constructor(options: ServerSocketOptions<T>) {
+		const transport = new ServerTransport<T>(options);
 
 		super(transport);
 
 		this._serverTransport = transport;
 	}
 
+	async deauthenticate(rejectOnFailedDelivery?: boolean): Promise<boolean> {
+		await super.deauthenticate();
+		
+		if (rejectOnFailedDelivery) {
+			try {
+				await this._serverTransport.invoke('#removeAuthToken', undefined, true)[0];
+			} catch (error) {
+				this._serverTransport.onError(error);
+				throw error;
+			}
+			return;
+		}
+
+		try {
+			await this.transmit('#removeAuthToken');
+		} catch (err) {
+			if (err.name !== 'BadConnectionError') {
+				throw err;
+			}
+		}
+	}
+
 	get service(): string {
 		return this._serverTransport.service;
+	}
+
+	get type(): 'server' {
+		return this._serverTransport.type;
 	}
 }

@@ -1,44 +1,27 @@
 import defaultCodec, { CodecEngine } from "@socket-mesh/formatter";
 import ws from "isomorphic-ws";
-import { AnyMiddleware, Middleware } from "./middleware/middleware.js";
+import { Middleware } from "./middleware/middleware.js";
 import { AnyPacket, AnyRequest, InvokeMethodRequest, InvokeServiceRequest, MethodPacket, TransmitMethodRequest, TransmitServiceRequest } from "./request.js";
 import { AbortError, BadConnectionError, InvalidActionError, InvalidArgumentsError, MiddlewareBlockedError, MiddlewareCaughtError, MiddlewareError, SocketProtocolError, TimeoutError, dehydrateError, socketProtocolErrorStatuses, socketProtocolIgnoreStatuses } from "@socket-mesh/errors";
 import { ClientRequest, IncomingMessage } from "http";
-import { PublicMethodMap, FunctionReturnType, MethodMap, ServiceMap } from "./client/maps/method-map.js";
+import { FunctionReturnType, MethodMap, ServiceMap } from "./client/maps/method-map.js";
 import { AnyResponse, MethodDataResponse } from "./response.js";
 import { HandlerMap } from "./client/maps/handler-map.js";
-import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
-import { Socket, SocketStatus } from "./socket.js";
+import { AuthToken, extractAuthTokenData, SignedAuthToken } from "@socket-mesh/auth";
+import { Socket, SocketOptions, SocketStatus, StreamCleanupMode } from "./socket.js";
 import base64id from "base64id";
 import { RequestHandlerArgs } from "./request-handler.js";
-import { AbortablePromise } from "./utils.js";
+import { SocketMap } from "./client/maps/socket-map.js";
+import { wait } from "./utils.js";
 
 export type CallIdGenerator = () => number;
 
-export interface SocketOptions<
-	TIncomingMap extends MethodMap<TIncomingMap>,
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>,
-	TSocketState extends object,
-	TSocket extends Socket<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState> = Socket<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>
-> {
-	ackTimeoutMs?: number,
-	id?: string,
-	callIdGenerator?: CallIdGenerator,
-	handlers?: HandlerMap<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>;
-	onUnhandledRequest?: (socket: TSocket, packet: AnyPacket<TServiceMap, TIncomingMap>) => boolean,
-	codecEngine?: CodecEngine,
-	middleware?: AnyMiddleware<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap>[],
-	state?: TSocketState
-}
-
-export interface InvokeMethodOptions<TMethodMap extends MethodMap<TMethodMap>, TMethod extends keyof TMethodMap> {
+export interface InvokeMethodOptions<TMethodMap extends MethodMap, TMethod extends keyof TMethodMap> {
 	method: TMethod,
 	ackTimeoutMs?: number | false
 }
 
-export interface InvokeServiceOptions<TServiceMap extends ServiceMap<TServiceMap>, TService extends keyof TServiceMap, TMethod extends keyof TServiceMap[TService]> {
+export interface InvokeServiceOptions<TServiceMap extends ServiceMap, TService extends keyof TServiceMap, TMethod extends keyof TServiceMap[TService]> {
 	service: TService,
 	method: TMethod,
 	ackTimeoutMs?: number | false
@@ -50,31 +33,30 @@ interface InvokeCallback<T> {
 	callback: (err: Error, result?: T) => void
 }
 
-export class SocketTransport<
-	TIncomingMap extends MethodMap<TIncomingMap>,
-	TServiceMap extends ServiceMap<TServiceMap>,
-	TOutgoingMap extends PublicMethodMap<TOutgoingMap, TPrivateOutgoingMap>,
-	TPrivateOutgoingMap extends MethodMap<TPrivateOutgoingMap>,
-	TSocketState extends object
-> {
-	private _socket: Socket<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>;
+interface WebSocketError extends Error {
+	code?: string
+}
+
+export class SocketTransport<T extends SocketMap> {
+	private _socket: Socket<T>;
 	private _webSocket: ws.WebSocket;
 	private _isOpen: boolean;
 	private _authToken?: AuthToken;
 	private _signedAuthToken?: SignedAuthToken;
 	private readonly _callIdGenerator: CallIdGenerator;
 	private readonly _callbackMap: {[cid: number]: InvokeCallback<unknown>};
-	private _handlers: HandlerMap<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>;
-	private _onUnhandledRequest: (socket: this, packet: AnyPacket<TServiceMap, TIncomingMap>) => boolean;
+	private _handlers: HandlerMap<T>;
+	private _onUnhandledRequest: (socket: SocketTransport<T>, packet: AnyPacket<T['Service'], T['Incoming']>) => boolean;
 	public readonly codecEngine: CodecEngine;
-	public readonly middleware: AnyMiddleware<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap>[];
-	public readonly state: Partial<TSocketState>;
+	public readonly middleware: Middleware<T>[];
+	public readonly state: Partial<T['State']>;
+	public streamCleanupMode: StreamCleanupMode;
 	public id: string;
 	public ackTimeoutMs: number;
 
-	protected constructor(
-		options?: SocketOptions<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>
-	) {
+	private _pingTimeoutRef: NodeJS.Timeout;
+
+	protected constructor(options?: SocketOptions<T>) {
 		let cid = 1;
 
 		this.id = (options?.id || base64id.generateId());
@@ -83,6 +65,7 @@ export class SocketTransport<
 		this._callbackMap = {};
 		this._handlers = options?.handlers || {};
 		this.state = options?.state || {};
+		this.streamCleanupMode = options?.streamCleanupMode || 'kill';
 
 		this._callIdGenerator = options?.callIdGenerator || (() => {
 			return cid++;
@@ -91,12 +74,20 @@ export class SocketTransport<
 		this.middleware = options?.middleware || [];
 	}
 
+	protected abortAllPendingCallbacksDueToBadConnection(status: SocketStatus): void {
+		for (const cid in this._callbackMap) {
+			const map = this._callbackMap[cid];
+			const msg = `Event ${map.method} was aborted due to a bad connection`;
+
+			map.callback(
+				new BadConnectionError(msg, status === 'open' ? 'disconnect' : 'connectAbort')
+			);
+		}
+	}
+
 	public disconnect(code=1000, reason?: string): void {
 		if (this.webSocket) {
-			const status = this.status;
-
 			this.webSocket.close(code);
-			this.onDisconnect(status, code, reason);
 			this.onClose(code, reason);
 		}
 	}
@@ -113,11 +104,11 @@ export class SocketTransport<
 		});
 	}
 
-	public get socket(): Socket<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState> {
+	public get socket(): Socket<T> {
 		return this._socket;
 	}
 
-	public set socket(value: Socket<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateOutgoingMap, TSocketState>) {
+	public set socket(value: Socket<T>) {
 		this._socket = value;
 	}
 
@@ -177,22 +168,17 @@ export class SocketTransport<
 
 		if (signedAuthToken !== this._signedAuthToken) {
 			if (!authToken) {
-				authToken = this.extractAuthTokenData(signedAuthToken);
+				const extractedAuthToken = extractAuthTokenData(signedAuthToken);
+			
+				if (typeof extractedAuthToken === 'string') {
+					throw new InvalidArgumentsError('Invalid authToken.');
+				}
+	
+				authToken = extractedAuthToken;
 			}
-
-			const wasAuthenticated = !!this._signedAuthToken;
 
 			this._authToken = authToken;
 			this._signedAuthToken = signedAuthToken;
-
-			this._socket.emit('authStateChange', { wasAuthenticated, isAuthenticated: true, authToken, signedAuthToken });
-			this._socket.emit('authenticate', { signedAuthToken, authToken });
-
-			for (const middleware of this.middleware) {
-				if (middleware.onAuthenticate) {
-					middleware.onAuthenticate();
-				}	
-			}
 
 			return true;
 		}
@@ -200,27 +186,43 @@ export class SocketTransport<
 		return false;
 	}
 
-	private extractAuthTokenData(signedAuthToken: SignedAuthToken): any {
-		if (typeof signedAuthToken !== 'string') return null;
+	public triggerAuthenticationEvents(wasSigned: boolean, wasAuthenticated: boolean): void {
+		this._socket.emit(
+			'authStateChange',
+			{ wasAuthenticated, isAuthenticated: true, authToken: this._authToken, signedAuthToken: this._signedAuthToken }
+		);
 
-		let tokenParts = signedAuthToken.split('.');
-		let encodedTokenData = tokenParts[1];
+		this._socket.emit(
+			'authenticate',
+			{ wasSigned, signedAuthToken: this._signedAuthToken, authToken:this._authToken }
+		);
 
-		if (encodedTokenData != null) {
-			let tokenData = encodedTokenData;
-
-			try {
-				tokenData = Buffer.from(tokenData, 'base64').toString('utf8')
-				return JSON.parse(tokenData);
-			} catch (e) {
-				return tokenData;
+		for (const middleware of this.middleware) {
+			if (middleware.onAuthenticated) {
+				middleware.onAuthenticated();
 			}
 		}
-
-		return null;
 	}
 	
-	public async deauthenticate(): Promise<boolean> {
+	public callMiddleware(middleware: Middleware<T>, fn: () => void): void {
+		try {
+			fn();
+		} catch (err) {
+			if (err instanceof MiddlewareBlockedError) {
+				throw err;
+			}
+
+			if (err instanceof MiddlewareCaughtError) {
+				throw err.innerError;
+			}
+
+			this.onError(err);
+
+			throw new MiddlewareError(`An unexpected error occurred in the ${middleware.type} middleware.`, middleware.type);
+		}
+	}
+
+	public async changeToUnauthenticatedState(): Promise<boolean> {
 		if (this._signedAuthToken) {
 			const authToken = this._authToken;
 			const signedAuthToken = this._signedAuthToken;
@@ -228,7 +230,11 @@ export class SocketTransport<
 			this._authToken = null;
 			this._signedAuthToken = null;	
 
-			this._socket.emit('authStateChange', { wasAuthenticated: true, isAuthenticated: false, authToken, signedAuthToken });
+			this._socket.emit('authStateChange', { wasAuthenticated: true, isAuthenticated: false });
+
+			// In order for the events to trigger we need to wait for the next tick.
+			await wait(0);
+
 			this._socket.emit('deauthenticate', { signedAuthToken, authToken });
 
 			for (const middleware of this.middleware) {
@@ -248,8 +254,13 @@ export class SocketTransport<
 	}
 
 	protected onClose(code: number, reason?: Buffer | string): void {
+		const prevStatus = this.status;
 		this.webSocket = null;
 		this._isOpen = false;
+
+		clearTimeout(this._pingTimeoutRef);
+
+		this.abortAllPendingCallbacksDueToBadConnection(prevStatus);
 
 		for (const middleware of this.middleware) {
 			if (middleware.onClose) {
@@ -261,9 +272,9 @@ export class SocketTransport<
 			let closeMessage: string;
 
 			if (typeof reason === 'string') {
-				closeMessage = 'Socket connection closed with status code ' + code + ' and reason: ' + reason;
+				closeMessage = `Socket connection closed with status code ${code} and reason: ${reason}`;
 			} else {
-				closeMessage = 'Socket connection closed with status code ' + code;
+				closeMessage = `Socket connection closed with status code ${code}`;
 			}
 
 			this.onError(new SocketProtocolError(socketProtocolErrorStatuses[code] || closeMessage, code));
@@ -287,8 +298,8 @@ export class SocketTransport<
 
 		this._socket.emit('message', { data, isBinary });
 
-		let packet: AnyPacket<TServiceMap, TIncomingMap> | AnyResponse<TServiceMap, TOutgoingMap, TPrivateOutgoingMap> |
-			(AnyPacket<TServiceMap, TIncomingMap> | AnyResponse<TServiceMap, TOutgoingMap, TPrivateOutgoingMap>)[];
+		let packet: AnyPacket<T['Service'], T['Incoming']> | AnyResponse<T['Service'], T['Outgoing'], T['PrivateOutgoing']> |
+			(AnyPacket<T['Service'], T['Incoming']> | AnyResponse<T['Service'], T['Outgoing'], T['PrivateOutgoing']>)[];
 
 		try {
 			packet = this.codecEngine.decode(message as string);
@@ -307,7 +318,6 @@ export class SocketTransport<
 					this.onResponse(curPacket);
 				} else {
 					this.onRequest(curPacket);
-					this._socket.emit('request', { request: curPacket });
 				}
 			}
 		} else {
@@ -315,7 +325,6 @@ export class SocketTransport<
 				this.onResponse(packet);
 			} else {
 				this.onRequest(packet);
-				this._socket.emit('request',  { request: packet });
 			}
 		}
 	}
@@ -328,19 +337,22 @@ export class SocketTransport<
 		this._socket.emit('pong', { data });
 	}
 
-	protected onRequest(packet: AnyPacket<TServiceMap, TIncomingMap>): boolean {
+	protected onRequest(packet: AnyPacket<T['Service'], T['Incoming']>): boolean {
 		packet.requestedAt = new Date();
+
+		this._socket.emit('request', { request: packet });
 		
 		const timeoutAt = typeof packet.ackTimeoutMs === 'number' ? new Date(packet.requestedAt.valueOf() + packet.ackTimeoutMs) : null;
 		let wasHandled = false;
 
-		const handler = this._handlers[(packet as MethodPacket<TIncomingMap>).method];
+		const handler = this._handlers[(packet as MethodPacket<T['Incoming']>).method];
 
 		if (handler) {
 			wasHandled = true;
 
 			handler(
 				new RequestHandlerArgs({
+					isRpc: !!packet.cid,
 					method: packet.method.toString(),
 					timeoutMs: packet.ackTimeoutMs,
 					socket: this._socket,
@@ -348,21 +360,25 @@ export class SocketTransport<
 					options: packet.data
 				})
 			).then(data => {
-				this.sendResponse([
-					{
-						rid: packet.cid,
-						timeoutAt,
-						data
-					} as MethodDataResponse<TIncomingMap>
-				])
+				if (packet.cid) {
+					this.sendResponse([
+						{
+							rid: packet.cid,
+							timeoutAt,
+							data
+						} as MethodDataResponse<T['Incoming']>
+					]);
+				}
 			}).catch(error => {
-				this.sendResponse([
-					{
-						rid: packet.cid,
-						timeoutAt,
-						error
-					}
-				]);
+				if (packet.cid) {
+					this.sendResponse([
+						{
+							rid: packet.cid,
+							timeoutAt,
+							error
+						}
+					]);
+				}
 
 				this.onError(error);
 			});
@@ -375,7 +391,7 @@ export class SocketTransport<
 		return wasHandled;
 	}
 
-	protected onUnhandledRequest(packet: AnyPacket<TServiceMap, TIncomingMap>): boolean {
+	protected onUnhandledRequest(packet: AnyPacket<T['Service'], T['Incoming']>): boolean {
 		if (this._onUnhandledRequest) {
 			return this._onUnhandledRequest(this, packet);
 		}
@@ -383,7 +399,7 @@ export class SocketTransport<
 		return false;
 	}
 
-	protected onResponse(response: AnyResponse<TServiceMap, TOutgoingMap, TPrivateOutgoingMap>) {
+	protected onResponse(response: AnyResponse<T['Service'], T['Outgoing'], T['PrivateOutgoing']>) {
 		const map = this._callbackMap[response.rid];
 
 		if (map) {
@@ -414,45 +430,42 @@ export class SocketTransport<
 		}
 
 		for (const middleware of this.middleware) {
-			if (middleware.onDisconnect) {
-				middleware.onDisconnect(status, code, reason);
+			if (middleware.onDisconnected) {
+				middleware.onDisconnected(status, code, reason);
 			}
-		}
-
-		this.abortAllPendingEventsDueToDisconnect(status);
-	}
-
-	private abortAllPendingEventsDueToDisconnect(status: SocketStatus): void {
-		for (const cid in this._callbackMap) {
-			const map = this._callbackMap[cid];
-			const msg = `Event ${map.method} was aborted due to a bad connection`;
-
-			map.callback(
-				new BadConnectionError(msg, status === 'open' ? 'disconnect' : 'connectAbort')
-			);
 		}
 	}
 
-	public callMiddleware(middleware: Middleware, fn: () => void): void {
-		try {
-			fn();
-		} catch (err) {
-			if (err instanceof MiddlewareBlockedError) {
-				throw err;
-			}
+	protected resetPingTimeout(timeoutMs: number | false, code: number) {
+		if (this._pingTimeoutRef) {
+			clearTimeout(this._pingTimeoutRef);
+		}
 
-			if (err instanceof MiddlewareCaughtError) {
-				throw err.innerError;
-			}
-
-			this.onError(err);
-
-			throw new MiddlewareError(`An unexpected error occurred in the ${middleware.type} middleware.`, middleware.type);
+		if (timeoutMs !== false) {
+			// Use `WebSocket#terminate()`, which immediately destroys the connection,
+			// instead of `WebSocket#close()`, which waits for the close timer.
+			// Delay should be equal to the interval at which your server
+			// sends out pings plus a conservative assumption of the latency.
+			this._pingTimeoutRef = setTimeout(() => {
+				this.webSocket.close(code);
+			}, timeoutMs);
 		}
 	}
 
-	public get url(): string {
-		return this._webSocket.url;
+	public setOpenStatus(authError?: Error): void {
+		if (this._webSocket?.readyState !== ws.OPEN) {
+			throw new InvalidActionError('Cannot set status to OPEN before socket is connected.');
+		}
+
+		this._isOpen = true;
+
+		for (const middleware of this.middleware) {
+			if (middleware.onOpen) {
+				middleware.onOpen();
+			}
+		}
+
+		this._socket.emit('connect', { isAuthenticated: !!this.signedAuthToken, authError });
 	}
 
 	public get status(): SocketStatus {
@@ -476,25 +489,9 @@ export class SocketTransport<
 		}
 	}
 
-	public setOpenStatus(): void {
-		if (this._webSocket?.readyState !== ws.OPEN) {
-			throw new InvalidActionError('Cannot set status to OPEN before socket is connected.');
-		}
-
-		this._isOpen = true;
-
-		for (const middleware of this.middleware) {
-			if (middleware.onOpen) {
-				middleware.onOpen();
-			}
-		}
-
-		this._socket.emit('connect', { isAuthenticated: !!this.signedAuthToken });
-	}
-
-	protected sendRequest(requests: (AnyRequest<TServiceMap, TPrivateOutgoingMap, TOutgoingMap>)[]): void;
-	protected sendRequest(index: number, requests: (AnyRequest<TServiceMap, TPrivateOutgoingMap, TOutgoingMap>)[]): void;
-	protected sendRequest(index: (AnyRequest<TServiceMap, TPrivateOutgoingMap, TOutgoingMap>)[] | number, requests?: (AnyRequest<TServiceMap, TPrivateOutgoingMap, TOutgoingMap>)[]): void {
+	protected sendRequest(requests: (AnyRequest<T['Service'], T['PrivateOutgoing'], T['Outgoing']>)[]): void;
+	protected sendRequest(index: number, requests: (AnyRequest<T['Service'], T['PrivateOutgoing'], T['Outgoing']>)[]): void;
+	protected sendRequest(index: (AnyRequest<T['Service'], T['PrivateOutgoing'], T['Outgoing']>)[] | number, requests?: (AnyRequest<T['Service'], T['PrivateOutgoing'], T['Outgoing']>)[]): void {
 		if (typeof index === 'object') {
 			requests = index;
 			index = 0;
@@ -511,7 +508,7 @@ export class SocketTransport<
 			}
 		}
 
-		const bypassRequests: AnyRequest<TServiceMap, TPrivateOutgoingMap, TOutgoingMap>[] = [];
+		const bypassRequests: AnyRequest<T['Service'], T['PrivateOutgoing'], T['Outgoing']>[] = [];
 
 		for (let i = 0; i < requests.length; i++) {
 			if (requests[i].bypassMiddleware) {
@@ -569,9 +566,19 @@ export class SocketTransport<
 		// If the socket is closed we need to call them back with an error.
 		if (this.status === 'closed') {
 			for (const request of requests) {
+				const err = new BadConnectionError(
+					`Socket invoke ${String(request.method)} event was aborted due to a bad connection`,
+					'connectAbort'
+				);
+
+				this.onError(err);
+
+				if ('sentCallback' in request && request.sentCallback) {
+					request.sentCallback(err);
+				}
+
 				if ('callback' in request && request.callback) {
-					//TODO:
-					request.callback(new Error('socket closed'));
+					request.callback(err);
 				}
 			}
 			return;
@@ -595,8 +602,15 @@ export class SocketTransport<
 
 		this._webSocket.send(
 			this.codecEngine.encode(encode.length === 1 ? encode[0] : encode),
-			(err) => {
+			(err: WebSocketError) => {
 				for (const req of requests) {
+					if (err?.code === 'ECONNRESET') {
+						err = new BadConnectionError(
+							`Socket ${req.sentCallback ? 'transmit' : 'invoke' } ${String(req.method)} event was aborted due to a bad connection`,
+							'connectAbort'
+						);
+					}
+
 					if (req.sentCallback) {
 						req.sentCallback(err);
 					}
@@ -609,9 +623,9 @@ export class SocketTransport<
 		);
 	}
 
-	protected sendResponse(responses: (AnyResponse<TServiceMap, TIncomingMap>)[]): void;
-	protected sendResponse(index: number, responses: (AnyResponse<TServiceMap, TIncomingMap>)[]): void;
-	protected sendResponse(index: (AnyResponse<TServiceMap, TIncomingMap>)[] | number, responses?: (AnyResponse<TServiceMap, TIncomingMap>)[]): void {
+	protected sendResponse(responses: (AnyResponse<T['Service'], T['Incoming']>)[]): void;
+	protected sendResponse(index: number, responses: (AnyResponse<T['Service'], T['Incoming']>)[]): void;
+	protected sendResponse(index: (AnyResponse<T['Service'], T['Incoming']>)[] | number, responses?: (AnyResponse<T['Service'], T['Incoming']>)[]): void {
 		if (typeof index === 'object') {
 			responses = index;
 			index = 0;
@@ -677,19 +691,19 @@ export class SocketTransport<
 		);
 	}
 
-	public transmit<TMethod extends keyof TOutgoingMap>(
-		method: TMethod, arg?: Parameters<TOutgoingMap[TMethod]>[0], bypassMiddleware?: boolean): Promise<void>;
-	public transmit<TService extends keyof TServiceMap, TMethod extends keyof TServiceMap[TService]>(
-		options: [TService, TMethod], arg?: Parameters<TServiceMap[TService][TMethod]>[0], bypassMiddleware?: boolean): Promise<void>;
-	public transmit<TMethod extends keyof TPrivateOutgoingMap>(
-		method: TMethod, arg?: Parameters<TPrivateOutgoingMap[TMethod]>[0], bypassMiddleware?: boolean): Promise<void>;
+	public transmit<TMethod extends keyof T['Outgoing']>(
+		method: TMethod, arg?: Parameters<T['Outgoing'][TMethod]>[0], bypassMiddleware?: boolean): Promise<void>;
+	public transmit<TService extends keyof T['Service'], TMethod extends keyof T['Service'][TService]>(
+		options: [TService, TMethod], arg?: Parameters<T['Service'][TService][TMethod]>[0], bypassMiddleware?: boolean): Promise<void>;
+	public transmit<TMethod extends keyof T['PrivateOutgoing']>(
+		method: TMethod, arg?: Parameters<T['PrivateOutgoing'][TMethod]>[0], bypassMiddleware?: boolean): Promise<void>;
 	public transmit<
-		TService extends keyof TServiceMap,
-		TServiceMethod extends keyof TServiceMap[TService],
-		TMethod extends keyof TOutgoingMap
+		TService extends keyof T['Service'],
+		TServiceMethod extends keyof T['Service'][TService],
+		TMethod extends keyof T['Outgoing']
 	>(
 		serviceAndMethod: TMethod | [TService, TServiceMethod],
-		arg?: (Parameters<TOutgoingMap[TMethod] | TServiceMap[TService][TServiceMethod]>)[0],
+		arg?: (Parameters<T['Outgoing'][TMethod] | T['Service'][TService][TServiceMethod]>)[0],
 		bypassMiddleware?: boolean
 	 ): Promise<void> {
 		let service: TService;
@@ -703,19 +717,18 @@ export class SocketTransport<
 			method = serviceAndMethod;
 		}
 
-		const request: TransmitMethodRequest<TOutgoingMap, TMethod> | TransmitServiceRequest<TServiceMap, TService, TServiceMethod> = 
+		const request: TransmitMethodRequest<T['Outgoing'], TMethod> | TransmitServiceRequest<T['Service'], TService, TServiceMethod> = 
 			Object.assign(
 				{
-					cid: this._callIdGenerator(),
 					bypassMiddleware: !!bypassMiddleware
 				},
 				service ? {
 					service,
 					method: serviceMethod,
-					data: arg as Parameters<TServiceMap[TService][TServiceMethod]>[0]
+					data: arg as Parameters<T['Service'][TService][TServiceMethod]>[0]
 				} : {
 					method,
-					data: arg as Parameters<TOutgoingMap[TMethod]>[0]
+					data: arg as Parameters<T['Outgoing'][TMethod]>[0]
 				}
 			);
 
@@ -737,28 +750,28 @@ export class SocketTransport<
 		return promise;
 	}
 
-	public invoke<TMethod extends keyof TOutgoingMap>(
-		method: TMethod, arg?: Parameters<TOutgoingMap[TMethod]>[0], bypassMiddleware?: boolean): AbortablePromise<FunctionReturnType<TOutgoingMap[TMethod]>>;
-	public invoke<TService extends keyof TServiceMap, TMethod extends keyof TServiceMap[TService]>(
-		options: [TService, TMethod, (number | false)?], arg?: Parameters<TServiceMap[TService][TMethod]>[0], bypassMiddleware?: boolean): AbortablePromise<FunctionReturnType<TServiceMap[TService][TMethod]>>;
-	public invoke<TService extends keyof TServiceMap, TMethod extends keyof TServiceMap[TService]>(
-		options: InvokeServiceOptions<TServiceMap, TService, TMethod>, arg?: Parameters<TServiceMap[TService][TMethod]>[0], bypassMiddleware?: boolean): AbortablePromise<FunctionReturnType<TServiceMap[TService][TMethod]>>;
-	public invoke<TMethod extends keyof TOutgoingMap>(
-		options: InvokeMethodOptions<TOutgoingMap, TMethod>, arg?: Parameters<TOutgoingMap[TMethod]>[0], bypassMiddleware?: boolean): AbortablePromise<FunctionReturnType<TOutgoingMap[TMethod]>>;
-	public invoke<TMethod extends keyof TPrivateOutgoingMap>(
-		method: TMethod, arg: Parameters<TPrivateOutgoingMap[TMethod]>[0], bypassMiddleware?: boolean): AbortablePromise<FunctionReturnType<TPrivateOutgoingMap[TMethod]>>;
-	public invoke<TMethod extends keyof TPrivateOutgoingMap>(
-		options: InvokeMethodOptions<TPrivateOutgoingMap, TMethod>, arg?: Parameters<TPrivateOutgoingMap[TMethod]>[0], bypassMiddleware?: boolean): AbortablePromise<FunctionReturnType<TPrivateOutgoingMap[TMethod]>>;
+	public invoke<TMethod extends keyof T['Outgoing']>(
+		method: TMethod, arg?: Parameters<T['Outgoing'][TMethod]>[0], bypassMiddleware?: boolean): [Promise<FunctionReturnType<T['Outgoing'][TMethod]>>, () => void];
+	public invoke<TService extends keyof T['Service'], TMethod extends keyof T['Service'][TService]>(
+		options: [TService, TMethod, (number | false)?], arg?: Parameters<T['Service'][TService][TMethod]>[0], bypassMiddleware?: boolean): [Promise<FunctionReturnType<T['Service'][TService][TMethod]>>, () => void];
+	public invoke<TService extends keyof T['Service'], TMethod extends keyof T['Service'][TService]>(
+		options: InvokeServiceOptions<T['Service'], TService, TMethod>, arg?: Parameters<T['Service'][TService][TMethod]>[0], bypassMiddleware?: boolean): [Promise<FunctionReturnType<T['Service'][TService][TMethod]>>, () => void];
+	public invoke<TMethod extends keyof T['Outgoing']>(
+		options: InvokeMethodOptions<T['Outgoing'], TMethod>, arg?: Parameters<T['Outgoing'][TMethod]>[0], bypassMiddleware?: boolean): [Promise<FunctionReturnType<T['Outgoing'][TMethod]>>, () => void];
+	public invoke<TMethod extends keyof T['PrivateOutgoing']>(
+		method: TMethod, arg: Parameters<T['PrivateOutgoing'][TMethod]>[0], bypassMiddleware?: boolean): [Promise<FunctionReturnType<T['PrivateOutgoing'][TMethod]>>, () => void];
+	public invoke<TMethod extends keyof T['PrivateOutgoing']>(
+		options: InvokeMethodOptions<T['PrivateOutgoing'], TMethod>, arg?: Parameters<T['PrivateOutgoing'][TMethod]>[0], bypassMiddleware?: boolean): [Promise<FunctionReturnType<T['PrivateOutgoing'][TMethod]>>, () => void];
 	public invoke<
-		TService extends keyof TServiceMap,
-		TServiceMethod extends keyof TServiceMap[TService],
-		TMethod extends keyof TOutgoingMap,
-		TPrivateMethod extends keyof TPrivateOutgoingMap
+		TService extends keyof T['Service'],
+		TServiceMethod extends keyof T['Service'][TService],
+		TMethod extends keyof T['Outgoing'],
+		TPrivateMethod extends keyof T['PrivateOutgoing']
 	> (
-		methodOptions: TMethod | TPrivateMethod | [TService, TServiceMethod, (number | false)?] | InvokeServiceOptions<TServiceMap, TService, TServiceMethod> | InvokeMethodOptions<TOutgoingMap, TMethod> | InvokeMethodOptions<TPrivateOutgoingMap, TPrivateMethod>,
-		arg?: (Parameters<TOutgoingMap[TMethod] | TPrivateOutgoingMap[TPrivateMethod] | TServiceMap[TService][TServiceMethod]>)[0],
+		methodOptions: TMethod | TPrivateMethod | [TService, TServiceMethod, (number | false)?] | InvokeServiceOptions<T['Service'], TService, TServiceMethod> | InvokeMethodOptions<T['Outgoing'], TMethod> | InvokeMethodOptions<T['PrivateOutgoing'], TPrivateMethod>,
+		arg?: (Parameters<T['Outgoing'][TMethod] | T['PrivateOutgoing'][TPrivateMethod] | T['Service'][TService][TServiceMethod]>)[0],
 		bypassMiddleware?: boolean
-	): AbortablePromise<FunctionReturnType<TServiceMap[TService][TServiceMethod] | TOutgoingMap[TMethod] | TPrivateOutgoingMap[TPrivateMethod]>> {
+	): [Promise<FunctionReturnType<T['Service'][TService][TServiceMethod] | T['Outgoing'][TMethod] | T['PrivateOutgoing'][TPrivateMethod]>>, () => void] {
 
 		let service: TService;
 		let serviceMethod: TServiceMethod;
@@ -786,7 +799,7 @@ export class SocketTransport<
 
 		let callbackMap = this._callbackMap;
 
-		const request: InvokeMethodRequest<TOutgoingMap, TMethod> | InvokeMethodRequest<TPrivateOutgoingMap, TPrivateMethod> | InvokeServiceRequest<TServiceMap, TService, TServiceMethod> = 
+		const request: InvokeMethodRequest<T['Outgoing'], TMethod> | InvokeMethodRequest<T['PrivateOutgoing'], TPrivateMethod> | InvokeServiceRequest<T['Service'], TService, TServiceMethod> = 
 			Object.assign(
 				{
 					cid: this._callIdGenerator(),
@@ -797,16 +810,16 @@ export class SocketTransport<
 				service ? {
 					service,
 					method: serviceMethod,
-					data: arg as Parameters<TServiceMap[TService][TServiceMethod]>[0]
+					data: arg as Parameters<T['Service'][TService][TServiceMethod]>[0]
 				} : {
 					method: method as TMethod,
-					data: arg as Parameters<TOutgoingMap[TMethod]>[0]
+					data: arg as Parameters<T['Outgoing'][TMethod]>[0]
 				}
 			);
 
 		let abort: () => void;
 
-		const promise = new Promise<FunctionReturnType<TServiceMap[TService][TServiceMethod] | TOutgoingMap[TMethod] | TPrivateOutgoingMap[TPrivateMethod]>>((resolve, reject) => {
+		const promise = new Promise<FunctionReturnType<T['Service'][TService][TServiceMethod] | T['Outgoing'][TMethod] | T['PrivateOutgoing'][TPrivateMethod]>>((resolve, reject) => {
 			if (request.ackTimeoutMs) {
 				request.timeoutId = setTimeout(
 					() => {
@@ -832,7 +845,7 @@ export class SocketTransport<
 				}
 			}
 
-			request.callback = (err: Error, result: FunctionReturnType<TServiceMap[TService][TServiceMethod] | TOutgoingMap[TMethod]>) => {
+			request.callback = (err: Error, result: FunctionReturnType<T['Service'][TService][TServiceMethod] | T['Outgoing'][TMethod]>) => {
 				delete callbackMap[request.cid];
 				request.callback = null;
 
@@ -851,6 +864,10 @@ export class SocketTransport<
 
 		this.sendRequest([request as any]);
 
-		return Object.assign(promise, { abort });
+		return [promise, abort];
+	}
+
+	public get url(): string {
+		return this._webSocket.url;
 	}
 }

@@ -1,0 +1,1 @@
+export type ChannelState = 'subscribed' | 'pending' | 'unsubscribed';

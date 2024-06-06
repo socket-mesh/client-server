@@ -1,7 +1,7 @@
 import { RequestHandlerArgs } from "../../request-handler.js";
 
 export async function removeAuthTokenHandler(
-	{ transport }: RequestHandlerArgs<void, {}>
+	{ transport }: RequestHandlerArgs<void>
 ): Promise<void> {
-	await transport.deauthenticate();
+	await transport.changeToUnauthenticatedState();
 }
