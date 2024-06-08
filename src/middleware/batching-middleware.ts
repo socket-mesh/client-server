@@ -1,6 +1,6 @@
 import { EmptySocketMap, SocketMap } from "../client/maps/socket-map.js";
 import { MethodRequest, ServiceRequest } from "../request.js";
-import { Middleware } from "./middleware.js";
+import { Middleware, SendRequestMiddlewareArgs } from "./middleware.js";
 
 export interface BatchingMiddlewareOptions {
 	// Whether or not to start batching messages immediately after the connection handshake completes. This is useful for handling
@@ -38,7 +38,7 @@ export class BatchingMiddleware<T extends SocketMap = EmptySocketMap> implements
 		return this._isBatching || this._batchingIntervalId !== null;
 	}
 
-	public onOpen(): void {
+	public onReady(): void {
 		if (this._isBatching) {
 			this.start();
 		} else if (typeof this.batchOnHandshakeDuration === 'number' && this.batchOnHandshakeDuration > 0) {
@@ -108,10 +108,7 @@ export class BatchingMiddleware<T extends SocketMap = EmptySocketMap> implements
 		}
 	}
 
-	public sendRequest(
-		requests: (MethodRequest<T['Outgoing']> | ServiceRequest<T['Service']>)[],
-		cont: (requests: (MethodRequest<T['Outgoing']> | ServiceRequest<T['Service']>)[]) => void
-	): void {
+	public sendRequest({ requests, cont }: SendRequestMiddlewareArgs<T>): void {
 		if (!this.isBatching) {
 			cont(requests);
 			return;

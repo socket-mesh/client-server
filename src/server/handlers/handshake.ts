@@ -66,7 +66,7 @@ export async function handshakeHandler(
 	server.clients[socket.id] = socket;
 	server.clientCount++;
 
-	transport.setOpenStatus(authError);
+	transport.setReadyStatus(authError);
 
 	// Needs to be executed after the connection event to allow consumers to be setup.
 	await wait(0);

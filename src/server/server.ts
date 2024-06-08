@@ -40,6 +40,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 	public isPingTimeoutDisabled: boolean;
 	public pingTimeoutMs: number;
 	public socketChannelLimit?: number;
+	public strictHandshake: boolean;
 
 	public readonly auth: AuthEngine;
 	public readonly brokerEngine: Broker<T['Channel']>;
@@ -63,26 +64,18 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 
 		options.clientTracking = true;
 
-		this.clients = {};
-		this.clientCount = 0;
-		this.pendingClients = {};
-		this.pendingClientCount = 0;
 		this.ackTimeoutMs = options.ackTimeoutMs || 10000;
 		this.allowClientPublish = options.allowClientPublish ?? true;
-		this.pingIntervalMs = options.pingIntervalMs || 8000;
-		this.isPingTimeoutDisabled = (options.pingTimeoutMs === false);
-		this.pingTimeoutMs = options.pingTimeoutMs || 20000;
-
+		this.auth = isAuthEngine(options.authEngine) ? options.authEngine : defaultAuthEngine(options.authEngine);
+		this.brokerEngine = options.brokerEngine || new SimpleBroker<T['Channel']>();
 		this._callIdGenerator = options.callIdGenerator || (() => {
 			return cid++;
 		});
-
-		this.auth = isAuthEngine(options.authEngine) ? options.authEngine : defaultAuthEngine(options.authEngine);
-		this.brokerEngine = options.brokerEngine || new SimpleBroker<T['Channel']>();
+		
+		this.clients = {};
+		this.clientCount = 0;
 		this.codecEngine = options.codecEngine || defaultCodec;
-		this.middleware = options.middleware || [];
-		this.socketChannelLimit = options.socketChannelLimit;
-		this.httpServer = options.server;
+
 		this._handlers = Object.assign(
 			{
 				"#authenticate": authenticateHandler,
@@ -94,6 +87,17 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 			},
 			options.handlers
 		);
+		this.httpServer = options.server;
+
+		this.middleware = options.middleware || [];
+		this.pendingClients = {};
+		this.pendingClientCount = 0;
+		this.pingIntervalMs = options.pingIntervalMs || 8000;
+		this.isPingTimeoutDisabled = (options.pingTimeoutMs === false);
+		this.pingTimeoutMs = options.pingTimeoutMs || 20000;
+
+		this.socketChannelLimit = options.socketChannelLimit;
+		this.strictHandshake = options.strictHandshake ?? true;
 
 		this._wss = new ws.WebSocketServer(options);
 

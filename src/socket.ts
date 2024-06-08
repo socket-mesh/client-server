@@ -36,7 +36,7 @@ export interface SocketOptions<T extends SocketMap, TSocket extends Socket<T> = 
 	streamCleanupMode?: StreamCleanupMode
 }
 
-export type SocketStatus = 'connecting' | 'open' | 'closing' | 'closed';
+export type SocketStatus = 'connecting' | 'ready' | 'closing' | 'closed';
 
 export interface InvokeMethodOptions<TMethodMap extends MethodMap, TMethod extends keyof TMethodMap> {
 	method: TMethod,

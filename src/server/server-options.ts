@@ -50,5 +50,7 @@ export interface ServerOptions<T extends ServerMap> extends ws.ServerOptions {
 	// Close mode means that consumers on the socket will
 	// be able to finish processing their stream backlogs
 	// bebfore they are ended.
-	socketStreamCleanupMode?: StreamCleanupMode
+	socketStreamCleanupMode?: StreamCleanupMode,
+
+	strictHandshake?: boolean
 }

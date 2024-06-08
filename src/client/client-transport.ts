@@ -8,7 +8,9 @@ import { InvokeMethodOptions, InvokeServiceOptions, SocketTransport } from "../s
 import { AutoReconnectOptions, ClientSocketOptions, ConnectOptions } from "./client-socket-options.js";
 import { AuthToken } from "@socket-mesh/auth";
 import { SocketMapFromClient } from "./maps/socket-map.js";
-import { ClientMap } from "./maps/client-map.js";
+import { ClientMap, ClientPrivateMap } from "./maps/client-map.js";
+import { AnyPacket } from "../request.js";
+import { AnyResponse } from "../response.js";
 
 export class ClientTransport<T extends ClientMap> extends SocketTransport<SocketMapFromClient<T>> {
 	public readonly authEngine: ClientAuthEngine;
@@ -115,6 +117,14 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 		return this._connectAttempts;
 	}
 
+	protected override decode(data: string | ws.RawData):
+		AnyPacket<T["Service"], T["Incoming"] & ClientPrivateMap> |
+		AnyResponse<T["Service"], T["Outgoing"], T["PrivateOutgoing"] & ServerPrivateMap> |
+		(AnyPacket<T["Service"], T["Incoming"] & ClientPrivateMap> | AnyResponse<T["Service"], T["Outgoing"], T["PrivateOutgoing"] & ServerPrivateMap>)[] {
+		
+		return super.decode(data);
+	}
+
 	public override disconnect(code=1000, reason?: string) {
 		if (code !== 4007) {
 			this.resetReconnect();
@@ -125,7 +135,7 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 
 	private async handshake(): Promise<HandshakeStatus> {
 		const token = await this.authEngine.loadToken();
-		// Don't wait for this.state to be 'open'.
+		// Don't wait for this.state to be 'ready'.
 		// The underlying WebSocket (this.socket) is already open.
 		// The casting to HandshakeStatus has to be here or typescript freaks out
 		const status = await this.invoke(
@@ -142,6 +152,8 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 	}
 
 	protected override onOpen() {
+		super.onOpen();
+
 		clearTimeout(this._connectTimeoutRef);		
 		this.resetReconnect();
 		this.resetPingTimeout(this.isPingTimeoutDisabled ? false : this.pingTimeoutMs, 4000);
@@ -164,8 +176,7 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 				return this.changeToUnauthenticatedState();
 			})
 			.then(() => {
-				this.setOpenStatus(authError);
-				super.onOpen();
+				this.setReadyStatus(authError);
 			})
 			.catch(err => {
 				if (err.statusCode == null) {

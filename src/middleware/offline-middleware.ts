@@ -1,26 +1,23 @@
 import { EmptySocketMap, SocketMap } from "../client/maps/socket-map.js";
 import { MethodRequest, ServiceRequest } from "../request.js";
-import { Middleware } from "./middleware.js";
+import { Middleware, SendRequestMiddlewareArgs } from "./middleware.js";
 
 export class OfflineMiddleware<T extends SocketMap = EmptySocketMap> implements Middleware<T> {
 
-	private _isOpen: boolean;
+	private _isReady: boolean;
 	private _requests: (MethodRequest<T['Outgoing']> | ServiceRequest<T['Service']>)[];
 	private _continue: (requests: (MethodRequest<T['Outgoing']> | ServiceRequest<T['Service']>)[]) => void | null;
 
 	constructor() {
-		this._isOpen = false;
+		this._isReady = false;
 		this._requests = [];
 		this._continue = null;
 	}
 
 	type: "offline";
 
-	public sendRequest(
-		requests: (MethodRequest<T['Outgoing']> | ServiceRequest<T['Service']>)[],
-		cont: (requests: (MethodRequest<T['Outgoing']> | ServiceRequest<T['Service']>)[]) => void
-	): void {
-		if (this._isOpen) {
+	public sendRequest({ requests, cont }: SendRequestMiddlewareArgs<T>): void {
+		if (this._isReady) {
 			cont(requests);
 			return;
 		}
@@ -29,13 +26,13 @@ export class OfflineMiddleware<T extends SocketMap = EmptySocketMap> implements 
 		this._requests.push(...requests);
 	}
 
-	public onOpen(): void {
-		this._isOpen = true;
+	public onReady(): void {
+		this._isReady = true;
 		this.flush();
 	}
 
 	public onClose(): void {
-		this._isOpen = false;
+		this._isReady = false;
 	}
 
 	public onDisconnected(): void {

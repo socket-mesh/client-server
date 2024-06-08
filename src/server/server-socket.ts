@@ -4,6 +4,7 @@ import ws from "ws";
 import { ServerTransport } from "./server-transport.js";
 import { SocketMapFromServer } from "../client/maps/socket-map.js";
 import { ServerMap } from "../client/maps/server-map.js";
+import { Exchange } from "./broker/exchange.js";
 
 export interface ServerSocketOptions<T extends ServerMap> extends SocketOptions<SocketMapFromServer<T>> {
 	handlers: HandlerMap<SocketMapFromServer<T>>,
@@ -42,6 +43,10 @@ export class ServerSocket<T extends ServerMap> extends Socket<SocketMapFromServe
 				throw err;
 			}
 		}
+	}
+
+	public get exchange(): Exchange<T['Channel']> {
+		return this._serverTransport.state.server.exchange;
 	}
 
 	get service(): string {

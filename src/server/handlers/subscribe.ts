@@ -6,7 +6,7 @@ import { BasicSocketMapServer } from "../../client/maps/socket-map.js";
 export async function subscribeHandler(
 	{ socket, transport, options }: RequestHandlerArgs<SubscribeOptions, BasicSocketMapServer>
 ): Promise<void> {
-	if (socket.status !== 'open') {
+	if (socket.status !== 'ready') {
 		// This is an invalid state; it means the client tried to subscribe before
 		// having completed the handshake.
 		throw new InvalidActionError('Cannot subscribe socket to a channel before it has completed the handshake');

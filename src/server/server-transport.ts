@@ -40,6 +40,21 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 
 		return false;
 	}
+	
+	protected override decode(data: string | RawData): 
+		AnyPacket<T["Service"], SocketMapFromServer<T>['Incoming']> | 
+		AnyResponse<T["Service"], T["Outgoing"], SocketMapFromServer<T>['PrivateOutgoing']> | 
+		(AnyPacket<T["Service"], SocketMapFromServer<T>['Incoming']> | AnyResponse<T["Service"], T["Outgoing"], SocketMapFromServer<T>['PrivateOutgoing']>)[] {
+
+		const packet = super.decode(data);
+
+		if ((packet === null || typeof packet !== 'object') && this.state.server.strictHandshake && this.status === 'connecting') {
+			this.disconnect(4009);
+			return null;
+		}
+
+		return packet;
+	}
 
 	protected override onClose(code: number, reason?: string | Buffer): void {
 		const status = this.status;
@@ -53,7 +68,7 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 	}
 	
 	protected override onDisconnect(status: SocketStatus, code: number, reason?: string): void {
-		if (status === 'open') {
+		if (status === 'ready') {
 			this.state.server.emit('socketDisconnect', { socket: this.socket, code, reason });
 		} else {
 			this.state.server.emit('socketConnectAbort', { socket: this.socket, code, reason });
@@ -109,6 +124,11 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 	}
 
 	protected override onPing(data: Buffer): void {
+		if (this.state.server.strictHandshake && this.status === 'connecting') {
+			this.disconnect(4009);
+			return;
+		}
+
 		super.onPing(data);
 		this.state.server.emit('socketPing', { socket: this.socket, data });	
 	}
@@ -142,7 +162,7 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		if (typeof authToken === 'string') {
 			const changed = await super.setAuthorization(authToken, options as AuthToken);
 
-			if (changed && this.status === 'open') {
+			if (changed && this.status === 'ready') {
 				this.triggerAuthenticationEvents(false, wasAuthenticated);
 			}
 			
@@ -165,7 +185,7 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 
 		const changed = super.setAuthorization(signedAuthToken, authToken);
 
-		if (changed && this.status === 'open') {
+		if (changed && this.status === 'ready') {
 			this.triggerAuthenticationEvents(true, wasAuthenticated);
 		}
 
@@ -201,8 +221,8 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		return changed;
 	}
 
-	public override setOpenStatus(authError?: Error): void {
-		super.setOpenStatus(authError);
+	public override setReadyStatus(authError?: Error): void {
+		super.setReadyStatus(authError);
 		this.state.server.emit('socketConnect', { socket: this.socket, isAuthenticated: !!this.signedAuthToken, authError });
 	}
 

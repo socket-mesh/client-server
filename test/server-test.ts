@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, it } from "node:test";
 import { ClientSocketOptions } from "../src/client/client-socket-options";
 import { ClientSocket } from "../src/client/client-socket";
 import { Server, ServerSocket, listen } from "../src";
-import { BasicServerMap, ServerPrivateMap } from "../src/client/maps/server-map";
+import { BasicServerMap } from "../src/client/maps/server-map";
 import { ServerOptions } from "../src/server/server-options";
 import { AuthToken } from "@socket-mesh/auth";
 import { RequestHandlerArgs } from "../src/request-handler";
 import jwt from "jsonwebtoken";
-import { BasicSocketMapServer, EmptySocketMap, SocketMapFromClient } from "../src/client/maps/socket-map";
+import { BasicSocketMapServer, SocketMapFromClient } from "../src/client/maps/socket-map";
 import { ServerTransport } from "../src/server/server-transport";
 import { AuthInfo } from "../src/server/handlers/authenticate";
 import assert from "node:assert";
@@ -18,8 +18,7 @@ import { SocketAuthStateChangeEvent } from "../src/server/server-event";
 import { MiddlewareBlockedError } from "@socket-mesh/errors";
 import { AuthOptions } from "../src/server/auth-engine";
 import { OfflineMiddleware } from "../src/middleware/offline-middleware";
-import { removeAuthTokenHandler } from "../src/client/handlers/remove-auth-token";
-import { AnyPacket, MethodRequest, ServiceRequest, TransmitMethodRequest } from "../src/request";
+import { MiddlewareArgs, SendRequestMiddlewareArgs } from "../src/middleware/middleware";
 
 // Add to the global scope like in browser.
 global.localStorage = localStorage;
@@ -896,9 +895,7 @@ describe('Integration tests', function () {
 							new OfflineMiddleware(),
 							{
 								type: 'Authenticate Interceptor',
-								sendRequest: (
-									requests: MethodRequest<ServerPrivateMap>[], cont: (requests: MethodRequest<ServerPrivateMap>[]) => void
-								) => {
+								sendRequest: ({ requests, cont }: SendRequestMiddlewareArgs<SocketMapFromClient<MyClientMap>>) => {
 									cont(
 										requests.map(
 											req => {
@@ -918,7 +915,7 @@ describe('Integration tests', function () {
 			);
 
 			const results = await Promise.allSettled([
-				server.listen('socketClose').once(500),
+				server.listen('socketClose').once(100),
 				client.listen('close').once(100),
 				client.authenticate(validSignedAuthTokenBob)
 			]);
@@ -933,4 +930,99 @@ describe('Integration tests', function () {
 			assert.strictEqual(results[2].reason.name, 'BadConnectionError');
 		});
 	});
+
+	describe('Socket handshake', function () {
+		it('Exchange is attached to socket before the handshake event is triggered', async function () {
+			server = listen(PORT_NUMBER, serverOptions);
+			bindFailureHandlers(server);
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(clientOptions);
+
+			const { socket } = await server.listen('handshake').once(100);
+
+			assert.notEqual(socket.exchange, null);
+		});
+
+		it('Should close the connection if the client tries to send a message before the handshake', async function () {
+			server = listen(PORT_NUMBER, serverOptions);
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(
+				Object.assign(
+					{
+						middleware: [{
+							onOpen({ transport }: MiddlewareArgs<SocketMapFromClient<MyClientMap>>) {
+								transport.send(Buffer.alloc(0));
+							}
+						}]
+					},
+					clientOptions
+				)
+			);
+
+			const results = await Promise.all([
+				server.listen('socketClose').once(2000),
+				client.listen('close').once(2000)
+			]);
+
+			assert.strictEqual(results[0].code, 4009);
+			assert.strictEqual(results[0].reason, 'Server received a message before the client handshake');
+			assert.strictEqual(results[1].code, 4009);
+			assert.strictEqual(results[1].reason, 'Server received a message before the client handshake');
+		});
+
+		it('Should close the connection if the client tries to send a ping before the handshake', async function () {
+			server = listen(PORT_NUMBER, serverOptions);
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(
+				Object.assign(
+					{
+						middleware: [{
+							onOpen({ transport }: MiddlewareArgs<SocketMapFromClient<MyClientMap>>) {
+								transport.ping();
+							}
+						}]
+					},
+					clientOptions
+				)
+			);
+
+			const { code: closeCode } = await client.listen('close').once(100);
+
+			assert.strictEqual(closeCode, 4009);
+		});
+
+		it('Should not close the connection if the client tries to send a message before the handshake and strictHandshake is false', async function () {
+			server = listen(PORT_NUMBER,
+				Object.assign(
+					{ strictHandshake: false },
+					serverOptions
+				)
+			);
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(
+				Object.assign(
+					{
+						middleware: [{
+							onOpen({ transport }: MiddlewareArgs<SocketMapFromClient<MyClientMap>>) {
+								transport.send(Buffer.alloc(0));
+							}
+						}]
+					},
+					clientOptions
+				)
+			);
+
+			const packet = await client.listen('connect').once(100);
+
+			assert.notEqual(packet, null);
+		});
+	});	
 });

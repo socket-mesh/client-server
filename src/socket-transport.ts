@@ -40,7 +40,7 @@ interface WebSocketError extends Error {
 export class SocketTransport<T extends SocketMap> {
 	private _socket: Socket<T>;
 	private _webSocket: ws.WebSocket;
-	private _isOpen: boolean;
+	private _isReady: boolean;
 	private _authToken?: AuthToken;
 	private _signedAuthToken?: SignedAuthToken;
 	private readonly _callIdGenerator: CallIdGenerator;
@@ -59,19 +59,19 @@ export class SocketTransport<T extends SocketMap> {
 	protected constructor(options?: SocketOptions<T>) {
 		let cid = 1;
 
-		this.id = (options?.id || base64id.generateId());
 		this.ackTimeoutMs = options?.ackTimeoutMs ?? 10000;
-		this.codecEngine = options?.codecEngine || defaultCodec;
-		this._callbackMap = {};
-		this._handlers = options?.handlers || {};
-		this.state = options?.state || {};
-		this.streamCleanupMode = options?.streamCleanupMode || 'kill';
 
 		this._callIdGenerator = options?.callIdGenerator || (() => {
 			return cid++;
 		});
 
+		this._callbackMap = {};
+		this.codecEngine = options?.codecEngine || defaultCodec;
+		this._handlers = options?.handlers || {};
+		this.id = (options?.id || base64id.generateId());
 		this.middleware = options?.middleware || [];
+		this.state = options?.state || {};
+		this.streamCleanupMode = options?.streamCleanupMode || 'kill';
 	}
 
 	protected abortAllPendingCallbacksDueToBadConnection(status: SocketStatus): void {
@@ -80,8 +80,70 @@ export class SocketTransport<T extends SocketMap> {
 			const msg = `Event ${map.method} was aborted due to a bad connection`;
 
 			map.callback(
-				new BadConnectionError(msg, status === 'open' ? 'disconnect' : 'connectAbort')
+				new BadConnectionError(msg, status === 'ready' ? 'disconnect' : 'connectAbort')
 			);
+		}
+	}
+
+	public get authToken(): AuthToken {
+		return this._authToken;
+	}
+	
+	public callMiddleware(middleware: Middleware<T>, fn: () => void): void {
+		try {
+			fn();
+		} catch (err) {
+			if (err instanceof MiddlewareBlockedError) {
+				throw err;
+			}
+
+			if (err instanceof MiddlewareCaughtError) {
+				throw err.innerError;
+			}
+
+			this.onError(err);
+
+			throw new MiddlewareError(`An unexpected error occurred in the ${middleware.type} middleware.`, middleware.type);
+		}
+	}
+
+	public async changeToUnauthenticatedState(): Promise<boolean> {
+		if (this._signedAuthToken) {
+			const authToken = this._authToken;
+			const signedAuthToken = this._signedAuthToken;
+
+			this._authToken = null;
+			this._signedAuthToken = null;	
+
+			this._socket.emit('authStateChange', { wasAuthenticated: true, isAuthenticated: false });
+
+			// In order for the events to trigger we need to wait for the next tick.
+			await wait(0);
+
+			this._socket.emit('deauthenticate', { signedAuthToken, authToken });
+
+			for (const middleware of this.middleware) {
+				if (middleware.onDeauthenticate) {
+					middleware.onDeauthenticate({ socket: this.socket, transport: this });
+				}	
+			}
+
+			return true;
+		}
+
+		return false;
+	}
+
+	protected decode(data: string | ws.RawData): any {
+		try {
+			return this.codecEngine.decode(data as string);
+		} catch (err) {
+			if (err.name === 'Error') {
+				err.name = 'InvalidMessageError';
+			}
+
+			this.onError(err);
+			return null;
 		}
 	}
 
@@ -110,49 +172,6 @@ export class SocketTransport<T extends SocketMap> {
 
 	public set socket(value: Socket<T>) {
 		this._socket = value;
-	}
-
-	protected get webSocket(): ws.WebSocket {
-		return this._webSocket;
-	}
-	
-	protected set webSocket(value: ws.WebSocket | null) {
-		if (this._webSocket) {
-			this._webSocket.off('open', this.onOpen);
-			this._webSocket.off('close', this.onClose);
-			this._webSocket.off('error', this.onError);
-			this._webSocket.off('upgrade', this.onUpgrade);
-			this._webSocket.off('message', this.onMessage);
-			this._webSocket.off('ping', this.onPing);
-			this._webSocket.off('pong', this.onPong);
-			this._webSocket.off('unexpectedResponse', this.onUnexpectedResponse);
-
-			delete this.onOpen;
-			delete this.onClose;
-			delete this.onError;
-			delete this.onUpgrade;
-			delete this.onMessage;
-			delete this.onPing;
-			delete this.onPong;
-			delete this.onUnexpectedResponse;
-		}
-
-		this._webSocket = value;
-
-		if (value) {
-			this._webSocket.on('open', this.onOpen = this.onOpen.bind(this));
-			this._webSocket.on('close', this.onClose = this.onClose.bind(this));
-			this._webSocket.on('error', this.onError = this.onError.bind(this));
-			this._webSocket.on('upgrade', this.onUpgrade = this.onUpgrade.bind(this));
-			this._webSocket.on('message', this.onMessage = this.onMessage.bind(this));
-			this._webSocket.on('ping', this.onPing = this.onPing.bind(this));
-			this._webSocket.on('pong', this.onPong = this.onPong.bind(this));
-			this._webSocket.on('unexpectedResponse', this.onUnexpectedResponse = this.onUnexpectedResponse.bind(this));
-		}
-	}
-
-	public get authToken(): AuthToken {
-		return this._authToken;
 	}
 
 	public get signedAuthToken(): SignedAuthToken {
@@ -199,64 +218,15 @@ export class SocketTransport<T extends SocketMap> {
 
 		for (const middleware of this.middleware) {
 			if (middleware.onAuthenticated) {
-				middleware.onAuthenticated();
+				middleware.onAuthenticated({ socket: this.socket, transport: this });
 			}
 		}
-	}
-	
-	public callMiddleware(middleware: Middleware<T>, fn: () => void): void {
-		try {
-			fn();
-		} catch (err) {
-			if (err instanceof MiddlewareBlockedError) {
-				throw err;
-			}
-
-			if (err instanceof MiddlewareCaughtError) {
-				throw err.innerError;
-			}
-
-			this.onError(err);
-
-			throw new MiddlewareError(`An unexpected error occurred in the ${middleware.type} middleware.`, middleware.type);
-		}
-	}
-
-	public async changeToUnauthenticatedState(): Promise<boolean> {
-		if (this._signedAuthToken) {
-			const authToken = this._authToken;
-			const signedAuthToken = this._signedAuthToken;
-
-			this._authToken = null;
-			this._signedAuthToken = null;	
-
-			this._socket.emit('authStateChange', { wasAuthenticated: true, isAuthenticated: false });
-
-			// In order for the events to trigger we need to wait for the next tick.
-			await wait(0);
-
-			this._socket.emit('deauthenticate', { signedAuthToken, authToken });
-
-			for (const middleware of this.middleware) {
-				if (middleware.onDeauthenticate) {
-					middleware.onDeauthenticate();
-				}	
-			}
-
-			return true;
-		}
-
-		return false;
-	}
-
-	protected onOpen(): void {
-		// Placeholder for inherited classes
 	}
 
 	protected onClose(code: number, reason?: Buffer | string): void {
 		const prevStatus = this.status;
 		this.webSocket = null;
-		this._isOpen = false;
+		this._isReady = false;
 
 		clearTimeout(this._pingTimeoutRef);
 
@@ -264,7 +234,7 @@ export class SocketTransport<T extends SocketMap> {
 
 		for (const middleware of this.middleware) {
 			if (middleware.onClose) {
-				middleware.onClose();
+				middleware.onClose({ socket: this.socket, transport: this });
 			}
 		}
 
@@ -285,6 +255,20 @@ export class SocketTransport<T extends SocketMap> {
 		this._socket.emit('close', { code, reason: strReason });
 	}
 
+	protected onDisconnect(status: SocketStatus, code: number, reason?: string): void {
+		if (status === 'ready') {
+			this._socket.emit('disconnect', { code, reason });
+		} else {
+			this._socket.emit('connectAbort', { code, reason });
+		}
+
+		for (const middleware of this.middleware) {
+			if (middleware.onDisconnected) {
+				middleware.onDisconnected({ socket: this.socket, transport: this, status, code, reason });
+			}
+		}
+	}
+
 	public onError(error: Error): void {
 		this._socket.emit('error', { error });
 	}
@@ -298,17 +282,12 @@ export class SocketTransport<T extends SocketMap> {
 
 		this._socket.emit('message', { data, isBinary });
 
-		let packet: AnyPacket<T['Service'], T['Incoming']> | AnyResponse<T['Service'], T['Outgoing'], T['PrivateOutgoing']> |
-			(AnyPacket<T['Service'], T['Incoming']> | AnyResponse<T['Service'], T['Outgoing'], T['PrivateOutgoing']>)[];
+		const packet: AnyPacket<T['Service'], T['Incoming']> | 
+			AnyResponse<T['Service'], T['Outgoing'], T['PrivateOutgoing']> |
+			(AnyPacket<T['Service'], T['Incoming']> | AnyResponse<T['Service'], T['Outgoing'], T['PrivateOutgoing']>)[] | null
+				= this.decode(message);
 
-		try {
-			packet = this.codecEngine.decode(message as string);
-		} catch (err) {
-			if (err.name === 'Error') {
-				err.name = 'InvalidMessageError';
-			}
-
-			this.onError(err);
+		if (packet === null) {
 			return;
 		}
 
@@ -320,21 +299,49 @@ export class SocketTransport<T extends SocketMap> {
 					this.onRequest(curPacket);
 				}
 			}
-		} else {
+		} else if (typeof packet === 'object') {
 			if ('rid' in packet) {
 				this.onResponse(packet);
 			} else {
 				this.onRequest(packet);
-			}
+			}	
 		}
 	}
 
+	protected onOpen(): void {
+		// Placeholder for inherited classes
+		for (const middleware of this.middleware) {
+			if (middleware.onOpen) {
+				middleware.onOpen({ socket: this.socket, transport: this });
+			}
+		}
+	}
+	
 	protected onPing(data: Buffer): void {
 		this._socket.emit('ping', { data });
 	}
 
 	protected onPong(data: Buffer): void {
 		this._socket.emit('pong', { data });
+	}
+
+	protected onResponse(response: AnyResponse<T['Service'], T['Outgoing'], T['PrivateOutgoing']>) {
+		const map = this._callbackMap[response.rid];
+
+		if (map) {
+			if (map.timeoutId) {
+				clearTimeout(map.timeoutId);
+				delete map.timeoutId;
+			}
+
+			if ('error' in response) {
+				map.callback(response.error);
+			} else {
+				map.callback(null, 'data' in response ? response.data : undefined);
+			}
+		}
+
+		this._socket.emit('response', { response });
 	}
 
 	protected onRequest(packet: AnyPacket<T['Service'], T['Incoming']>): boolean {
@@ -391,49 +398,16 @@ export class SocketTransport<T extends SocketMap> {
 		return wasHandled;
 	}
 
+	protected onUnexpectedResponse(request: ClientRequest, response: IncomingMessage): void {
+		this._socket.emit('unexpectedResponse', { request, response });
+	}
+
 	protected onUnhandledRequest(packet: AnyPacket<T['Service'], T['Incoming']>): boolean {
 		if (this._onUnhandledRequest) {
 			return this._onUnhandledRequest(this, packet);
 		}
 
 		return false;
-	}
-
-	protected onResponse(response: AnyResponse<T['Service'], T['Outgoing'], T['PrivateOutgoing']>) {
-		const map = this._callbackMap[response.rid];
-
-		if (map) {
-			if (map.timeoutId) {
-				clearTimeout(map.timeoutId);
-				delete map.timeoutId;
-			}
-
-			if ('error' in response) {
-				map.callback(response.error);
-			} else {
-				map.callback(null, 'data' in response ? response.data : undefined);
-			}
-		}
-
-		this._socket.emit('response', { response });
-	}
-
-	protected onUnexpectedResponse(request: ClientRequest, response: IncomingMessage): void {
-		this._socket.emit('unexpectedResponse', { request, response });
-	}
-
-	protected onDisconnect(status: SocketStatus, code: number, reason?: string): void {
-		if (status === 'open') {
-			this._socket.emit('disconnect', { code, reason });
-		} else {
-			this._socket.emit('connectAbort', { code, reason });
-		}
-
-		for (const middleware of this.middleware) {
-			if (middleware.onDisconnected) {
-				middleware.onDisconnected(status, code, reason);
-			}
-		}
 	}
 
 	protected resetPingTimeout(timeoutMs: number | false, code: number) {
@@ -452,16 +426,16 @@ export class SocketTransport<T extends SocketMap> {
 		}
 	}
 
-	public setOpenStatus(authError?: Error): void {
+	public setReadyStatus(authError?: Error): void {
 		if (this._webSocket?.readyState !== ws.OPEN) {
 			throw new InvalidActionError('Cannot set status to OPEN before socket is connected.');
 		}
 
-		this._isOpen = true;
+		this._isReady = true;
 
 		for (const middleware of this.middleware) {
-			if (middleware.onOpen) {
-				middleware.onOpen();
+			if (middleware.onReady) {
+				middleware.onReady({ socket: this.socket, transport: this });
 			}
 		}
 
@@ -473,8 +447,8 @@ export class SocketTransport<T extends SocketMap> {
 			return 'closed';
 		}
 
-		if (this._isOpen) {
-			return 'open';
+		if (this._isReady) {
+			return 'ready';
 		}
 
 		switch (this._webSocket.readyState) {
@@ -487,6 +461,26 @@ export class SocketTransport<T extends SocketMap> {
 			default:
 				return 'closed';
 		}
+	}
+
+	public send(data: Buffer | string): Promise<void> {
+		return new Promise((resolve, reject) => {
+			try {
+				this._webSocket.send(
+					data,
+					(err) => {
+						if (err) {
+							reject(err);
+							return;
+						}
+
+						resolve();
+					}
+				);
+			} catch (err) {
+				throw err;
+			}
+		});
 	}
 
 	protected sendRequest(requests: (AnyRequest<T['Service'], T['PrivateOutgoing'], T['Outgoing']>)[]): void;
@@ -528,10 +522,12 @@ export class SocketTransport<T extends SocketMap> {
 						this.callMiddleware(
 							middleware,
 							() => {
-								middleware.sendRequest(
+								middleware.sendRequest({
+									socket: this.socket,
+									transport: this,
 									requests,
-									this.sendRequest.bind(this, index)
-								);
+									cont: this.sendRequest.bind(this, index)
+								});
 							}
 						);
 					} catch (err) {
@@ -646,10 +642,12 @@ export class SocketTransport<T extends SocketMap> {
 					this.callMiddleware(
 						middleware,
 						() => {
-							middleware.sendResponse(
+							middleware.sendResponse({
+								socket: this.socket,
+								transport: this,
 								responses,
-								this.sendResponse.bind(this, index)
-							);
+								cont: this.sendResponse.bind(this, index)
+							});
 						}
 					);
 				} catch (err) {
@@ -870,4 +868,43 @@ export class SocketTransport<T extends SocketMap> {
 	public get url(): string {
 		return this._webSocket.url;
 	}
+
+	protected get webSocket(): ws.WebSocket {
+		return this._webSocket;
+	}
+	
+	protected set webSocket(value: ws.WebSocket | null) {
+		if (this._webSocket) {
+			this._webSocket.off('open', this.onOpen);
+			this._webSocket.off('close', this.onClose);
+			this._webSocket.off('error', this.onError);
+			this._webSocket.off('upgrade', this.onUpgrade);
+			this._webSocket.off('message', this.onMessage);
+			this._webSocket.off('ping', this.onPing);
+			this._webSocket.off('pong', this.onPong);
+			this._webSocket.off('unexpectedResponse', this.onUnexpectedResponse);
+
+			delete this.onOpen;
+			delete this.onClose;
+			delete this.onError;
+			delete this.onUpgrade;
+			delete this.onMessage;
+			delete this.onPing;
+			delete this.onPong;
+			delete this.onUnexpectedResponse;
+		}
+
+		this._webSocket = value;
+
+		if (value) {
+			this._webSocket.on('open', this.onOpen = this.onOpen.bind(this));
+			this._webSocket.on('close', this.onClose = this.onClose.bind(this));
+			this._webSocket.on('error', this.onError = this.onError.bind(this));
+			this._webSocket.on('upgrade', this.onUpgrade = this.onUpgrade.bind(this));
+			this._webSocket.on('message', this.onMessage = this.onMessage.bind(this));
+			this._webSocket.on('ping', this.onPing = this.onPing.bind(this));
+			this._webSocket.on('pong', this.onPong = this.onPong.bind(this));
+			this._webSocket.on('unexpectedResponse', this.onUnexpectedResponse = this.onUnexpectedResponse.bind(this));
+		}
+	}	
 }
