@@ -53,7 +53,9 @@ export interface CloseEvent {
 }
 
 export interface ConnectEvent {
+	id: string,
 	isAuthenticated: boolean,
+	pingTimeoutMs: number,
 	authError?: Error
 }
 

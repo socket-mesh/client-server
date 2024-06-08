@@ -221,9 +221,9 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		return changed;
 	}
 
-	public override setReadyStatus(authError?: Error): void {
-		super.setReadyStatus(authError);
-		this.state.server.emit('socketConnect', { socket: this.socket, isAuthenticated: !!this.signedAuthToken, authError });
+	public override setReadyStatus(pingTimeoutMs: number, authError?: Error): void {
+		super.setReadyStatus(pingTimeoutMs, authError);
+		this.state.server.emit('socketConnect', { socket: this.socket, pingTimeoutMs, id: this.socket.id, isAuthenticated: !!this.signedAuthToken, authError });
 	}
 
 	public override get socket(): ServerSocket<T> {

@@ -13,8 +13,8 @@ import { AuthInfo } from "../src/server/handlers/authenticate";
 import assert from "node:assert";
 import localStorage from '@socket-mesh/local-storage';
 import { wait } from "../src/utils";
-import { AuthStateChangeEvent, AuthenticatedChangeEvent, CloseEvent } from "../src/socket-event";
-import { SocketAuthStateChangeEvent } from "../src/server/server-event";
+import { AuthStateChangeEvent, AuthenticatedChangeEvent, CloseEvent, ConnectEvent } from "../src/socket-event";
+import { ConnectionEvent, SocketAuthStateChangeEvent } from "../src/server/server-event";
 import { MiddlewareBlockedError } from "@socket-mesh/errors";
 import { AuthOptions } from "../src/server/auth-engine";
 import { OfflineMiddleware } from "../src/middleware/offline-middleware";
@@ -42,6 +42,7 @@ type MyChannels = {
 }
 
 type ServerIncomingMap = {
+	greeting: () => void,
 	login: (auth: AuthToken) => void,
 	loginWithTenDayExpiry: (auth: AuthToken) => void,
 	loginWithTenDayExp: (auth: AuthToken) => void,
@@ -1023,6 +1024,170 @@ describe('Integration tests', function () {
 			const packet = await client.listen('connect').once(100);
 
 			assert.notEqual(packet, null);
+			assert.notEqual(packet.id, null);
 		});
-	});	
+	});
+
+	describe('Socket connection', function () {
+		it('Server-side socket connect event and server connection event should trigger', async function () {
+			server = listen(PORT_NUMBER, serverOptions);
+			bindFailureHandlers(server);
+
+			let connectionEvent: ConnectEvent | null = null;
+
+			(async () => {
+				for await (let event of server.listen('socketConnect')) {
+					connectionEvent = event;
+					// This is to check that mutating the status on the server
+					// doesn't affect the status sent to the client.
+					(connectionEvent as any).foo = 123;
+				}
+			})();
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(clientOptions);
+
+			let connectStatus: ConnectEvent | null = null;
+			let socketId: string | null = null;
+
+			(async () => {
+				for await (let {socket} of server.listen('connection')) {
+					(async () => {
+						for await (let serverSocketStatus of socket.listen('connect')) {
+							socketId = socket.id;
+							connectStatus = serverSocketStatus;
+							// This is to check that mutating the status on the server
+							// doesn't affect the status sent to the client.
+							(serverSocketStatus as any).foo = 456;
+						}
+					})();
+				}
+			})();
+
+			let clientConnectStatus: ConnectEvent | null = null;
+
+			(async () => {
+				for await (let event of client.listen('connect')) {
+					clientConnectStatus = event;
+				}
+			})();
+
+			await wait(100);
+
+			assert.notEqual(connectionEvent, null);
+			assert.strictEqual(connectionEvent!.id, socketId);
+			assert.strictEqual(connectionEvent!.pingTimeoutMs, server.pingTimeoutMs);
+			assert.strictEqual(connectionEvent!.authError, undefined);
+			assert.strictEqual(connectionEvent!.isAuthenticated, false);
+
+			assert.notEqual(connectStatus, null);
+			assert.strictEqual(connectStatus!.id, socketId);
+			assert.strictEqual(connectStatus!.pingTimeoutMs, server.pingTimeoutMs);
+			assert.strictEqual(connectStatus!.authError, undefined);
+			assert.strictEqual(connectStatus!.isAuthenticated, false);
+
+			assert.notEqual(clientConnectStatus, null);
+			assert.strictEqual(clientConnectStatus!.id, socketId);
+			assert.strictEqual(clientConnectStatus!.pingTimeoutMs, server.pingTimeoutMs);
+			assert.strictEqual(clientConnectStatus!.authError, undefined);
+			assert.strictEqual(clientConnectStatus!.isAuthenticated, false);
+			assert.strictEqual((clientConnectStatus as any).foo, undefined);
+			// Client socket status should be a clone of server socket status; not
+			// a reference to the same object.
+			assert.notEqual((clientConnectStatus as any).foo, (connectStatus as any).foo);
+		});
+
+		it('Server-side connection event should trigger with large number of concurrent connections', async function () {
+			server = listen(PORT_NUMBER, serverOptions);
+			bindFailureHandlers(server);
+
+			const connectionList: ConnectionEvent<BasicServerMap<ServerIncomingMap, MyChannels>>[] = [];
+
+			(async () => {
+				for await (let event of server.listen('connection')) {
+					connectionList.push(event);
+				}
+			})();
+
+			await server.listen('ready').once();
+
+			const clientList: ClientSocket<MyClientMap>[] = [];
+			let client: ClientSocket<MyClientMap>;
+
+			for (let i = 0; i < 100; i++) {
+				client = new ClientSocket(clientOptions);
+				clientList.push(client);
+			}
+
+			await wait(100);
+
+			assert.strictEqual(connectionList.length, 100);
+
+			for (let client of clientList) {
+				client.disconnect();
+			}
+
+			await wait(100);
+		});
+
+		it('Server should support large a number of connections invoking procedures concurrently immediately upon connect', async function () {
+			let connectionCount = 0;
+			let requestCount = 0;
+
+			server = listen(
+				PORT_NUMBER,
+				Object.assign(
+					{},
+					serverOptions,
+					{
+						handlers: {
+							greeting: async function (): Promise<void> {
+								requestCount++;
+								await wait(1);
+							}
+						}
+					}
+				)
+			);
+
+			bindFailureHandlers(server);
+
+			(async () => {
+				for await (let {} of server.listen('connection')) {
+					connectionCount++;
+				}
+			})();
+
+			await server.listen('ready').once();
+
+			const clientList: ClientSocket<MyClientMap>[] = [];
+			let client: ClientSocket<MyClientMap>;
+
+			for (let i = 0; i < 100; i++) {
+				client = new ClientSocket(
+					Object.assign(
+						{},
+						clientOptions,
+						{
+							middleware: [new OfflineMiddleware()]
+						}
+					)
+				);
+				clientList.push(client);
+				await client.invoke('greeting');
+			}
+
+			await wait(10);
+
+			assert.strictEqual(requestCount, 100);
+			assert.strictEqual(connectionCount, 100);
+
+			for (let client of clientList) {
+				client.disconnect();
+			}
+			await wait(100);
+		});
+	});
+
 });

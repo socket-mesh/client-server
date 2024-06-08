@@ -426,7 +426,7 @@ export class SocketTransport<T extends SocketMap> {
 		}
 	}
 
-	public setReadyStatus(authError?: Error): void {
+	public setReadyStatus(pingTimeoutMs: number, authError?: Error): void {
 		if (this._webSocket?.readyState !== ws.OPEN) {
 			throw new InvalidActionError('Cannot set status to OPEN before socket is connected.');
 		}
@@ -439,7 +439,7 @@ export class SocketTransport<T extends SocketMap> {
 			}
 		}
 
-		this._socket.emit('connect', { isAuthenticated: !!this.signedAuthToken, authError });
+		this._socket.emit('connect', { id: this.id, pingTimeoutMs, isAuthenticated: !!this.signedAuthToken, authError });
 	}
 
 	public get status(): SocketStatus {

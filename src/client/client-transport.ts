@@ -176,7 +176,7 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 				return this.changeToUnauthenticatedState();
 			})
 			.then(() => {
-				this.setReadyStatus(authError);
+				this.setReadyStatus(this.pingTimeoutMs, authError);
 			})
 			.catch(err => {
 				if (err.statusCode == null) {
