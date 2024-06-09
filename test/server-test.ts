@@ -1594,30 +1594,39 @@ describe('Integration tests', function () {
 			// Since the client disconnect() call is executed on the 11th message, we can assume that the 'disconnect' event will trigger sooner.
 			assert.strictEqual(requestDataAtTimeOfDisconnect != null && requestDataAtTimeOfDisconnect < 15, true);
 		});
-/*
-		it('Socket streams should be killed immediately if socket disconnects (default/kill mode)', async function () {
-			server = listen(PORT_NUMBER, {
-				authKey: serverOptions.authKey
-//        wsEngine: WS_ENGINE
-			});
-			bindFailureHandlers(server);
 
-			let handledPackets: number[] = [];
+		it('Socket streams should be killed immediately if socket disconnects (default/kill mode)', async function () {
+			const handledPackets: number[] = [];
 			let closedReceiver = false;
+
+			server = listen(
+				PORT_NUMBER,
+				Object.assign(
+					{},
+					serverOptions,
+					{
+						handlers: {
+							foo: async ({ options: data }: RequestHandlerArgs<number, BasicSocketMapServer<{}, {}, {}, ClientIncomingMap>>) => {
+								await wait(30);
+								handledPackets.push(data);	
+							}
+						}
+					}
+				)
+			);
+			
+			bindFailureHandlers(server);
 
 			(async () => {
 				for await (let {socket} of server.listen('connection')) {
 					(async () => {
-						for await (let packet of socket.receiver.listen<number>('foo')) {
-							await wait(30);
-							handledPackets.push(packet);
-						}
+						for await (let packet of socket.listen()) {}
 						closedReceiver = true;
 					})();
 				}
 			})();
 
-			await server.listen('ready').once();
+			await server.listen('ready').once(100);
 
 			client = new ClientSocket(clientOptions);
 
@@ -1627,32 +1636,43 @@ describe('Integration tests', function () {
 				client.transmit('foo', i);
 			}
 
-			await wait(110);
+			await wait(90);
 
 			client.disconnect(4445, 'Disconnect');
 
 			await wait(400);
+
 			assert.strictEqual(handledPackets.length, 4);
 			assert.strictEqual(closedReceiver, true);
 		});
 
 		it('Socket streams should be closed eventually if socket disconnects (close mode)', async function () {
-			server = listen(PORT_NUMBER, {
-				authKey: serverOptions.authKey,
-//        wsEngine: WS_ENGINE,
-				socketStreamCleanupMode: 'close'
-			});
-			bindFailureHandlers(server);
-
 			let handledPackets: number[] = [];
 			let closedReceiver = false;
+
+			server = listen(
+				PORT_NUMBER,
+				Object.assign(
+					{},
+					serverOptions,
+					{
+						socketStreamCleanupMode: 'close',
+						handlers: {
+							foo: async ({ options: data }: RequestHandlerArgs<number, BasicSocketMapServer<{}, {}, {}, ClientIncomingMap>>) => {
+								await wait(30);
+								handledPackets.push(data);	
+							}
+						}
+					}
+				)
+			);
+
+			bindFailureHandlers(server);
 
 			(async () => {
 				for await (let {socket} of server.listen('connection')) {
 					(async () => {
-						for await (let packet of socket.receiver.listen<number>('foo')) {
-							await wait(30);
-							handledPackets.push(packet);
+						for await (let packet of socket.listen()) {
 						}
 						closedReceiver = true;
 					})();
@@ -1669,33 +1689,42 @@ describe('Integration tests', function () {
 				client.transmit('foo', i);
 			}
 
-			await wait(110);
+			await wait(90);
 
 			client.disconnect(4445, 'Disconnect');
 
-			await wait(500);
+			await wait(400);
 			assert.strictEqual(handledPackets.length, 15);
 			assert.strictEqual(closedReceiver, true);
 		});
 
 		it('Socket streams should be closed eventually if socket disconnects (none mode)', async function () {
-			server = listen(PORT_NUMBER, {
-				authKey: serverOptions.authKey,
-//        wsEngine: WS_ENGINE,
-				socketStreamCleanupMode: 'none'
-			});
-			bindFailureHandlers(server);
-
 			let handledPackets: number[] = [];
 			let closedReceiver = false;
+
+			server = listen(
+				PORT_NUMBER,
+				Object.assign(
+					{},
+					serverOptions,
+					{
+						socketStreamCleanupMode: 'none',
+						handlers: {
+							foo: async ({ options: data }: RequestHandlerArgs<number, BasicSocketMapServer<{}, {}, {}, ClientIncomingMap>>) => {
+								await wait(30);
+								handledPackets.push(data);	
+							}
+						}
+					}
+				)
+			);
+
+			bindFailureHandlers(server);
 
 			(async () => {
 				for await (let {socket} of server.listen('connection')) {
 					(async () => {
-						for await (let packet of socket.receiver.listen<number>('foo')) {
-							await wait(30);
-							handledPackets.push(packet);
-						}
+						for await (let packet of socket.listen()) {}
 						closedReceiver = false;
 					})();
 				}
@@ -1715,11 +1744,10 @@ describe('Integration tests', function () {
 
 			client.disconnect(4445, 'Disconnect');
 
-			await wait(500);
+			await wait(400);
 			assert.strictEqual(handledPackets.length, 15);
 			assert.strictEqual(closedReceiver, false);
 		});
-*/
 	});
 
 });

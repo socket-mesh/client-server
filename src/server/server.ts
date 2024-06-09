@@ -1,6 +1,6 @@
 import ws from "ws";
 import { ServerProtocolError } from "@socket-mesh/errors";
-import { CallIdGenerator } from "../socket.js";
+import { CallIdGenerator, StreamCleanupMode } from "../socket.js";
 import { ServerSocket } from "./server-socket.js";
 import { ClientSocket } from "../client/client-socket.js";
 import { IncomingMessage, Server as HttpServer } from 'http';
@@ -49,6 +49,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 	public readonly codecEngine: CodecEngine;
 	public readonly pendingClients: { [ id: string ]: ClientSocket<ClientMapFromServer<T>> | ServerSocket<T> };	
 	public pendingClientCount: number;
+	public readonly socketStreamCleanupMode: StreamCleanupMode;
 	public readonly httpServer: HttpServer;
 
 	public readonly middleware: ServerMiddleware<T>[];
@@ -97,6 +98,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 		this.pingTimeoutMs = options.pingTimeoutMs || 20000;
 
 		this.socketChannelLimit = options.socketChannelLimit;
+		this.socketStreamCleanupMode = options.socketStreamCleanupMode || 'kill';
 		this.strictHandshake = options.strictHandshake ?? true;
 
 		this._wss = new ws.WebSocketServer(options);
@@ -175,11 +177,12 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 			ackTimeoutMs: this.ackTimeoutMs,
 			callIdGenerator: this._callIdGenerator,
 			codecEngine: this.codecEngine,
+			handlers: this._handlers,
 			middleware: this.middleware,
+			onUnhandledRequest: this.onUnhandledRequest.bind(this),
 			socket: wsSocket,
 			state: { server: this },
-			handlers: this._handlers,
-			onUnhandledRequest: this.onUnhandledRequest.bind(this)
+			streamCleanupMode: this.socketStreamCleanupMode
 		});
 
 		this.pendingClientCount++;
