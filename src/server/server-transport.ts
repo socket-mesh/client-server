@@ -90,11 +90,13 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 			(async () => {
 				await this.socket.listen('end').once();
 				this.socket.killListeners();
+				this.inboundMessageStream.kill();
 			})();
 		} else if (this.streamCleanupMode === 'close') {
 			(async () => {
 				await this.socket.listen('end').once();
 				this.socket.closeListeners();
+				this.inboundMessageStream.close();
 			})();
 		}
 		
@@ -111,11 +113,11 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		super.onMessage(data, isBinary);
 	}
 
-	protected override onRequest(packet: AnyPacket<T['Service'], SocketMapFromServer<T>['Incoming']>): boolean {
+	protected override async onRequest(packet: AnyPacket<T['Service'], SocketMapFromServer<T>['Incoming']>): Promise<boolean> {
 		let wasHandled = false;
 
 		if (!this.service || !('service' in packet) || packet.service === this.service) {
-			wasHandled = super.onRequest(packet);
+			wasHandled = await super.onRequest(packet);
 		} else {
 			wasHandled = this.onUnhandledRequest(packet);
 		}

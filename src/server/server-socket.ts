@@ -28,7 +28,7 @@ export class ServerSocket<T extends ServerMap> extends Socket<SocketMapFromServe
 		
 		if (rejectOnFailedDelivery) {
 			try {
-				await this._serverTransport.invoke('#removeAuthToken', undefined, true)[0];
+				await this._serverTransport.invoke('#removeAuthToken', undefined)[0];
 			} catch (error) {
 				this._serverTransport.onError(error);
 				throw error;

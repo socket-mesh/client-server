@@ -20,7 +20,6 @@ export type MethodRequest<TMethodMap extends MethodMap> =
 
 
 export interface Request {
-	bypassMiddleware: boolean,
 	sentCallback?: (err?: Error) => void
 }
 

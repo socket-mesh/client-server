@@ -13,6 +13,7 @@ import base64id from "base64id";
 import { RequestHandlerArgs } from "./request-handler.js";
 import { SocketMap } from "./client/maps/socket-map.js";
 import { wait } from "./utils.js";
+import { WritableConsumableStream } from "@socket-mesh/writable-consumable-stream";
 
 export type CallIdGenerator = () => number;
 
@@ -45,7 +46,8 @@ export class SocketTransport<T extends SocketMap> {
 	private _signedAuthToken?: SignedAuthToken;
 	private readonly _callIdGenerator: CallIdGenerator;
 	private readonly _callbackMap: {[cid: number]: InvokeCallback<unknown>};
-	private _handlers: HandlerMap<T>;
+	private readonly _handlers: HandlerMap<T>;
+	protected readonly inboundMessageStream: WritableConsumableStream<string | ArrayBuffer | Buffer[]>;
 	private _onUnhandledRequest: (socket: SocketTransport<T>, packet: AnyPacket<T['Service'], T['Incoming']>) => boolean;
 	public readonly codecEngine: CodecEngine;
 	public readonly middleware: Middleware<T>[];
@@ -72,6 +74,9 @@ export class SocketTransport<T extends SocketMap> {
 		this.middleware = options?.middleware || [];
 		this.state = options?.state || {};
 		this.streamCleanupMode = options?.streamCleanupMode || 'kill';
+		this.inboundMessageStream = new WritableConsumableStream();
+
+		this.handleInboudMessageStream();
 	}
 
 	protected abortAllPendingCallbacksDueToBadConnection(status: SocketStatus): void {
@@ -149,8 +154,37 @@ export class SocketTransport<T extends SocketMap> {
 
 	public disconnect(code=1000, reason?: string): void {
 		if (this.webSocket) {
-			this.webSocket.close(code);
+			this.webSocket.close(code, reason);
 			this.onClose(code, reason);
+		}
+	}
+
+	private async handleInboudMessageStream(): Promise<void> {
+		for await (let message of this.inboundMessageStream) {
+			const packet: AnyPacket<T['Service'], T['Incoming']> | 
+				AnyResponse<T['Service'], T['Outgoing'], T['PrivateOutgoing']> |
+				(AnyPacket<T['Service'], T['Incoming']> | AnyResponse<T['Service'], T['Outgoing'], T['PrivateOutgoing']>)[] | null
+					= this.decode(message);
+	
+			if (packet === null) {
+				return;
+			}
+	
+			if (Array.isArray(packet)) {
+				for (const curPacket of packet) {
+					if ('rid' in curPacket) {
+						this.onResponse(curPacket);
+					} else {
+						await this.onRequest(curPacket);
+					}
+				}
+			} else if (typeof packet === 'object') {
+				if ('rid' in packet) {
+					this.onResponse(packet);
+				} else {
+					await this.onRequest(packet);
+				}	
+			}			
 		}
 	}
 
@@ -280,32 +314,8 @@ export class SocketTransport<T extends SocketMap> {
 	protected onMessage(data: ws.RawData, isBinary: boolean): void {
 		let message = isBinary ? data : data.toString();
 
+		this.inboundMessageStream.write(message);
 		this._socket.emit('message', { data, isBinary });
-
-		const packet: AnyPacket<T['Service'], T['Incoming']> | 
-			AnyResponse<T['Service'], T['Outgoing'], T['PrivateOutgoing']> |
-			(AnyPacket<T['Service'], T['Incoming']> | AnyResponse<T['Service'], T['Outgoing'], T['PrivateOutgoing']>)[] | null
-				= this.decode(message);
-
-		if (packet === null) {
-			return;
-		}
-
-		if (Array.isArray(packet)) {
-			for (const curPacket of packet) {
-				if ('rid' in curPacket) {
-					this.onResponse(curPacket);
-				} else {
-					this.onRequest(curPacket);
-				}
-			}
-		} else if (typeof packet === 'object') {
-			if ('rid' in packet) {
-				this.onResponse(packet);
-			} else {
-				this.onRequest(packet);
-			}	
-		}
 	}
 
 	protected onOpen(): void {
@@ -344,7 +354,7 @@ export class SocketTransport<T extends SocketMap> {
 		this._socket.emit('response', { response });
 	}
 
-	protected onRequest(packet: AnyPacket<T['Service'], T['Incoming']>): boolean {
+	protected async onRequest(packet: AnyPacket<T['Service'], T['Incoming']>): Promise<boolean> {
 		packet.requestedAt = new Date();
 
 		this._socket.emit('request', { request: packet });
@@ -357,16 +367,18 @@ export class SocketTransport<T extends SocketMap> {
 		if (handler) {
 			wasHandled = true;
 
-			handler(
-				new RequestHandlerArgs({
-					isRpc: !!packet.cid,
-					method: packet.method.toString(),
-					timeoutMs: packet.ackTimeoutMs,
-					socket: this._socket,
-					transport: this,
-					options: packet.data
-				})
-			).then(data => {
+			try {
+				const data = await handler(
+					new RequestHandlerArgs({
+						isRpc: !!packet.cid,
+						method: packet.method.toString(),
+						timeoutMs: packet.ackTimeoutMs,
+						socket: this._socket,
+						transport: this,
+						options: packet.data
+					})
+				);
+				
 				if (packet.cid) {
 					this.sendResponse([
 						{
@@ -375,8 +387,8 @@ export class SocketTransport<T extends SocketMap> {
 							data
 						} as MethodDataResponse<T['Incoming']>
 					]);
-				}
-			}).catch(error => {
+				}					
+			} catch (error) {
 				if (packet.cid) {
 					this.sendResponse([
 						{
@@ -387,8 +399,8 @@ export class SocketTransport<T extends SocketMap> {
 					]);
 				}
 
-				this.onError(error);
-			});
+				this.onError(error);				
+			}
 		}
 
 		if (!wasHandled) {
@@ -502,68 +514,45 @@ export class SocketTransport<T extends SocketMap> {
 			}
 		}
 
-		const bypassRequests: AnyRequest<T['Service'], T['PrivateOutgoing'], T['Outgoing']>[] = [];
+		for (; index < this.middleware.length; index++) {
+			const middleware = this.middleware[index];
 
-		for (let i = 0; i < requests.length; i++) {
-			if (requests[i].bypassMiddleware) {
-				bypassRequests.push(...requests.splice(i, 1));
-				i--;
-			}
-		}
+			if ('sendRequest' in middleware) {
+				index++;
 
-		if (requests.length) {
-			for (; index < this.middleware.length; index++) {
-				const middleware = this.middleware[index];
+				try {
+					this.callMiddleware(
+						middleware,
+						() => {
+							middleware.sendRequest({
+								socket: this.socket,
+								transport: this,
+								requests,
+								cont: this.sendRequest.bind(this, index)
+							});
+						}
+					);
+				} catch (err) {
+					for (const req of requests) {
+						if (req.sentCallback) {
+							req.sentCallback(err);
+						}
 
-				if ('sendRequest' in middleware) {
-					index++;
-
-					try {
-						this.callMiddleware(
-							middleware,
-							() => {
-								middleware.sendRequest({
-									socket: this.socket,
-									transport: this,
-									requests,
-									cont: this.sendRequest.bind(this, index)
-								});
-							}
-						);
-					} catch (err) {
-						for (const req of requests) {
-							if (req.sentCallback) {
-								req.sentCallback(err);
-							}
-
-							if ('callback' in req) {
-								req.callback(err);
-							}
+						if ('callback' in req) {
+							req.callback(err);
 						}
 					}
-		
-					if (!bypassRequests.length) {
-						return;
-					}
-
-					requests = [];
-
-					break;
 				}
+	
+				return;
 			}
-		}
-
-		if (!requests.length) {
-			requests = bypassRequests;
-		} else if (bypassRequests.length) {
-			requests = requests.concat(bypassRequests);
 		}
 
 		// If the socket is closed we need to call them back with an error.
 		if (this.status === 'closed') {
 			for (const request of requests) {
 				const err = new BadConnectionError(
-					`Socket invoke ${String(request.method)} event was aborted due to a bad connection`,
+					`Socket ${request.sentCallback ? 'transmit' : 'invoke' } ${String(request.method)} event was aborted due to a bad connection`,
 					'connectAbort'
 				);
 
@@ -663,8 +652,7 @@ export class SocketTransport<T extends SocketMap> {
 		// If the socket is closed we need to call them back with an error.
 		if (this.status === 'closed') {
 			for (const response of responses) {
-				// TODO: Use specific error
-				this.onError(new Error());				
+				this.onError(new Error(`WebSocket is not open: readyState 3 (CLOSED)`));
 			}
 			return;
 		}
@@ -690,19 +678,18 @@ export class SocketTransport<T extends SocketMap> {
 	}
 
 	public transmit<TMethod extends keyof T['Outgoing']>(
-		method: TMethod, arg?: Parameters<T['Outgoing'][TMethod]>[0], bypassMiddleware?: boolean): Promise<void>;
+		method: TMethod, arg?: Parameters<T['Outgoing'][TMethod]>[0]): Promise<void>;
 	public transmit<TService extends keyof T['Service'], TMethod extends keyof T['Service'][TService]>(
-		options: [TService, TMethod], arg?: Parameters<T['Service'][TService][TMethod]>[0], bypassMiddleware?: boolean): Promise<void>;
+		options: [TService, TMethod], arg?: Parameters<T['Service'][TService][TMethod]>[0]): Promise<void>;
 	public transmit<TMethod extends keyof T['PrivateOutgoing']>(
-		method: TMethod, arg?: Parameters<T['PrivateOutgoing'][TMethod]>[0], bypassMiddleware?: boolean): Promise<void>;
+		method: TMethod, arg?: Parameters<T['PrivateOutgoing'][TMethod]>[0]): Promise<void>;
 	public transmit<
 		TService extends keyof T['Service'],
 		TServiceMethod extends keyof T['Service'][TService],
 		TMethod extends keyof T['Outgoing']
 	>(
 		serviceAndMethod: TMethod | [TService, TServiceMethod],
-		arg?: (Parameters<T['Outgoing'][TMethod] | T['Service'][TService][TServiceMethod]>)[0],
-		bypassMiddleware?: boolean
+		arg?: (Parameters<T['Outgoing'][TMethod] | T['Service'][TService][TServiceMethod]>)[0]
 	 ): Promise<void> {
 		let service: TService;
 		let serviceMethod: TServiceMethod;
@@ -716,19 +703,14 @@ export class SocketTransport<T extends SocketMap> {
 		}
 
 		const request: TransmitMethodRequest<T['Outgoing'], TMethod> | TransmitServiceRequest<T['Service'], TService, TServiceMethod> = 
-			Object.assign(
-				{
-					bypassMiddleware: !!bypassMiddleware
-				},
-				service ? {
-					service,
-					method: serviceMethod,
-					data: arg as Parameters<T['Service'][TService][TServiceMethod]>[0]
-				} : {
-					method,
-					data: arg as Parameters<T['Outgoing'][TMethod]>[0]
-				}
-			);
+			service ? {
+				service,
+				method: serviceMethod,
+				data: arg as Parameters<T['Service'][TService][TServiceMethod]>[0]
+			} : {
+				method,
+				data: arg as Parameters<T['Outgoing'][TMethod]>[0]
+			};
 
 		const promise = new Promise<void>((resolve, reject) => {
 			request.sentCallback = (err?: Error) => {
@@ -749,17 +731,17 @@ export class SocketTransport<T extends SocketMap> {
 	}
 
 	public invoke<TMethod extends keyof T['Outgoing']>(
-		method: TMethod, arg?: Parameters<T['Outgoing'][TMethod]>[0], bypassMiddleware?: boolean): [Promise<FunctionReturnType<T['Outgoing'][TMethod]>>, () => void];
+		method: TMethod, arg?: Parameters<T['Outgoing'][TMethod]>[0]): [Promise<FunctionReturnType<T['Outgoing'][TMethod]>>, () => void];
 	public invoke<TService extends keyof T['Service'], TMethod extends keyof T['Service'][TService]>(
-		options: [TService, TMethod, (number | false)?], arg?: Parameters<T['Service'][TService][TMethod]>[0], bypassMiddleware?: boolean): [Promise<FunctionReturnType<T['Service'][TService][TMethod]>>, () => void];
+		options: [TService, TMethod, (number | false)?], arg?: Parameters<T['Service'][TService][TMethod]>[0]): [Promise<FunctionReturnType<T['Service'][TService][TMethod]>>, () => void];
 	public invoke<TService extends keyof T['Service'], TMethod extends keyof T['Service'][TService]>(
-		options: InvokeServiceOptions<T['Service'], TService, TMethod>, arg?: Parameters<T['Service'][TService][TMethod]>[0], bypassMiddleware?: boolean): [Promise<FunctionReturnType<T['Service'][TService][TMethod]>>, () => void];
+		options: InvokeServiceOptions<T['Service'], TService, TMethod>, arg?: Parameters<T['Service'][TService][TMethod]>[0]): [Promise<FunctionReturnType<T['Service'][TService][TMethod]>>, () => void];
 	public invoke<TMethod extends keyof T['Outgoing']>(
-		options: InvokeMethodOptions<T['Outgoing'], TMethod>, arg?: Parameters<T['Outgoing'][TMethod]>[0], bypassMiddleware?: boolean): [Promise<FunctionReturnType<T['Outgoing'][TMethod]>>, () => void];
+		options: InvokeMethodOptions<T['Outgoing'], TMethod>, arg?: Parameters<T['Outgoing'][TMethod]>[0]): [Promise<FunctionReturnType<T['Outgoing'][TMethod]>>, () => void];
 	public invoke<TMethod extends keyof T['PrivateOutgoing']>(
-		method: TMethod, arg: Parameters<T['PrivateOutgoing'][TMethod]>[0], bypassMiddleware?: boolean): [Promise<FunctionReturnType<T['PrivateOutgoing'][TMethod]>>, () => void];
+		method: TMethod, arg: Parameters<T['PrivateOutgoing'][TMethod]>[0]): [Promise<FunctionReturnType<T['PrivateOutgoing'][TMethod]>>, () => void];
 	public invoke<TMethod extends keyof T['PrivateOutgoing']>(
-		options: InvokeMethodOptions<T['PrivateOutgoing'], TMethod>, arg?: Parameters<T['PrivateOutgoing'][TMethod]>[0], bypassMiddleware?: boolean): [Promise<FunctionReturnType<T['PrivateOutgoing'][TMethod]>>, () => void];
+		options: InvokeMethodOptions<T['PrivateOutgoing'], TMethod>, arg?: Parameters<T['PrivateOutgoing'][TMethod]>[0]): [Promise<FunctionReturnType<T['PrivateOutgoing'][TMethod]>>, () => void];
 	public invoke<
 		TService extends keyof T['Service'],
 		TServiceMethod extends keyof T['Service'][TService],
@@ -767,8 +749,7 @@ export class SocketTransport<T extends SocketMap> {
 		TPrivateMethod extends keyof T['PrivateOutgoing']
 	> (
 		methodOptions: TMethod | TPrivateMethod | [TService, TServiceMethod, (number | false)?] | InvokeServiceOptions<T['Service'], TService, TServiceMethod> | InvokeMethodOptions<T['Outgoing'], TMethod> | InvokeMethodOptions<T['PrivateOutgoing'], TPrivateMethod>,
-		arg?: (Parameters<T['Outgoing'][TMethod] | T['PrivateOutgoing'][TPrivateMethod] | T['Service'][TService][TServiceMethod]>)[0],
-		bypassMiddleware?: boolean
+		arg?: (Parameters<T['Outgoing'][TMethod] | T['PrivateOutgoing'][TPrivateMethod] | T['Service'][TService][TServiceMethod]>)[0]
 	): [Promise<FunctionReturnType<T['Service'][TService][TServiceMethod] | T['Outgoing'][TMethod] | T['PrivateOutgoing'][TPrivateMethod]>>, () => void] {
 
 		let service: TService;
@@ -802,8 +783,7 @@ export class SocketTransport<T extends SocketMap> {
 				{
 					cid: this._callIdGenerator(),
 					ackTimeoutMs: ackTimeoutMs ?? this.ackTimeoutMs,
-					callback: null,
-					bypassMiddleware: !!bypassMiddleware
+					callback: null
 				},
 				service ? {
 					service,

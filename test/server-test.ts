@@ -41,7 +41,13 @@ type MyChannels = {
 	bar: string
 }
 
+type ClientIncomingMap = {
+	bla:(num: number) => void,
+	hi: (num: number) => void
+}
+
 type ServerIncomingMap = {
+	foo:(num: number) => string,
 	greeting: () => void,
 	login: (auth: AuthToken) => void,
 	loginWithTenDayExpiry: (auth: AuthToken) => void,
@@ -61,7 +67,7 @@ interface MyClientMap {
 	State: {}
 };
 
-function bindFailureHandlers(server: Server<BasicServerMap<ServerIncomingMap, MyChannels>>) {
+function bindFailureHandlers(server: Server<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>) {
 	if (LOG_ERRORS) {
 		(async () => {
 			for await (let {error} of server.listen('error')) {
@@ -167,7 +173,7 @@ const clientOptions: ClientSocketOptions<MyClientMap> = {
 	ackTimeoutMs: 200
 }
 
-const serverOptions: ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels>> = {
+const serverOptions: ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>> = {
 	authEngine: { authKey: SERVER_AUTH_KEY },
 	ackTimeoutMs: 200,
 	handlers: {
@@ -182,7 +188,7 @@ const serverOptions: ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels>
 }
 
 let client: ClientSocket<MyClientMap>;
-let server: Server<BasicServerMap<ServerIncomingMap, MyChannels>>;
+let server: Server<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>;
 
 describe('Integration tests', function () {
 	afterEach(async function () {
@@ -261,7 +267,7 @@ describe('Integration tests', function () {
 
 			const authenticateEvents: AuthToken[] = [];
 			const deauthenticateEvents: AuthToken[] = [];
-			const authenticationStateChangeEvents: SocketAuthStateChangeEvent<BasicServerMap<ServerIncomingMap, MyChannels>>[] = [];
+			const authenticationStateChangeEvents: SocketAuthStateChangeEvent<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>[] = [];
 			const authStateChangeEvents: AuthStateChangeEvent[] = [];
 
 			(async () => {
@@ -332,7 +338,7 @@ describe('Integration tests', function () {
 		it('Should emit correct events/data when socket is deauthenticated', async function () {
 			global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
 
-			const authenticationStateChangeEvents: SocketAuthStateChangeEvent<BasicServerMap<ServerIncomingMap, MyChannels>>[] = [];
+			const authenticationStateChangeEvents: SocketAuthStateChangeEvent<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>[] = [];
 			const authStateChangeEvents: AuthStateChangeEvent[] = [];
 
 			(async () => {
@@ -859,7 +865,7 @@ describe('Integration tests', function () {
 
 			client = new ClientSocket(clientOptions);
 
-			let serverSocket: ServerSocket<BasicServerMap<ServerIncomingMap, MyChannels, {}>> | null = null;
+			let serverSocket: ServerSocket<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>> | null = null;
 
 			(async () => {
 				for await (let {socket} of server.listen('handshake')) {
@@ -1102,7 +1108,7 @@ describe('Integration tests', function () {
 			server = listen(PORT_NUMBER, serverOptions);
 			bindFailureHandlers(server);
 
-			const connectionList: ConnectionEvent<BasicServerMap<ServerIncomingMap, MyChannels>>[] = [];
+			const connectionList: ConnectionEvent<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>[] = [];
 
 			(async () => {
 				for await (let event of server.listen('connection')) {
@@ -1188,6 +1194,532 @@ describe('Integration tests', function () {
 			}
 			await wait(100);
 		});
+	});
+
+	describe('Socket disconnection', function () {
+		it('Server-side socket disconnect event should not trigger if the socket did not complete the handshake; instead, it should trigger connectAbort', async function () {
+			server = listen(PORT_NUMBER,
+				Object.assign(
+					{},
+					serverOptions,
+					{
+						authEngine: {
+							authKey: SERVER_AUTH_KEY,
+							signToken: async() => {
+								return '';
+							},
+							verifyToken: async () => {
+								await wait(100);
+								return {};
+							}
+						}
+					}
+				)
+			);
+
+			bindFailureHandlers(server);
+
+			let connectionOnServer = false;
+
+			(async () => {
+				for await (let {socket} of server.listen('connection')) {
+					connectionOnServer = true;
+				}
+			})();
+
+			await server.listen('ready').once();
+
+			client = new ClientSocket(clientOptions);
+
+			let socketDisconnected = false;
+			let socketDisconnectedBeforeConnect = false;
+			let clientSocketAborted = false;
+
+			(async () => {
+				const {socket} = await server.listen('handshake').once();
+				assert.strictEqual(server.pendingClientCount, 1);
+				assert.notEqual(server.pendingClients[socket.id], null);
+
+				(async () => {
+					await socket.listen('disconnect').once();
+					if (!connectionOnServer) {
+						socketDisconnectedBeforeConnect = true;
+					}
+					socketDisconnected = true;
+				})();
+
+				(async () => {
+					const event = await socket.listen('connectAbort').once();
+					clientSocketAborted = true;
+
+					assert.strictEqual(event.code, 4444);
+					assert.strictEqual(event.reason, 'Disconnect before handshake');
+				})();
+			})();
+
+			let serverDisconnected = false;
+			let serverSocketAborted = false;
+
+			(async () => {
+				await server.listen('socketDisconnect').once();
+				serverDisconnected = true;
+			})();
+
+			(async () => {
+				await server.listen('socketConnectAbort').once(200);
+				serverSocketAborted = true;
+			})();
+
+			await wait(10);
+			client.disconnect(4444, 'Disconnect before handshake');
+
+			await wait(300);
+
+			assert.strictEqual(socketDisconnected, false);
+			assert.strictEqual(socketDisconnectedBeforeConnect, false);
+			assert.strictEqual(clientSocketAborted, true);
+			assert.strictEqual(serverSocketAborted, true);
+			assert.strictEqual(serverDisconnected, false);
+		});
+
+		it('Server-side socket disconnect event should trigger if the socket completed the handshake (not connectAbort)', async function () {
+			server = listen(PORT_NUMBER,
+				Object.assign(
+					{},
+					serverOptions,
+					{
+						authEngine: {
+							authKey: SERVER_AUTH_KEY,
+							signToken: async() => {
+								return '';
+							},
+							verifyToken: async () => {
+								await wait(10);
+								return {};
+							}
+						}
+					}
+				)
+			);
+
+			bindFailureHandlers(server);
+
+			let connectionOnServer = false;
+
+			(async () => {
+				for await (let {socket} of server.listen('connection')) {
+					connectionOnServer = true;
+				}
+			})();
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(clientOptions);
+
+			let socketDisconnected = false;
+			let socketDisconnectedBeforeConnect = false;
+			let clientSocketAborted = false;
+
+			(async () => {
+				let {socket} = await server.listen('handshake').once();
+				assert.strictEqual(server.pendingClientCount, 1);
+				assert.notEqual(server.pendingClients[socket.id], null);
+
+				(async () => {
+					let event = await socket.listen('disconnect').once();
+					if (!connectionOnServer) {
+						socketDisconnectedBeforeConnect = true;
+					}
+					socketDisconnected = true;
+					assert.strictEqual(event.code, 4445);
+					assert.strictEqual(event.reason, 'Disconnect after handshake');
+				})();
+
+				(async () => {
+					let event = await socket.listen('connectAbort').once();
+					clientSocketAborted = true;
+				})();
+			})();
+
+			let serverDisconnected = false;
+			let serverSocketAborted = false;
+
+			(async () => {
+				await server.listen('socketDisconnect').once();
+				serverDisconnected = true;
+			})();
+
+			(async () => {
+				await server.listen('socketConnectAbort').once();
+				serverSocketAborted = true;
+			})();
+
+			await wait(10);
+			client.disconnect(4445, 'Disconnect after handshake');
+
+			await wait(300);
+
+			assert.strictEqual(socketDisconnectedBeforeConnect, false);
+			assert.strictEqual(socketDisconnected, true);
+			assert.strictEqual(clientSocketAborted, false);
+			assert.strictEqual(serverDisconnected, true);
+			assert.strictEqual(serverSocketAborted, false);
+		});
+
+		it('The close event should trigger when the socket loses the connection before the handshake', async function () {
+			server = listen(PORT_NUMBER,
+				Object.assign(
+					{},
+					serverOptions,
+					{
+						authEngine: {
+							authKey: SERVER_AUTH_KEY,
+							signToken: async() => {
+								return '';
+							},
+							verifyToken: async () => {
+								await wait(100);
+								return {};
+							}
+						}
+					}
+				)
+			);
+			
+			bindFailureHandlers(server);
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(clientOptions);
+
+			let serverSocketClosed = false;
+			let serverSocketAborted = false;
+			let serverClosure = false;
+
+			(async () => {
+				for await (let {socket} of server.listen('handshake')) {
+					let event = await socket.listen('close').once();
+					serverSocketClosed = true;
+					assert.strictEqual(event.code, 4444);
+					assert.strictEqual(event.reason, 'Disconnect before handshake');
+				}
+			})();
+
+			(async () => {
+				for await (let event of server.listen('socketConnectAbort')) {
+					serverSocketAborted = true;
+				}
+			})();
+
+			(async () => {
+				for await (let event of server.listen('socketClose')) {
+					assert.strictEqual(event.socket.status, 'closed');
+					serverClosure = true;
+				}
+			})();
+
+			await wait(50);
+			client.disconnect(4444, 'Disconnect before handshake');
+
+			await wait(300);
+			assert.strictEqual(serverSocketClosed, true);
+			assert.strictEqual(serverSocketAborted, true);
+			assert.strictEqual(serverClosure, true);
+		});
+
+		it('The close event should trigger when the socket loses the connection after the handshake', async function () {
+			server = listen(PORT_NUMBER,
+				Object.assign(
+					{},
+					serverOptions,
+					{
+						authEngine: {
+							authKey: SERVER_AUTH_KEY,
+							signToken: async() => {
+								return '';
+							},
+							verifyToken: async () => {
+								await wait(0);
+								return {};
+							}
+						}
+					}
+				)
+			);
+
+			bindFailureHandlers(server);
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(clientOptions);
+
+			let serverSocketClosed = false;
+			let serverDisconnection = false;
+			let serverClosure = false;
+
+			(async () => {
+				for await (let {socket} of server.listen('handshake')) {
+					let event = await socket.listen('close').once();
+					serverSocketClosed = true;
+					assert.strictEqual(event.code, 4445);
+					assert.strictEqual(event.reason, 'Disconnect after handshake');
+				}
+			})();
+
+			(async () => {
+				for await (let event of server.listen('socketDisconnect')) {
+					serverDisconnection = true;
+				}
+			})();
+
+			(async () => {
+				for await (let event of server.listen('socketClose')) {
+					assert.strictEqual(event.socket.status, 'closed');
+					serverClosure = true;
+				}
+			})();
+
+			await wait(100);
+			client.disconnect(4445, 'Disconnect after handshake');
+
+			await wait(300);
+			assert.strictEqual(serverSocketClosed, true);
+			assert.strictEqual(serverDisconnection, true);
+			assert.strictEqual(serverClosure, true);
+		});
+
+		it('Disconnection should support socket message backpressure', async function () {
+			let currentRequestData: number | null = null;
+			let requestDataAtTimeOfDisconnect: number | null = null;
+
+			server = listen(
+				PORT_NUMBER,
+				Object.assign(
+					{},
+					serverOptions,
+					{
+						handlers: {
+							foo: async ({ socket, options: data }: RequestHandlerArgs<number, BasicSocketMapServer<{}, {}, {}, ClientIncomingMap>>) => {
+								currentRequestData = data;
+								await wait(10);
+								(async () => {
+									try {
+										await socket.invoke('bla', data);
+									} catch (err) {}
+								})();
+
+								try {
+									await socket.transmit('hi', data);	
+								} catch (err) {}
+
+								if (data === 10) {
+									client.disconnect();
+								}
+
+								return 'bar';
+							}
+						}
+					}
+				)
+			);
+
+			bindFailureHandlers(server);
+
+			const serverWarnings: Error[] = [];
+			(async () => {
+				for await (let {error} of server.listen('socketError')) {
+					serverWarnings.push(error);
+				}
+			})();
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(
+				Object.assign(
+					{},
+					clientOptions,
+					{
+						middleware: [new OfflineMiddleware()]
+					}
+				)
+			);
+
+			(async () => {
+				for await (let {socket} of server.listen('connection')) {
+					(async () => {
+						await socket.listen('disconnect').once();
+						requestDataAtTimeOfDisconnect = currentRequestData;
+					})();
+				}
+			})();
+
+			for (let i = 0; i < 30; i++) {
+				(async () => {
+					try {
+						await client.invoke('foo', i);
+					} catch (error) {
+						return;
+					}
+				})();
+			}
+
+			await wait(600);
+
+			// Expect a server warning (socket error) if a response was sent on a disconnected socket.
+			assert.strictEqual(
+				serverWarnings.some((warning) => {
+					return warning.message.match(/WebSocket is not open/g);
+				}), 
+				true
+			);
+
+			// Expect a server warning (socket error) if transmit was called on a disconnected socket.
+			assert.strictEqual(
+				serverWarnings.some((warning) => {
+					return warning.name === 'BadConnectionError' && warning.message.match(/Socket transmit hi event was aborted/g);
+				}), 
+				true
+			);
+
+			// Expect a server warning (socket error) if invoke was called on a disconnected socket.
+			assert.strictEqual(
+				serverWarnings.some((warning) => {
+					return warning.name === 'BadConnectionError' && warning.message.match(/Socket invoke bla event was aborted/g);
+				}), 
+				true
+			);
+
+			// Check that the disconnect event on the back end socket triggers as soon as possible (out-of-band) and not at the end of the stream.
+			// Any value less than 30 indicates that the 'disconnect' event was triggerred out-of-band.
+			// Since the client disconnect() call is executed on the 11th message, we can assume that the 'disconnect' event will trigger sooner.
+			assert.strictEqual(requestDataAtTimeOfDisconnect != null && requestDataAtTimeOfDisconnect < 15, true);
+		});
+/*
+		it('Socket streams should be killed immediately if socket disconnects (default/kill mode)', async function () {
+			server = listen(PORT_NUMBER, {
+				authKey: serverOptions.authKey
+//        wsEngine: WS_ENGINE
+			});
+			bindFailureHandlers(server);
+
+			let handledPackets: number[] = [];
+			let closedReceiver = false;
+
+			(async () => {
+				for await (let {socket} of server.listen('connection')) {
+					(async () => {
+						for await (let packet of socket.receiver.listen<number>('foo')) {
+							await wait(30);
+							handledPackets.push(packet);
+						}
+						closedReceiver = true;
+					})();
+				}
+			})();
+
+			await server.listen('ready').once();
+
+			client = new ClientSocket(clientOptions);
+
+			await wait(100);
+
+			for (let i = 0; i < 15; i++) {
+				client.transmit('foo', i);
+			}
+
+			await wait(110);
+
+			client.disconnect(4445, 'Disconnect');
+
+			await wait(400);
+			assert.strictEqual(handledPackets.length, 4);
+			assert.strictEqual(closedReceiver, true);
+		});
+
+		it('Socket streams should be closed eventually if socket disconnects (close mode)', async function () {
+			server = listen(PORT_NUMBER, {
+				authKey: serverOptions.authKey,
+//        wsEngine: WS_ENGINE,
+				socketStreamCleanupMode: 'close'
+			});
+			bindFailureHandlers(server);
+
+			let handledPackets: number[] = [];
+			let closedReceiver = false;
+
+			(async () => {
+				for await (let {socket} of server.listen('connection')) {
+					(async () => {
+						for await (let packet of socket.receiver.listen<number>('foo')) {
+							await wait(30);
+							handledPackets.push(packet);
+						}
+						closedReceiver = true;
+					})();
+				}
+			})();
+
+			await server.listen('ready').once();
+
+			client = new ClientSocket(clientOptions);
+
+			await wait(100);
+
+			for (let i = 0; i < 15; i++) {
+				client.transmit('foo', i);
+			}
+
+			await wait(110);
+
+			client.disconnect(4445, 'Disconnect');
+
+			await wait(500);
+			assert.strictEqual(handledPackets.length, 15);
+			assert.strictEqual(closedReceiver, true);
+		});
+
+		it('Socket streams should be closed eventually if socket disconnects (none mode)', async function () {
+			server = listen(PORT_NUMBER, {
+				authKey: serverOptions.authKey,
+//        wsEngine: WS_ENGINE,
+				socketStreamCleanupMode: 'none'
+			});
+			bindFailureHandlers(server);
+
+			let handledPackets: number[] = [];
+			let closedReceiver = false;
+
+			(async () => {
+				for await (let {socket} of server.listen('connection')) {
+					(async () => {
+						for await (let packet of socket.receiver.listen<number>('foo')) {
+							await wait(30);
+							handledPackets.push(packet);
+						}
+						closedReceiver = false;
+					})();
+				}
+			})();
+
+			await server.listen('ready').once();
+
+			client = new ClientSocket(clientOptions);
+
+			await wait(100);
+
+			for (let i = 0; i < 15; i++) {
+				client.transmit('foo', i);
+			}
+
+			await wait(110);
+
+			client.disconnect(4445, 'Disconnect');
+
+			await wait(500);
+			assert.strictEqual(handledPackets.length, 15);
+			assert.strictEqual(closedReceiver, false);
+		});
+*/
 	});
 
 });
