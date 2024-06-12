@@ -91,14 +91,9 @@ export async function processAuthentication(
 	}
 
 	for (const middleware of transport.state.server.middleware) {
-		if ('onAuthenticate' in middleware) {
+		if (middleware.onAuthenticate) {
 			try {
-				transport.callMiddleware(
-					middleware,
-					() => {
-						middleware.onAuthenticate(authInfo);
-					}
-				);
+				middleware.onAuthenticate(authInfo);
 			} catch (err) {
 				await transport.changeToUnauthenticatedState();
 

@@ -19,6 +19,8 @@ import { MiddlewareBlockedError } from "@socket-mesh/errors";
 import { AuthOptions } from "../src/server/auth-engine";
 import { OfflineMiddleware } from "../src/middleware/offline-middleware";
 import { MiddlewareArgs, SendRequestMiddlewareArgs } from "../src/middleware/middleware";
+import { isRequestPacket } from "../src/request";
+import { isPublishOptions } from "../src/channels/channels";
 
 // Add to the global scope like in browser.
 global.localStorage = localStorage;
@@ -41,12 +43,16 @@ type MyChannels = {
 	bar: string
 }
 
+type CustomProcArgs = { good: true } | { bad: true };
+
 type ClientIncomingMap = {
 	bla:(num: number) => void,
 	hi: (num: number) => void
 }
 
 type ServerIncomingMap = {
+	customProc:(args: CustomProcArgs) => string,
+	customRemoteEvent:(str: string) => void,
 	foo:(num: number) => string,
 	greeting: () => void,
 	login: (auth: AuthToken) => void,
@@ -1354,10 +1360,10 @@ describe('Integration tests', function () {
 				serverSocketAborted = true;
 			})();
 
-			await wait(10);
+			await wait(30);
 			client.disconnect(4445, 'Disconnect after handshake');
 
-			await wait(300);
+			await wait(100);
 
 			assert.strictEqual(socketDisconnectedBeforeConnect, false);
 			assert.strictEqual(socketDisconnected, true);
@@ -1636,7 +1642,7 @@ describe('Integration tests', function () {
 				client.transmit('foo', i);
 			}
 
-			await wait(90);
+			await wait(100);
 
 			client.disconnect(4445, 'Disconnect');
 
@@ -1689,7 +1695,7 @@ describe('Integration tests', function () {
 				client.transmit('foo', i);
 			}
 
-			await wait(90);
+			await wait(110);
 
 			client.disconnect(4445, 'Disconnect');
 
@@ -1740,7 +1746,7 @@ describe('Integration tests', function () {
 				client.transmit('foo', i);
 			}
 
-			await wait(110);
+			await wait(130);
 
 			client.disconnect(4445, 'Disconnect');
 
@@ -1750,4 +1756,240 @@ describe('Integration tests', function () {
 		});
 	});
 
+	describe('Socket RPC invoke', function () {
+		it ('Should support invoking a remote procedure on the server', async function () {
+			server = listen(
+				PORT_NUMBER,
+				Object.assign(
+					{},
+					serverOptions,
+					{
+						handlers: {
+							customProc: async ({ options }: RequestHandlerArgs<CustomProcArgs, BasicSocketMapServer<{}, {}, {}, ClientIncomingMap>>) => {
+								if ('bad' in options) {
+									const err = new Error('Server failed to execute the procedure');
+									err.name = 'BadCustomError';
+									throw err;
+								}
+
+								return 'Success';
+							}
+						}
+					}
+				)
+			);
+
+			bindFailureHandlers(server);
+
+			client = new ClientSocket(
+				Object.assign(
+					{},
+					clientOptions,
+					{
+						middleware: [new OfflineMiddleware()]
+					}
+				)
+			);
+
+			let result = await client.invoke('customProc', {good: true});
+
+			assert.strictEqual(result, 'Success');
+
+			let error: Error | null = null;
+			try {
+				result = await client.invoke('customProc', {bad: true});
+			} catch (err) {
+				error = err;
+			}
+			assert.notEqual(error, null);
+			assert.strictEqual(error!.name, 'BadCustomError');
+		});
+	});
+
+	describe('Socket transmit', function () {
+		it ('Should support receiving remote transmitted data on the server', function (context, done) {
+			server = listen(
+				PORT_NUMBER,
+				Object.assign(
+					{},
+					serverOptions,
+					{
+						handlers: {
+							customRemoteEvent: async ({ options: data }: RequestHandlerArgs<string, BasicSocketMapServer<{}, {}, {}, ClientIncomingMap>>) => {
+								assert.strictEqual(data, 'This is data');
+								done();
+							}
+						}
+					}
+				)
+			);
+
+			bindFailureHandlers(server);
+
+			(async () => {
+				await wait(10);
+
+				client = new ClientSocket(
+					Object.assign(
+						{},
+						clientOptions,
+						{
+							middleware: [new OfflineMiddleware()]
+						}
+					)
+				);
+				await client.transmit('customRemoteEvent', 'This is data');
+			})();
+		});
+	});
+
+	describe('Socket backpressure', function () {
+		it('Should be able to getInboundBackpressure() on a socket object', async function () {
+			const backpressureHistory: number[] = [];
+			
+			server = listen(
+				PORT_NUMBER,
+				Object.assign<
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>>(
+					{
+						middleware: [
+							{
+								type: 'Message Interceptor',
+								async onMessageRaw({ socket, message }) {
+									backpressureHistory.push(socket.getInboundBackpressure());
+	
+									return message;
+								},
+								async onMessage({ packet }) {
+									if (isRequestPacket(packet) && isPublishOptions(packet.data) && packet.data.data === 5) {
+										await wait(140);
+									}
+	
+									return packet;
+								}
+							}
+						]
+					},
+					serverOptions
+				)
+			);
+			bindFailureHandlers(server);
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(clientOptions);
+
+			await client.listen('connect').once(100);
+
+			for (let i = 0; i < 20; i++) {
+				await wait(10);
+				client.channels.transmitPublish('foo', i);
+			}
+
+			await wait(250);
+
+			// Backpressure should go up and come back down.
+			assert.strictEqual(backpressureHistory.length, 21);
+			assert.strictEqual(backpressureHistory[0], 1);
+			assert.strictEqual(backpressureHistory[12] > 4, true);
+			assert.strictEqual(backpressureHistory[14] > 6, true);
+			assert.strictEqual(backpressureHistory[19], 1);
+		});
+/*
+		it('Should be able to getOutboundBackpressure() on a socket object', async function () {
+			server = listen(PORT_NUMBER, {
+				authKey: serverOptions.authKey
+//        wsEngine: WS_ENGINE
+			});
+			bindFailureHandlers(server);
+
+			let backpressureHistory: number[] = [];
+
+			(async () => {
+				for await (let {socket} of server.listen('connection')) {
+					(async () => {
+						await socket.listen('subscribe').once();
+
+						for (let i = 0; i < 20; i++) {
+							await wait(10);
+							server.exchange.transmitPublish('foo', i);
+							backpressureHistory.push(socket.getOutboundBackpressure());
+						}
+					})();
+				}
+			})();
+
+			server.setMiddleware(MiddlewareType.MIDDLEWARE_OUTBOUND, async (middlewareStream) => {
+				for await (let action of middlewareStream) {
+					if (action.data === 5) {
+						await wait(140);
+					}
+					action.allow();
+				}
+			});
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(clientOptions);
+
+			await client.subscribe('foo').listen('subscribe').once();
+
+			await wait(400);
+
+			// Backpressure should go up and come back down.
+			assert.strictEqual(backpressureHistory.length, 20);
+			assert.strictEqual(backpressureHistory[0], 1);
+			assert.strictEqual(backpressureHistory[13] > 7, true);
+			assert.strictEqual(backpressureHistory[14] > 8, true);
+			assert.strictEqual(backpressureHistory[19], 1);
+		});
+
+		it('Should be able to getBackpressure() on a socket object and it should be the highest backpressure', async function () {
+			server = listen(PORT_NUMBER, {
+				authKey: serverOptions.authKey
+//        wsEngine: WS_ENGINE
+			});
+			bindFailureHandlers(server);
+
+			let backpressureHistory: number[] = [];
+
+			server.setMiddleware(MiddlewareType.MIDDLEWARE_INBOUND_RAW, async (middlewareStream) => {
+				for await (let action of middlewareStream) {
+					backpressureHistory.push(action.socket.getBackpressure());
+					action.allow();
+				}
+			});
+
+			server.setMiddleware(MiddlewareType.MIDDLEWARE_INBOUND, async (middlewareStream) => {
+				for await (let action of middlewareStream) {
+					if ('data' in action && action.data === 5) {
+						await wait(140);
+					}
+					action.allow();
+				}
+			});
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(clientOptions);
+
+			await client.listen('connect').once(100);
+
+			for (let i = 0; i < 20; i++) {
+				await wait(10);
+				client.channels.transmitPublish('foo', i);
+			}
+
+			await wait(400);
+
+			// Backpressure should go up and come back down.
+			assert.strictEqual(backpressureHistory.length, 21);
+			assert.strictEqual(backpressureHistory[0], 1);
+			assert.strictEqual(backpressureHistory[12] > 4, true);
+			assert.strictEqual(backpressureHistory[14] > 6, true);
+			assert.strictEqual(backpressureHistory[19], 1);
+		});
+*/
+	});
 });

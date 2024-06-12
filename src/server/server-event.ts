@@ -12,6 +12,7 @@ import {
 import { ServerMap } from "../client/maps/server-map.js";
 import { ClientMapFromServer } from "../client/maps/client-map.js";
 import { SubscribeEvent, SubscribeFailEvent, SubscribeStateChangeEvent, UnsubscribeEvent } from "../channels/channel-events.js";
+import { SocketMapFromServer } from "../client/maps/socket-map.js";
 
 export type ServerEvent<T extends ServerMap> =
 	ConnectionEvent<T> |
@@ -96,9 +97,9 @@ export type SocketPongEvent<T extends ServerMap> = PongEvent & ServerSocketEvent
 
 export type SocketRemoveAuthTokenEvent<T extends ServerMap> = RemoveAuthTokenEvent & ServerSocketEvent<T>;
 
-export type SocketRequestEvent<T extends ServerMap> = RequestEvent<T['Service'], T['Incoming']> & ServerSocketEvent<T>;
+export type SocketRequestEvent<T extends ServerMap> = RequestEvent<SocketMapFromServer<T>>;
 
-export type SocketResponseEvent<T extends ServerMap> = ResponseEvent<T['Service'], T['Outgoing'], T['PrivateOutgoing']> & ServerSocketEvent<T>;
+export type SocketResponseEvent<T extends ServerMap> = ResponseEvent<T> & ServerSocketEvent<T>;
 
 export type SocketSubscribeEvent<T extends ServerMap> = SubscribeEvent & ServerSocketEvent<T>;
 

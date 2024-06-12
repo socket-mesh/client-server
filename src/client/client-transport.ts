@@ -8,7 +8,7 @@ import { InvokeMethodOptions, InvokeServiceOptions, SocketTransport } from "../s
 import { AutoReconnectOptions, ClientSocketOptions, ConnectOptions } from "./client-socket-options.js";
 import { AuthToken } from "@socket-mesh/auth";
 import { SocketMapFromClient } from "./maps/socket-map.js";
-import { ClientMap, ClientPrivateMap } from "./maps/client-map.js";
+import { ClientMap } from "./maps/client-map.js";
 import { AnyPacket } from "../request.js";
 import { AnyResponse } from "../response.js";
 
@@ -118,9 +118,8 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 	}
 
 	protected override decode(data: string | ws.RawData):
-		AnyPacket<T["Service"], T["Incoming"] & ClientPrivateMap> |
-		AnyResponse<T["Service"], T["Outgoing"], T["PrivateOutgoing"] & ServerPrivateMap> |
-		(AnyPacket<T["Service"], T["Incoming"] & ClientPrivateMap> | AnyResponse<T["Service"], T["Outgoing"], T["PrivateOutgoing"] & ServerPrivateMap>)[] {
+		AnyPacket<SocketMapFromClient<T>> | AnyPacket<SocketMapFromClient<T>>[] |
+		AnyResponse<SocketMapFromClient<T>> | AnyResponse<SocketMapFromClient<T>>[] {
 		
 		return super.decode(data);
 	}

@@ -1,18 +1,18 @@
 import defaultCodec, { CodecEngine } from "@socket-mesh/formatter";
 import ws from "isomorphic-ws";
 import { Middleware } from "./middleware/middleware.js";
-import { AnyPacket, AnyRequest, InvokeMethodRequest, InvokeServiceRequest, MethodPacket, TransmitMethodRequest, TransmitServiceRequest } from "./request.js";
-import { AbortError, BadConnectionError, InvalidActionError, InvalidArgumentsError, MiddlewareBlockedError, MiddlewareCaughtError, MiddlewareError, SocketProtocolError, TimeoutError, dehydrateError, socketProtocolErrorStatuses, socketProtocolIgnoreStatuses } from "@socket-mesh/errors";
+import { AnyPacket, AnyRequest, InvokeMethodRequest, InvokeServiceRequest, MethodPacket, TransmitMethodRequest, TransmitServiceRequest, isRequestPacket } from "./request.js";
+import { AbortError, BadConnectionError, InvalidActionError, InvalidArgumentsError, MiddlewareBlockedError, SocketProtocolError, TimeoutError, dehydrateError, socketProtocolErrorStatuses, socketProtocolIgnoreStatuses } from "@socket-mesh/errors";
 import { ClientRequest, IncomingMessage } from "http";
 import { FunctionReturnType, MethodMap, ServiceMap } from "./client/maps/method-map.js";
-import { AnyResponse, MethodDataResponse } from "./response.js";
+import { AnyResponse, MethodDataResponse, isResponsePacket } from "./response.js";
 import { HandlerMap } from "./client/maps/handler-map.js";
 import { AuthToken, extractAuthTokenData, SignedAuthToken } from "@socket-mesh/auth";
 import { Socket, SocketOptions, SocketStatus, StreamCleanupMode } from "./socket.js";
 import base64id from "base64id";
 import { RequestHandlerArgs } from "./request-handler.js";
 import { SocketMap } from "./client/maps/socket-map.js";
-import { wait } from "./utils.js";
+import { toArray, wait } from "./utils.js";
 import { WritableConsumableStream } from "@socket-mesh/writable-consumable-stream";
 
 export type CallIdGenerator = () => number;
@@ -34,6 +34,11 @@ interface InvokeCallback<T> {
 	callback: (err: Error, result?: T) => void
 }
 
+interface InboundMessage {
+	timestamp: Date,
+	data: string | ws.RawData
+}
+
 interface WebSocketError extends Error {
 	code?: string
 }
@@ -41,14 +46,16 @@ interface WebSocketError extends Error {
 export class SocketTransport<T extends SocketMap> {
 	private _socket: Socket<T>;
 	private _webSocket: ws.WebSocket;
+	private _inboundProcessedMessageCount: number;
+	private _inboundReceivedMessageCount: number;
 	private _isReady: boolean;
 	private _authToken?: AuthToken;
 	private _signedAuthToken?: SignedAuthToken;
 	private readonly _callIdGenerator: CallIdGenerator;
 	private readonly _callbackMap: {[cid: number]: InvokeCallback<unknown>};
 	private readonly _handlers: HandlerMap<T>;
-	protected readonly inboundMessageStream: WritableConsumableStream<string | ArrayBuffer | Buffer[]>;
-	private _onUnhandledRequest: (socket: SocketTransport<T>, packet: AnyPacket<T['Service'], T['Incoming']>) => boolean;
+	protected readonly inboundMessageStream: WritableConsumableStream<InboundMessage>;
+	private _onUnhandledRequest: (socket: SocketTransport<T>, packet: AnyPacket<T>) => boolean;
 	public readonly codecEngine: CodecEngine;
 	public readonly middleware: Middleware<T>[];
 	public readonly state: Partial<T['State']>;
@@ -71,6 +78,8 @@ export class SocketTransport<T extends SocketMap> {
 		this.codecEngine = options?.codecEngine || defaultCodec;
 		this._handlers = options?.handlers || {};
 		this.id = (options?.id || base64id.generateId());
+		this._inboundProcessedMessageCount = 0;
+		this._inboundReceivedMessageCount = 0;
 		this.middleware = options?.middleware || [];
 		this.state = options?.state || {};
 		this.streamCleanupMode = options?.streamCleanupMode || 'kill';
@@ -92,24 +101,6 @@ export class SocketTransport<T extends SocketMap> {
 
 	public get authToken(): AuthToken {
 		return this._authToken;
-	}
-	
-	public callMiddleware(middleware: Middleware<T>, fn: () => void): void {
-		try {
-			fn();
-		} catch (err) {
-			if (err instanceof MiddlewareBlockedError) {
-				throw err;
-			}
-
-			if (err instanceof MiddlewareCaughtError) {
-				throw err.innerError;
-			}
-
-			this.onError(err);
-
-			throw new MiddlewareError(`An unexpected error occurred in the ${middleware.type} middleware.`, middleware.type);
-		}
 	}
 
 	public async changeToUnauthenticatedState(): Promise<boolean> {
@@ -159,32 +150,38 @@ export class SocketTransport<T extends SocketMap> {
 		}
 	}
 
+	public getInboundBackpressure(): number {
+		return this._inboundReceivedMessageCount - this._inboundProcessedMessageCount;
+	}
+
 	private async handleInboudMessageStream(): Promise<void> {
 		for await (let message of this.inboundMessageStream) {
-			const packet: AnyPacket<T['Service'], T['Incoming']> | 
-				AnyResponse<T['Service'], T['Outgoing'], T['PrivateOutgoing']> |
-				(AnyPacket<T['Service'], T['Incoming']> | AnyResponse<T['Service'], T['Outgoing'], T['PrivateOutgoing']>)[] | null
-					= this.decode(message);
-	
+			this._inboundProcessedMessageCount++;
+
+			let packet: (AnyPacket<T> | AnyResponse<T>) | (AnyPacket<T> | AnyResponse<T>)[] | null = this.decode(message.data);
+
 			if (packet === null) {
 				return;
 			}
-	
-			if (Array.isArray(packet)) {
-				for (const curPacket of packet) {
-					if ('rid' in curPacket) {
-						this.onResponse(curPacket);
-					} else {
-						await this.onRequest(curPacket);
+
+			packet = toArray<AnyPacket<T> | AnyResponse<T>>(packet);
+
+			for (const curPacket of packet) {
+				for (const middleware of this.middleware) {
+					if (middleware.onMessage) {
+						packet = await middleware.onMessage({ socket: this.socket, transport: this, packet: curPacket, timestamp: message.timestamp })
 					}
 				}
-			} else if (typeof packet === 'object') {
-				if ('rid' in packet) {
-					this.onResponse(packet);
+
+				// Check to see if it is a request or response packet. 
+				if (isResponsePacket(curPacket)) {
+					this.onResponse(curPacket);
+				} else if (isRequestPacket(curPacket)) {
+					await this.onRequest(curPacket, message.timestamp);
 				} else {
-					await this.onRequest(packet);
-				}	
-			}			
+					// TODO: Handle non packets here (binary data)
+				}
+			}
 		}
 	}
 
@@ -312,10 +309,31 @@ export class SocketTransport<T extends SocketMap> {
 	}
 
 	protected onMessage(data: ws.RawData, isBinary: boolean): void {
-		let message = isBinary ? data : data.toString();
+		const timestamp = new Date();
+		let p = Promise.resolve(isBinary ? data : data.toString());
 
-		this.inboundMessageStream.write(message);
-		this._socket.emit('message', { data, isBinary });
+		this._inboundReceivedMessageCount++;
+
+		for (let i = 0; i < this.middleware.length; i++) {
+			const middleware = this.middleware[i];
+
+			if (middleware.onMessageRaw) {
+				p = p.then(message => {
+					return middleware.onMessageRaw({ socket: this.socket, transport: this, message, timestamp })
+				});	
+			}
+		}
+
+		p.then(msg => {
+			this.inboundMessageStream.write({ timestamp, data: msg });
+			this._socket.emit('message', { data, isBinary });	
+		}).catch(err => {
+			this._inboundProcessedMessageCount++;
+
+			if (!(err instanceof MiddlewareBlockedError)) {
+				this.onError(err);
+			}
+		});
 	}
 
 	protected onOpen(): void {
@@ -335,7 +353,7 @@ export class SocketTransport<T extends SocketMap> {
 		this._socket.emit('pong', { data });
 	}
 
-	protected onResponse(response: AnyResponse<T['Service'], T['Outgoing'], T['PrivateOutgoing']>) {
+	protected onResponse(response: AnyResponse<T>) {
 		const map = this._callbackMap[response.rid];
 
 		if (map) {
@@ -354,12 +372,10 @@ export class SocketTransport<T extends SocketMap> {
 		this._socket.emit('response', { response });
 	}
 
-	protected async onRequest(packet: AnyPacket<T['Service'], T['Incoming']>): Promise<boolean> {
-		packet.requestedAt = new Date();
-
+	protected async onRequest(packet: AnyPacket<T>, timestamp: Date): Promise<boolean> {
 		this._socket.emit('request', { request: packet });
 		
-		const timeoutAt = typeof packet.ackTimeoutMs === 'number' ? new Date(packet.requestedAt.valueOf() + packet.ackTimeoutMs) : null;
+		const timeoutAt = typeof packet.ackTimeoutMs === 'number' ? new Date(timestamp.valueOf() + packet.ackTimeoutMs) : null;
 		let wasHandled = false;
 
 		const handler = this._handlers[(packet as MethodPacket<T['Incoming']>).method];
@@ -414,7 +430,7 @@ export class SocketTransport<T extends SocketMap> {
 		this._socket.emit('unexpectedResponse', { request, response });
 	}
 
-	protected onUnhandledRequest(packet: AnyPacket<T['Service'], T['Incoming']>): boolean {
+	protected onUnhandledRequest(packet: AnyPacket<T>): boolean {
 		if (this._onUnhandledRequest) {
 			return this._onUnhandledRequest(this, packet);
 		}
@@ -495,9 +511,9 @@ export class SocketTransport<T extends SocketMap> {
 		});
 	}
 
-	protected sendRequest(requests: (AnyRequest<T['Service'], T['PrivateOutgoing'], T['Outgoing']>)[]): void;
-	protected sendRequest(index: number, requests: (AnyRequest<T['Service'], T['PrivateOutgoing'], T['Outgoing']>)[]): void;
-	protected sendRequest(index: (AnyRequest<T['Service'], T['PrivateOutgoing'], T['Outgoing']>)[] | number, requests?: (AnyRequest<T['Service'], T['PrivateOutgoing'], T['Outgoing']>)[]): void {
+	protected sendRequest(requests: (AnyRequest<T>)[]): void;
+	protected sendRequest(index: number, requests: (AnyRequest<T>)[]): void;
+	protected sendRequest(index: (AnyRequest<T>)[] | number, requests?: (AnyRequest<T>)[]): void {
 		if (typeof index === 'object') {
 			requests = index;
 			index = 0;
@@ -521,17 +537,12 @@ export class SocketTransport<T extends SocketMap> {
 				index++;
 
 				try {
-					this.callMiddleware(
-						middleware,
-						() => {
-							middleware.sendRequest({
-								socket: this.socket,
-								transport: this,
-								requests,
-								cont: this.sendRequest.bind(this, index)
-							});
-						}
-					);
+					middleware.sendRequest({
+						socket: this.socket,
+						transport: this,
+						requests,
+						cont: this.sendRequest.bind(this, index)
+					});
 				} catch (err) {
 					for (const req of requests) {
 						if (req.sentCallback) {
@@ -608,9 +619,9 @@ export class SocketTransport<T extends SocketMap> {
 		);
 	}
 
-	protected sendResponse(responses: (AnyResponse<T['Service'], T['Incoming']>)[]): void;
-	protected sendResponse(index: number, responses: (AnyResponse<T['Service'], T['Incoming']>)[]): void;
-	protected sendResponse(index: (AnyResponse<T['Service'], T['Incoming']>)[] | number, responses?: (AnyResponse<T['Service'], T['Incoming']>)[]): void {
+	protected sendResponse(responses: (AnyResponse<T>)[]): void;
+	protected sendResponse(index: number, responses: (AnyResponse<T>)[]): void;
+	protected sendResponse(index: (AnyResponse<T>)[] | number, responses?: (AnyResponse<T>)[]): void {
 		if (typeof index === 'object') {
 			responses = index;
 			index = 0;
@@ -628,17 +639,12 @@ export class SocketTransport<T extends SocketMap> {
 				index++;
 
 				try {
-					this.callMiddleware(
-						middleware,
-						() => {
-							middleware.sendResponse({
-								socket: this.socket,
-								transport: this,
-								responses,
-								cont: this.sendResponse.bind(this, index)
-							});
-						}
-					);
+					middleware.sendResponse({
+						socket: this.socket,
+						transport: this,
+						responses,
+						cont: this.sendResponse.bind(this, index)
+					});
 				} catch (err) {
 					this.sendResponse(
 						index, responses.map(item => ({ rid: item.rid, timeoutAt: item.timeoutAt, error: err }))

@@ -41,11 +41,7 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		return false;
 	}
 	
-	protected override decode(data: string | RawData): 
-		AnyPacket<T["Service"], SocketMapFromServer<T>['Incoming']> | 
-		AnyResponse<T["Service"], T["Outgoing"], SocketMapFromServer<T>['PrivateOutgoing']> | 
-		(AnyPacket<T["Service"], SocketMapFromServer<T>['Incoming']> | AnyResponse<T["Service"], T["Outgoing"], SocketMapFromServer<T>['PrivateOutgoing']>)[] {
-
+	protected override decode(data: string | RawData): AnyPacket<SocketMapFromServer<T>> | AnyPacket<SocketMapFromServer<T>>[] | AnyResponse<SocketMapFromServer<T>> | AnyResponse<SocketMapFromServer<T>>[] | null {
 		const packet = super.decode(data);
 
 		if ((packet === null || typeof packet !== 'object') && this.state.server.strictHandshake && this.status === 'connecting') {
@@ -113,11 +109,11 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		super.onMessage(data, isBinary);
 	}
 
-	protected override async onRequest(packet: AnyPacket<T['Service'], SocketMapFromServer<T>['Incoming']>): Promise<boolean> {
+	protected override async onRequest(packet: AnyPacket<SocketMapFromServer<T>>, timestamp: Date): Promise<boolean> {
 		let wasHandled = false;
 
 		if (!this.service || !('service' in packet) || packet.service === this.service) {
-			wasHandled = await super.onRequest(packet);
+			wasHandled = await super.onRequest(packet, timestamp);
 		} else {
 			wasHandled = this.onUnhandledRequest(packet);
 		}
@@ -141,7 +137,7 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		this.state.server.emit('socketPong', { socket: this.socket, data });
 	}
 	
-	protected override onResponse(response: AnyResponse<T["Service"], SocketMapFromServer<T>['Outgoing']>): void {
+	protected override onResponse(response: AnyResponse<SocketMapFromServer<T>>): void {
 		super.onResponse(response);
 		this.state.server.emit('socketResponse', { socket: this.socket, response });
 	}

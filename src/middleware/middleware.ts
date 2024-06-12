@@ -1,8 +1,9 @@
 import { EmptySocketMap, SocketMap } from "../client/maps/socket-map.js";
-import { AnyRequest } from "../request.js";
+import { AnyPacket, AnyRequest } from "../request.js";
 import { AnyResponse } from "../response.js";
 import { SocketTransport } from "../socket-transport.js";
 import { Socket, SocketStatus } from "../socket.js";
+import ws from "isomorphic-ws";
 
 export type MiddlewareType = 'request' | 'response' | 'handshake';
 
@@ -17,14 +18,24 @@ export interface DisconnectedMiddlewareArgs<T extends SocketMap = EmptySocketMap
 	reason?: string
 }
 
+export interface MessageMiddlewareArgs<T extends SocketMap = EmptySocketMap> extends MiddlewareArgs<T> {
+	timestamp: Date,
+	packet: AnyPacket<T> | AnyResponse<T>
+}
+
+export interface MessageRawMiddlewareArgs<T extends SocketMap = EmptySocketMap> extends MiddlewareArgs<T> {
+	timestamp: Date,
+	message: ws.RawData | string
+}
+
 export interface SendRequestMiddlewareArgs<T extends SocketMap = EmptySocketMap> extends MiddlewareArgs<T> {
-	requests: AnyRequest<T['Service'], T['PrivateOutgoing'], T['Outgoing']>[],
-	cont: (requests: AnyRequest<T['Service'], T['PrivateOutgoing'], T['Outgoing']>[]) => void
+	requests: AnyRequest<T>[],
+	cont: (requests: AnyRequest<T>[]) => void
 }
 
 export interface SendResponseMiddlewareArgs<T extends SocketMap = EmptySocketMap> extends MiddlewareArgs<T> {
-	responses: AnyResponse<T['Service'], T['Incoming']>[],
-	cont: (requests: AnyResponse<T['Service'], T['Incoming']>[]) => void
+	responses: AnyResponse<T>[],
+	cont: (requests: AnyResponse<T>[]) => void
 }
 
 export interface Middleware<T extends SocketMap = EmptySocketMap> {
@@ -33,6 +44,8 @@ export interface Middleware<T extends SocketMap = EmptySocketMap> {
 	onClose?(options: MiddlewareArgs<T>): void,
 	onDeauthenticate?(options: MiddlewareArgs<T>): void,
 	onDisconnected?(options: DisconnectedMiddlewareArgs<T>): void,
+	onMessage?(options: MessageMiddlewareArgs<T>): Promise<AnyPacket<T> | AnyResponse<T>>,
+	onMessageRaw?(options: MessageRawMiddlewareArgs<T>): Promise<ws.RawData | string>,
 	onOpen?(options: MiddlewareArgs<T>): void,
 	onReady?(options: MiddlewareArgs<T>): void,
 	sendRequest?(options: SendRequestMiddlewareArgs<T>): void,

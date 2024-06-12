@@ -18,17 +18,12 @@ export async function handshakeHandler(
 	const authInfo = await validateAuthToken(server.auth, options.authToken);
 
 	for (const middleware of server.middleware) {
-		if ('onHandshake' in middleware) {
+		if (middleware.onHandshake) {
 			try {
-				transport.callMiddleware(
-					middleware,
-					() => {
-						middleware.onHandshake(
-							'authError' in authInfo ?
-								{ signedAuthToken: options.authToken, authError: authInfo.authError } :
-								{ signedAuthToken: options.authToken, authToken: authInfo.authToken }
-						);			
-					}
+				middleware.onHandshake(
+					'authError' in authInfo ?
+						{ signedAuthToken: options.authToken, authError: authInfo.authError } :
+						{ signedAuthToken: options.authToken, authToken: authInfo.authToken }
 				);
 			} catch (err) {
 				if (err.statusCode == null) {

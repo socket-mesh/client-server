@@ -25,6 +25,10 @@ export interface PublishOptions {
 	data: any
 }
 
+export function isPublishOptions(options: unknown): options is PublishOptions {
+	return typeof options === 'object' && 'channel' in options && typeof options.channel === 'string';
+}
+
 export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<ChannelEvent> {
 	public readonly channelPrefix?: string;
 	public readonly output: StreamDemuxWrapper<T[keyof T & string]>;

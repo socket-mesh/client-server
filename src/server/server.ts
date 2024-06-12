@@ -272,7 +272,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 
 	private onUnhandledRequest(
 		socket: ServerSocket<T> | ClientSocket<ClientMapFromServer<T>>,
-		packet: AnyPacket<T['Service'], T['Incoming']>
+		packet: AnyPacket<SocketMapFromServer<T>>
 	): void {
 
 	}

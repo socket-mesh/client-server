@@ -1,10 +1,8 @@
-import { MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap } from "./client/maps/method-map.js";
+import { MethodMap, ServiceMap } from "./client/maps/method-map.js";
+import { SocketMap } from "./client/maps/socket-map.js";
 
-export type AnyRequest<
-	TServiceMap extends ServiceMap,
-	TPrivateOutgoingMap extends PrivateMethodMap,
-	TOutgoingMap extends PublicMethodMap
-> = ServiceRequest<TServiceMap> | MethodRequest<TPrivateOutgoingMap> | MethodRequest<TOutgoingMap>;
+export type AnyRequest<T extends SocketMap> =
+	ServiceRequest<T['Service']> | MethodRequest<T['PrivateOutgoing']> | MethodRequest<T['Outgoing']>;
 
 export type ServiceRequest<TServiceMap extends ServiceMap> =
 	{ [TService in keyof TServiceMap]:
@@ -49,10 +47,7 @@ export interface InvokeMethodRequest<TMethodMap extends MethodMap, TMethod exten
 }
 
 
-export type AnyPacket<
-	TServiceMap extends ServiceMap,
-	TIncomingMap extends MethodMap
-> = ServicePacket<TServiceMap> | MethodPacket<TIncomingMap>;
+export type AnyPacket<T extends SocketMap> = ServicePacket<T['Service']> | MethodPacket<T['Incoming']>;
 
 export type ServicePacket<TServiceMap extends ServiceMap> =
 	{ [TService in keyof TServiceMap]:
@@ -61,9 +56,8 @@ export type ServicePacket<TServiceMap extends ServiceMap> =
 		}[keyof TServiceMap[TService]]
 	}[keyof TServiceMap]
 
-export interface RequestPacket {
-	cid?: number,
-	requestedAt: Date
+interface RequestPacket {
+	cid?: number
 }
 
 export type MethodPacket<TMethodMap extends MethodMap> =
@@ -86,4 +80,8 @@ export interface MethodRequestPacket<TMethodMap extends MethodMap, TMethod exten
 	method: TMethod,
 	data?: Parameters<TMethodMap[TMethod]>[0],
 	ackTimeoutMs?: number | boolean
+}
+
+export function isRequestPacket<T extends SocketMap>(packet?: unknown): packet is AnyPacket<T> {
+	return (typeof packet === 'object') && 'method' in packet;
 }
