@@ -1986,7 +1986,7 @@ describe('Integration tests', function () {
 							{
 								type: 'Message Interceptor',
 								async onMessageRaw({ socket, message }) {
-									backpressureHistory.push(socket.getInboundBackpressure());
+									backpressureHistory.push(socket.getBackpressure());
 	
 									return message;
 								},

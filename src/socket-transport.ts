@@ -154,6 +154,13 @@ export class SocketTransport<T extends SocketMap> {
 		}
 	}
 
+	public getBackpressure(): number {
+		return Math.max(
+			this.getInboundBackpressure(),
+			this.getOutboundBackpressure()
+		);
+	}
+
 	public getInboundBackpressure(): number {
 		return this._inboundReceivedMessageCount - this._inboundProcessedMessageCount;
 	}

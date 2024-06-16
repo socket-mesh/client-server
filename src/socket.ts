@@ -79,6 +79,15 @@ export class Socket<T extends SocketMap> extends AsyncStreamEmitter<SocketEvent<
 		this._transport.disconnect(code, reason);
 	}
 
+	public getBackpressure(): number {
+		return Math.max(
+			this._transport.getBackpressure(),
+			this.getListenerBackpressure(),
+			//this.receiver.getBackpressure(),
+			//this.procedure.getBackpressure()
+		);
+	}
+
 	public getInboundBackpressure(): number {
 		return this._transport.getInboundBackpressure();
 	}
