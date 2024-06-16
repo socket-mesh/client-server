@@ -48,6 +48,8 @@ export class SocketTransport<T extends SocketMap> {
 	private _webSocket: ws.WebSocket;
 	private _inboundProcessedMessageCount: number;
 	private _inboundReceivedMessageCount: number;
+	private _outboundPreparedMessageCount: number;
+	private _outboundSentMessageCount: number
 	private _isReady: boolean;
 	private _authToken?: AuthToken;
 	private _signedAuthToken?: SignedAuthToken;
@@ -80,6 +82,8 @@ export class SocketTransport<T extends SocketMap> {
 		this.id = (options?.id || base64id.generateId());
 		this._inboundProcessedMessageCount = 0;
 		this._inboundReceivedMessageCount = 0;
+		this._outboundPreparedMessageCount = 0;
+		this._outboundSentMessageCount = 0;
 		this.middleware = options?.middleware || [];
 		this.state = options?.state || {};
 		this.streamCleanupMode = options?.streamCleanupMode || 'kill';
@@ -152,6 +156,10 @@ export class SocketTransport<T extends SocketMap> {
 
 	public getInboundBackpressure(): number {
 		return this._inboundReceivedMessageCount - this._inboundProcessedMessageCount;
+	}
+
+	public getOutboundBackpressure(): number {
+		return this._outboundPreparedMessageCount - this._outboundSentMessageCount;
 	}
 
 	private async handleInboudMessageStream(): Promise<void> {
@@ -563,7 +571,7 @@ export class SocketTransport<T extends SocketMap> {
 		if (this.status === 'closed') {
 			for (const request of requests) {
 				const err = new BadConnectionError(
-					`Socket ${request.sentCallback ? 'transmit' : 'invoke' } ${String(request.method)} event was aborted due to a bad connection`,
+					`Socket ${'callback' in request ? 'invoke' : 'transmit' } ${String(request.method)} event was aborted due to a bad connection`,
 					'connectAbort'
 				);
 
@@ -602,7 +610,7 @@ export class SocketTransport<T extends SocketMap> {
 				for (const req of requests) {
 					if (err?.code === 'ECONNRESET') {
 						err = new BadConnectionError(
-							`Socket ${req.sentCallback ? 'transmit' : 'invoke' } ${String(req.method)} event was aborted due to a bad connection`,
+							`Socket ${'callback' in req ? 'invoke' : 'transmit' } ${String(req.method)} event was aborted due to a bad connection`,
 							'connectAbort'
 						);
 					}
@@ -720,7 +728,8 @@ export class SocketTransport<T extends SocketMap> {
 
 		const promise = new Promise<void>((resolve, reject) => {
 			request.sentCallback = (err?: Error) => {
-				request.sentCallback = null;
+				delete request.sentCallback;
+				this._outboundSentMessageCount++;
 
 				if (err) {
 					reject(err);
@@ -730,7 +739,9 @@ export class SocketTransport<T extends SocketMap> {
 				resolve();
 			};
 		});
-	
+
+		this._outboundPreparedMessageCount++;
+
 		this.sendRequest([request as any]);
 
 		return promise;
@@ -844,7 +855,14 @@ export class SocketTransport<T extends SocketMap> {
 
 				resolve(result);
 			};
+
+			request.sentCallback = () => {
+				delete request.sentCallback;
+				this._outboundSentMessageCount++;
+			};
 		});
+
+		this._outboundPreparedMessageCount++;
 
 		this.sendRequest([request as any]);
 

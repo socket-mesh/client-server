@@ -82,6 +82,6 @@ export interface MethodRequestPacket<TMethodMap extends MethodMap, TMethod exten
 	ackTimeoutMs?: number | boolean
 }
 
-export function isRequestPacket<T extends SocketMap>(packet?: unknown): packet is AnyPacket<T> {
+export function isRequestPacket<T extends SocketMap>(packet: unknown): packet is AnyPacket<T> {
 	return (typeof packet === 'object') && 'method' in packet;
 }

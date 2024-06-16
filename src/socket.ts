@@ -79,8 +79,12 @@ export class Socket<T extends SocketMap> extends AsyncStreamEmitter<SocketEvent<
 		this._transport.disconnect(code, reason);
 	}
 
-	getInboundBackpressure(): number {
+	public getInboundBackpressure(): number {
 		return this._transport.getInboundBackpressure();
+	}
+
+	public getOutboundBackpressure(): number {
+		return this._transport.getOutboundBackpressure();
 	}
 
 	emit(event: 'authStateChange', data: AuthStateChangeEvent): void;

@@ -7,7 +7,7 @@ import { ServerOptions } from "../src/server/server-options";
 import { AuthToken } from "@socket-mesh/auth";
 import { RequestHandlerArgs } from "../src/request-handler";
 import jwt from "jsonwebtoken";
-import { BasicSocketMapServer, SocketMapFromClient } from "../src/client/maps/socket-map";
+import { BasicSocketMapServer, SocketMapFromClient, SocketMapFromServer } from "../src/client/maps/socket-map";
 import { ServerTransport } from "../src/server/server-transport";
 import { AuthInfo } from "../src/server/handlers/authenticate";
 import assert from "node:assert";
@@ -19,8 +19,9 @@ import { MiddlewareBlockedError } from "@socket-mesh/errors";
 import { AuthOptions } from "../src/server/auth-engine";
 import { OfflineMiddleware } from "../src/middleware/offline-middleware";
 import { MiddlewareArgs, SendRequestMiddlewareArgs } from "../src/middleware/middleware";
-import { isRequestPacket } from "../src/request";
+import { AnyRequest, isRequestPacket } from "../src/request";
 import { isPublishOptions } from "../src/channels/channels";
+import { WritableConsumableStream } from "@socket-mesh/writable-consumable-stream";
 
 // Add to the global scope like in browser.
 global.localStorage = localStorage;
@@ -1896,20 +1897,47 @@ describe('Integration tests', function () {
 			assert.strictEqual(backpressureHistory[14] > 6, true);
 			assert.strictEqual(backpressureHistory[19], 1);
 		});
-/*
-		it('Should be able to getOutboundBackpressure() on a socket object', async function () {
-			server = listen(PORT_NUMBER, {
-				authKey: serverOptions.authKey
-//        wsEngine: WS_ENGINE
-			});
-			bindFailureHandlers(server);
 
-			let backpressureHistory: number[] = [];
+		it('Should be able to getOutboundBackpressure() on a socket object', async function () {
+			const backpressureHistory: number[] = [];
+			const requestStream = 
+				new WritableConsumableStream<SendRequestMiddlewareArgs<SocketMapFromServer<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>>>();
+
+			(async () => {
+				for await (let { requests, cont } of requestStream) {
+					if (isPublishOptions(requests[0].data) && requests[0].data.data === 5) {
+						await wait(140);
+					}
+
+					cont(requests);
+				}
+			})();
+
+			server = listen(
+				PORT_NUMBER,
+				Object.assign<
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>>(
+					{
+						middleware: [
+							{
+								type: 'Send Request Interceptor',
+								sendRequest(options) {
+									requestStream.write(options);
+								}
+							}
+						]
+					},
+					serverOptions
+				)
+			);
+
+			bindFailureHandlers(server);
 
 			(async () => {
 				for await (let {socket} of server.listen('connection')) {
 					(async () => {
-						await socket.listen('subscribe').once();
+						await socket.exchange.listen('subscribe').once(100);
 
 						for (let i = 0; i < 20; i++) {
 							await wait(10);
@@ -1920,20 +1948,20 @@ describe('Integration tests', function () {
 				}
 			})();
 
-			server.setMiddleware(MiddlewareType.MIDDLEWARE_OUTBOUND, async (middlewareStream) => {
-				for await (let action of middlewareStream) {
-					if (action.data === 5) {
-						await wait(140);
-					}
-					action.allow();
-				}
-			});
-
 			await server.listen('ready').once(100);
 
-			client = new ClientSocket(clientOptions);
+			client = new ClientSocket(
+				Object.assign(
+					{
+						middleware: [
+							new OfflineMiddleware()
+						]
+					},
+					clientOptions
+				)
+			);
 
-			await client.subscribe('foo').listen('subscribe').once();
+			await client.channels.subscribe('foo').listen('subscribe').once(100);
 
 			await wait(400);
 
@@ -1946,29 +1974,36 @@ describe('Integration tests', function () {
 		});
 
 		it('Should be able to getBackpressure() on a socket object and it should be the highest backpressure', async function () {
-			server = listen(PORT_NUMBER, {
-				authKey: serverOptions.authKey
-//        wsEngine: WS_ENGINE
-			});
+			const backpressureHistory: number[] = [];
+			
+			server = listen(
+				PORT_NUMBER,
+				Object.assign<
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>>(
+					{
+						middleware: [
+							{
+								type: 'Message Interceptor',
+								async onMessageRaw({ socket, message }) {
+									backpressureHistory.push(socket.getInboundBackpressure());
+	
+									return message;
+								},
+								async onMessage({ packet }) {
+									if (isRequestPacket(packet) && isPublishOptions(packet.data) && packet.data.data === 5) {
+										await wait(140);
+									}
+	
+									return packet;
+								}
+							}
+						]
+					},
+					serverOptions
+				)
+			);
 			bindFailureHandlers(server);
-
-			let backpressureHistory: number[] = [];
-
-			server.setMiddleware(MiddlewareType.MIDDLEWARE_INBOUND_RAW, async (middlewareStream) => {
-				for await (let action of middlewareStream) {
-					backpressureHistory.push(action.socket.getBackpressure());
-					action.allow();
-				}
-			});
-
-			server.setMiddleware(MiddlewareType.MIDDLEWARE_INBOUND, async (middlewareStream) => {
-				for await (let action of middlewareStream) {
-					if ('data' in action && action.data === 5) {
-						await wait(140);
-					}
-					action.allow();
-				}
-			});
 
 			await server.listen('ready').once(100);
 
@@ -1990,6 +2025,5 @@ describe('Integration tests', function () {
 			assert.strictEqual(backpressureHistory[14] > 6, true);
 			assert.strictEqual(backpressureHistory[19], 1);
 		});
-*/
 	});
 });
