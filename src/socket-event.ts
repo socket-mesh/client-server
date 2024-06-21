@@ -1,6 +1,6 @@
 import ws from "isomorphic-ws";
 import { ClientRequest, IncomingMessage } from "http";
-import { MethodPacket, ServicePacket } from "./request.js";
+import { MethodPacket, ServicePacket } from "./packet.js";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
 import { AnyResponse } from "./response.js";
 import { SocketMap } from "./client/maps/socket-map.js";
@@ -79,7 +79,7 @@ export interface ErrorEvent {
 }
 
 export interface MessageEvent {
-	data: ws.RawData,
+	data: string | ws.RawData,
 	isBinary: boolean
 }
 

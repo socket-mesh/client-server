@@ -1,5 +1,5 @@
 import { EmptySocketMap, SocketMap } from "../client/maps/socket-map.js";
-import { MethodRequest, ServiceRequest } from "../request.js";
+import { AnyRequest, RequestCollection } from "../request.js";
 import { Middleware, SendRequestMiddlewareArgs } from "./middleware.js";
 
 const SYSTEM_METHODS = ['#handshake', '#removeAuthToken'];
@@ -7,10 +7,11 @@ const SYSTEM_METHODS = ['#handshake', '#removeAuthToken'];
 export class OfflineMiddleware<T extends SocketMap = EmptySocketMap> implements Middleware<T> {
 
 	private _isReady: boolean;
-	private _requests: (MethodRequest<T['Outgoing']> | ServiceRequest<T['Service']>)[][];
-	private _continue: (requests: (MethodRequest<T['Outgoing']> | ServiceRequest<T['Service']>)[]) => void | null;
+	private _requests: AnyRequest<T>[][];
+	private _continue: (requests: AnyRequest<T>[], cb?: (error?: Error) => void) => void| null;
 
 	constructor() {
+		this.type = 'offline';
 		this._isReady = false;
 		this._requests = [];
 		this._continue = null;
@@ -25,14 +26,15 @@ export class OfflineMiddleware<T extends SocketMap = EmptySocketMap> implements 
 		}
 
 		const systemRequests = requests.filter(item => SYSTEM_METHODS.indexOf(String(item.method)) > -1);
+		let otherRequests: AnyRequest<T>[] = requests;
 
 		if (systemRequests.length) {
-			requests = (systemRequests.length === requests.length) ? [] : requests.filter(item => SYSTEM_METHODS.indexOf(String(item.method)) < 0);
+			otherRequests = (systemRequests.length === requests.length) ? [] : requests.filter(item => SYSTEM_METHODS.indexOf(String(item.method)) < 0);
 		}
 
-		if (requests.length) {
+		if (otherRequests.length) {
 			this._continue = cont;
-			this._requests.push(requests);	
+			this._requests.push(otherRequests);	
 		}
 
 		if (systemRequests.length) {
@@ -57,7 +59,7 @@ export class OfflineMiddleware<T extends SocketMap = EmptySocketMap> implements 
 	private flush() {
 		if (this._requests.length) {
 			for (const reqs of this._requests) {
-				this._continue(reqs);				
+				this._continue(reqs);
 			}
 			this._requests = [];
 			this._continue = null;

@@ -1,8 +1,59 @@
 import { MethodMap, ServiceMap } from "./client/maps/method-map.js";
 import { SocketMap } from "./client/maps/socket-map.js";
+import { toArray } from "./utils.js";
 
 export type AnyRequest<T extends SocketMap> =
 	ServiceRequest<T['Service']> | MethodRequest<T['PrivateOutgoing']> | MethodRequest<T['Outgoing']>;
+
+export class RequestCollection<T extends SocketMap> {
+	private readonly _requests: AnyRequest<T>[];
+	private readonly _callbacks: (() => void)[];
+
+	constructor(requests: AnyRequest<T> | AnyRequest<T>[]) {
+		this._requests = toArray(requests).filter(req => !isRequestDone(req));
+		this._callbacks = [];
+	}
+
+	public get items(): ReadonlyArray<AnyRequest<T>> {
+		return this._requests;
+	}
+
+	public listen(cb: () => void): void {
+		for (const req of this._requests) {
+			this._callbacks.push(cb);
+
+			req.promise.finally(() => {
+				const i = this._requests.indexOf(req);
+				this._requests.splice(i, 1);
+
+				if (!this._requests.length) {
+					for (const cb of this._callbacks) {
+						cb();
+					}
+				}
+			});
+		}
+	}
+
+	public isDone(): boolean {
+		return this._requests.length === 0;
+	}
+
+	[Symbol.iterator]() {
+    const values = this._requests;
+    let index = 0;
+
+    return {
+      next() {
+        if (index < values.length) {
+          const val = values[index];
+          index++;
+          return { value: val, done: false };
+        } else return { done: true };
+      }
+    };
+	}
+}
 
 export type ServiceRequest<TServiceMap extends ServiceMap> =
 	{ [TService in keyof TServiceMap]:
@@ -18,6 +69,7 @@ export type MethodRequest<TMethodMap extends MethodMap> =
 
 
 export interface Request {
+	promise: Promise<void>,
 	sentCallback?: (err?: Error) => void
 }
 
@@ -46,42 +98,10 @@ export interface InvokeMethodRequest<TMethodMap extends MethodMap, TMethod exten
 	callback: (err: Error, result?: TMethodMap[TMethod]) => void | null
 }
 
+export function isRequestDone<T extends SocketMap>(request: AnyRequest<T>): boolean {
+	if ('callback' in request) {
+		return (request.callback === null);
+	}
 
-export type AnyPacket<T extends SocketMap> = ServicePacket<T['Service']> | MethodPacket<T['Incoming']>;
-
-export type ServicePacket<TServiceMap extends ServiceMap> =
-	{ [TService in keyof TServiceMap]:
-		{ [TMethod in keyof TServiceMap[TService]]:
-			ServiceRequestPacket<TServiceMap, TService, TMethod>
-		}[keyof TServiceMap[TService]]
-	}[keyof TServiceMap]
-
-interface RequestPacket {
-	cid?: number
-}
-
-export type MethodPacket<TMethodMap extends MethodMap> =
-	{ [TMethod in keyof TMethodMap]: 
-		MethodRequestPacket<TMethodMap, TMethod>
-	}[keyof TMethodMap]
-
-export interface ServiceRequestPacket<
-	TServiceMap extends ServiceMap,
-	TService extends keyof TServiceMap,
-	TMethod extends keyof TServiceMap[TService]
-> extends RequestPacket {
-	service: TService,
-	method: TMethod,
-	ackTimeoutMs?: number | boolean,
-	data?: Parameters<TServiceMap[TService][TMethod]>[0]
-}
-
-export interface MethodRequestPacket<TMethodMap extends MethodMap, TMethod extends keyof TMethodMap> extends RequestPacket {
-	method: TMethod,
-	data?: Parameters<TMethodMap[TMethod]>[0],
-	ackTimeoutMs?: number | boolean
-}
-
-export function isRequestPacket<T extends SocketMap>(packet: unknown): packet is AnyPacket<T> {
-	return (typeof packet === 'object') && 'method' in packet;
+	return !request.sentCallback;
 }

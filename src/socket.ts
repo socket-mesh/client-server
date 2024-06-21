@@ -1,5 +1,5 @@
 import { CodecEngine } from "@socket-mesh/formatter";
-import { AnyPacket } from "./request";
+import { AnyPacket } from "./packet";
 import { AsyncStreamEmitter } from "@socket-mesh/async-stream-emitter";
 import { SocketEvent, AuthenticateEvent, BadAuthTokenEvent, CloseEvent, ConnectEvent, DisconnectEvent, ErrorEvent, MessageEvent, PingEvent, PongEvent, RequestEvent, UnexpectedResponseEvent, UpgradeEvent, ResponseEvent, AuthStateChangeEvent, RemoveAuthTokenEvent, ConnectingEvent, DeauthenticateEvent } from "./socket-event.js";
 import { FunctionReturnType, MethodMap, ServiceMap } from "./client/maps/method-map.js";

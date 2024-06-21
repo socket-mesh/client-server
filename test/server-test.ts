@@ -18,8 +18,10 @@ import { ConnectionEvent, SocketAuthStateChangeEvent } from "../src/server/serve
 import { MiddlewareBlockedError } from "@socket-mesh/errors";
 import { AuthOptions } from "../src/server/auth-engine";
 import { OfflineMiddleware } from "../src/middleware/offline-middleware";
+import { InOrderMiddleware } from "../src/middleware/in-order-middleware";
 import { MiddlewareArgs, SendRequestMiddlewareArgs } from "../src/middleware/middleware";
-import { AnyRequest, isRequestPacket } from "../src/request";
+import { AnyRequest } from "../src/request";
+import { isRequestPacket } from "../src/packet";
 import { isPublishOptions } from "../src/channels/channels";
 import { WritableConsumableStream } from "@socket-mesh/writable-consumable-stream";
 
@@ -1501,7 +1503,10 @@ describe('Integration tests', function () {
 
 			server = listen(
 				PORT_NUMBER,
-				Object.assign(
+				Object.assign<
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>>(
 					{},
 					serverOptions,
 					{
@@ -1525,7 +1530,8 @@ describe('Integration tests', function () {
 
 								return 'bar';
 							}
-						}
+						},
+						middleware: [new InOrderMiddleware()]
 					}
 				)
 			);
@@ -1617,7 +1623,8 @@ describe('Integration tests', function () {
 								await wait(30);
 								handledPackets.push(data);	
 							}
-						}
+						},
+						middleware: [new InOrderMiddleware()]
 					}
 				)
 			);
@@ -1869,7 +1876,8 @@ describe('Integration tests', function () {
 	
 									return packet;
 								}
-							}
+							},
+							new InOrderMiddleware()
 						]
 					},
 					serverOptions
@@ -1997,7 +2005,8 @@ describe('Integration tests', function () {
 	
 									return packet;
 								}
-							}
+							},
+							new InOrderMiddleware()
 						]
 					},
 					serverOptions
@@ -2026,4 +2035,45 @@ describe('Integration tests', function () {
 			assert.strictEqual(backpressureHistory[19], 1);
 		});
 	});
+/*
+	describe('Socket pub/sub', function () {
+		it('Should maintain order of publish and subscribe', async function () {
+			server = listen(PORT_NUMBER, {
+				authKey: serverOptions.authKey
+//        wsEngine: WS_ENGINE
+			});
+			bindFailureHandlers(server);
+
+			(async () => {
+				for await (let {socket} of server.listen('connection')) {
+					connectionHandler(socket);
+				}
+			})();
+
+			await server.listen('ready').once();
+
+			client = create({
+				hostname: clientOptions.hostname,
+				port: PORT_NUMBER,
+				authTokenName: 'socketcluster.authToken'
+			});
+
+			await client.listen('connect').once();
+
+			let receivedMessages: unknown[] = [];
+
+			(async () => {
+				for await (let data of client.subscribe('foo')) {
+					receivedMessages.push(data);
+				}
+			})();
+
+			await client.invokePublish('foo', 123);
+
+			assert.strictEqual(client.state, SocketState.OPEN);
+			await wait(100);
+			assert.strictEqual(receivedMessages.length, 1);
+		});
+	});
+*/
 });

@@ -1,5 +1,5 @@
 import { EmptySocketMap, SocketMap } from "../client/maps/socket-map.js";
-import { MethodRequest, ServiceRequest } from "../request.js";
+import { AnyRequest, MethodRequest, ServiceRequest } from "../request.js";
 import { Middleware, SendRequestMiddlewareArgs } from "./middleware.js";
 
 export interface BatchingMiddlewareOptions {
@@ -18,11 +18,12 @@ export class BatchingMiddleware<T extends SocketMap = EmptySocketMap> implements
 	
 	private _isBatching: boolean;
 	private _requests: (MethodRequest<T['Outgoing']> | ServiceRequest<T['Service']>)[];
-	private _continue: (requests: (MethodRequest<T['Outgoing']> | ServiceRequest<T['Service']>)[]) => void | null;
+	private _continue: (requests: AnyRequest<T>[], cb?: (error?: Error) => void) => void | null;
 	private _handshakeTimeoutId: NodeJS.Timeout | null;
 	private _batchingIntervalId: NodeJS.Timeout | null;
 
 	constructor(options?: BatchingMiddlewareOptions) {
+		this.type = 'batching';
 		this._isBatching = false;
 		this._requests = [];
 		this._continue = null;

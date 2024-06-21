@@ -1,5 +1,6 @@
 import { EmptySocketMap, SocketMap } from "../client/maps/socket-map.js";
-import { AnyPacket, AnyRequest } from "../request.js";
+import { AnyPacket } from "../packet.js";
+import { AnyRequest, RequestCollection } from "../request.js";
 import { AnyResponse } from "../response.js";
 import { SocketTransport } from "../socket-transport.js";
 import { Socket, SocketStatus } from "../socket.js";
@@ -25,7 +26,8 @@ export interface MessageMiddlewareArgs<T extends SocketMap = EmptySocketMap> ext
 
 export interface MessageRawMiddlewareArgs<T extends SocketMap = EmptySocketMap> extends MiddlewareArgs<T> {
 	timestamp: Date,
-	message: ws.RawData | string
+	message: ws.RawData | string,
+	promise: Promise<void>
 }
 
 export interface SendRequestMiddlewareArgs<T extends SocketMap = EmptySocketMap> extends MiddlewareArgs<T> {
@@ -44,6 +46,7 @@ export interface Middleware<T extends SocketMap = EmptySocketMap> {
 	onClose?(options: MiddlewareArgs<T>): void,
 	onDeauthenticate?(options: MiddlewareArgs<T>): void,
 	onDisconnected?(options: DisconnectedMiddlewareArgs<T>): void,
+	onEnd?(options: MiddlewareArgs<T>): void,
 	onMessage?(options: MessageMiddlewareArgs<T>): Promise<AnyPacket<T> | AnyResponse<T>>,
 	onMessageRaw?(options: MessageRawMiddlewareArgs<T>): Promise<ws.RawData | string>,
 	onOpen?(options: MiddlewareArgs<T>): void,

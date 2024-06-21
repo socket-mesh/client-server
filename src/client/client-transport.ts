@@ -9,7 +9,7 @@ import { AutoReconnectOptions, ClientSocketOptions, ConnectOptions } from "./cli
 import { AuthToken } from "@socket-mesh/auth";
 import { SocketMapFromClient } from "./maps/socket-map.js";
 import { ClientMap } from "./maps/client-map.js";
-import { AnyPacket } from "../request.js";
+import { AnyPacket } from "../packet.js";
 import { AnyResponse } from "../response.js";
 
 export class ClientTransport<T extends ClientMap> extends SocketTransport<SocketMapFromClient<T>> {

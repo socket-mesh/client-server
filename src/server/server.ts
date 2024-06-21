@@ -6,7 +6,7 @@ import { ClientSocket } from "../client/client-socket.js";
 import { IncomingMessage, Server as HttpServer } from 'http';
 import defaultCodec, { CodecEngine } from "@socket-mesh/formatter";
 import { HandlerMap } from "../client/maps/handler-map.js";
-import { AnyPacket } from "../request.js";
+import { AnyPacket } from "../packet.js";
 import { AuthEngine, defaultAuthEngine, isAuthEngine } from "./auth-engine.js";
 import { handshakeHandler } from "./handlers/handshake.js";
 import { ServerMiddleware } from "./middleware/server-middleware.js";

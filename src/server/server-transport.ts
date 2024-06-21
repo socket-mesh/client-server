@@ -1,4 +1,4 @@
-import { AnyPacket } from "../request.js";
+import { AnyPacket } from "../packet.js";
 import { ServerMap } from "../client/maps/server-map.js";
 import { ServerSocket, ServerSocketOptions } from "./server-socket.js";
 import { SocketTransport } from "../socket-transport.js";
@@ -82,17 +82,23 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 			this.state.server.pendingClientCount--;
 		}
 
-		if (this.streamCleanupMode === 'kill') {
+		if (this.streamCleanupMode !== 'none') {
 			(async () => {
 				await this.socket.listen('end').once();
-				this.socket.killListeners();
-				this.inboundMessageStream.kill();
-			})();
-		} else if (this.streamCleanupMode === 'close') {
-			(async () => {
-				await this.socket.listen('end').once();
-				this.socket.closeListeners();
-				this.inboundMessageStream.close();
+
+				if (this.streamCleanupMode === 'kill') {
+					this.socket.killListeners();
+				} else if (this.streamCleanupMode === 'close') {
+					this.socket.closeListeners();
+				}
+			
+				for (let i = 0; i < this.middleware.length; i++) {
+					const middleware = this.middleware[i];
+		
+					if (middleware.onEnd) {
+						middleware.onEnd({ socket: this.socket, transport: this });
+					}
+				}
 			})();
 		}
 		
@@ -181,7 +187,7 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 			throw err;
 		}
 
-		const changed = super.setAuthorization(signedAuthToken, authToken);
+		const changed = await super.setAuthorization(signedAuthToken, authToken);
 
 		if (changed && this.status === 'ready') {
 			this.triggerAuthenticationEvents(true, wasAuthenticated);

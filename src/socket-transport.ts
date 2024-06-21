@@ -1,7 +1,8 @@
 import defaultCodec, { CodecEngine } from "@socket-mesh/formatter";
 import ws from "isomorphic-ws";
 import { Middleware } from "./middleware/middleware.js";
-import { AnyPacket, AnyRequest, InvokeMethodRequest, InvokeServiceRequest, MethodPacket, TransmitMethodRequest, TransmitServiceRequest, isRequestPacket } from "./request.js";
+import { AnyRequest, InvokeMethodRequest, InvokeServiceRequest, TransmitMethodRequest, TransmitServiceRequest, isRequestDone } from "./request.js";
+import { AnyPacket, MethodPacket, isRequestPacket } from "./packet.js";
 import { AbortError, BadConnectionError, InvalidActionError, InvalidArgumentsError, MiddlewareBlockedError, SocketProtocolError, TimeoutError, dehydrateError, socketProtocolErrorStatuses, socketProtocolIgnoreStatuses } from "@socket-mesh/errors";
 import { ClientRequest, IncomingMessage } from "http";
 import { FunctionReturnType, MethodMap, ServiceMap } from "./client/maps/method-map.js";
@@ -13,7 +14,6 @@ import base64id from "base64id";
 import { RequestHandlerArgs } from "./request-handler.js";
 import { SocketMap } from "./client/maps/socket-map.js";
 import { toArray, wait } from "./utils.js";
-import { WritableConsumableStream } from "@socket-mesh/writable-consumable-stream";
 
 export type CallIdGenerator = () => number;
 
@@ -56,7 +56,6 @@ export class SocketTransport<T extends SocketMap> {
 	private readonly _callIdGenerator: CallIdGenerator;
 	private readonly _callbackMap: {[cid: number]: InvokeCallback<unknown>};
 	private readonly _handlers: HandlerMap<T>;
-	protected readonly inboundMessageStream: WritableConsumableStream<InboundMessage>;
 	private _onUnhandledRequest: (socket: SocketTransport<T>, packet: AnyPacket<T>) => boolean;
 	public readonly codecEngine: CodecEngine;
 	public readonly middleware: Middleware<T>[];
@@ -87,9 +86,6 @@ export class SocketTransport<T extends SocketMap> {
 		this.middleware = options?.middleware || [];
 		this.state = options?.state || {};
 		this.streamCleanupMode = options?.streamCleanupMode || 'kill';
-		this.inboundMessageStream = new WritableConsumableStream();
-
-		this.handleInboudMessageStream();
 	}
 
 	protected abortAllPendingCallbacksDueToBadConnection(status: SocketStatus): void {
@@ -169,102 +165,29 @@ export class SocketTransport<T extends SocketMap> {
 		return this._outboundPreparedMessageCount - this._outboundSentMessageCount;
 	}
 
-	private async handleInboudMessageStream(): Promise<void> {
-		for await (let message of this.inboundMessageStream) {
-			this._inboundProcessedMessageCount++;
+	private async handleInboudMessage({ data, timestamp }: InboundMessage): Promise<void> {
+		let packet: (AnyPacket<T> | AnyResponse<T>) | (AnyPacket<T> | AnyResponse<T>)[] | null = this.decode(data);
 
-			let packet: (AnyPacket<T> | AnyResponse<T>) | (AnyPacket<T> | AnyResponse<T>)[] | null = this.decode(message.data);
-
-			if (packet === null) {
-				return;
-			}
-
-			packet = toArray<AnyPacket<T> | AnyResponse<T>>(packet);
-
-			for (const curPacket of packet) {
-				for (const middleware of this.middleware) {
-					if (middleware.onMessage) {
-						packet = await middleware.onMessage({ socket: this.socket, transport: this, packet: curPacket, timestamp: message.timestamp })
-					}
-				}
-
-				// Check to see if it is a request or response packet. 
-				if (isResponsePacket(curPacket)) {
-					this.onResponse(curPacket);
-				} else if (isRequestPacket(curPacket)) {
-					await this.onRequest(curPacket, message.timestamp);
-				} else {
-					// TODO: Handle non packets here (binary data)
-				}
-			}
-		}
-	}
-
-	public ping(): Promise<void> {
-		return new Promise<void>((resolve, reject) => {
-			this.webSocket.ping(undefined, undefined, (err) => {
-				if (err) {
-					reject(err);
-				} else {
-					resolve();
-				}
-			});
-		});
-	}
-
-	public get socket(): Socket<T> {
-		return this._socket;
-	}
-
-	public set socket(value: Socket<T>) {
-		this._socket = value;
-	}
-
-	public get signedAuthToken(): SignedAuthToken {
-		return this._signedAuthToken;
-	}
-
-	public async setAuthorization(authToken: AuthToken): Promise<boolean>;
-	public async setAuthorization(signedAuthToken: SignedAuthToken, authToken?: AuthToken): Promise<boolean>;
-	public async setAuthorization(signedAuthToken: AuthToken | SignedAuthToken, authToken?: AuthToken): Promise<boolean> {
-		if (typeof signedAuthToken !== 'string') {
-			throw new InvalidArgumentsError('SignedAuthToken must be type string.');
+		if (packet === null) {
+			return;
 		}
 
-		if (signedAuthToken !== this._signedAuthToken) {
-			if (!authToken) {
-				const extractedAuthToken = extractAuthTokenData(signedAuthToken);
-			
-				if (typeof extractedAuthToken === 'string') {
-					throw new InvalidArgumentsError('Invalid authToken.');
+		packet = toArray<AnyPacket<T> | AnyResponse<T>>(packet);
+
+		for (const curPacket of packet) {
+			for (const middleware of this.middleware) {
+				if (middleware.onMessage) {
+					packet = await middleware.onMessage({ socket: this.socket, transport: this, packet: curPacket, timestamp: timestamp })
 				}
-	
-				authToken = extractedAuthToken;
 			}
 
-			this._authToken = authToken;
-			this._signedAuthToken = signedAuthToken;
-
-			return true;
-		}
-
-		return false;
-	}
-
-	public triggerAuthenticationEvents(wasSigned: boolean, wasAuthenticated: boolean): void {
-		this._socket.emit(
-			'authStateChange',
-			{ wasAuthenticated, isAuthenticated: true, authToken: this._authToken, signedAuthToken: this._signedAuthToken }
-		);
-
-		this._socket.emit(
-			'authenticate',
-			{ wasSigned, signedAuthToken: this._signedAuthToken, authToken:this._authToken }
-		);
-
-		for (const middleware of this.middleware) {
-			if (middleware.onAuthenticated) {
-				middleware.onAuthenticated({ socket: this.socket, transport: this });
+			// Check to see if it is a request or response packet. 
+			if (isResponsePacket(curPacket)) {
+				this.onResponse(curPacket);
+			} else if (isRequestPacket(curPacket)) {
+				await this.onRequest(curPacket, timestamp);
+			} else {
+				// TODO: Handle non packets here (binary data)
 			}
 		}
 	}
@@ -326,6 +249,13 @@ export class SocketTransport<T extends SocketMap> {
 	protected onMessage(data: ws.RawData, isBinary: boolean): void {
 		const timestamp = new Date();
 		let p = Promise.resolve(isBinary ? data : data.toString());
+		let resolve: () => void;
+		let reject: (err: Error) => void;
+
+		const promise = new Promise<void>((res, rej) => {
+			resolve = res;
+			reject = rej;
+		});
 
 		this._inboundReceivedMessageCount++;
 
@@ -334,20 +264,23 @@ export class SocketTransport<T extends SocketMap> {
 
 			if (middleware.onMessageRaw) {
 				p = p.then(message => {
-					return middleware.onMessageRaw({ socket: this.socket, transport: this, message, timestamp })
+					return middleware.onMessageRaw({ socket: this.socket, transport: this, message, timestamp, promise })
 				});	
 			}
 		}
 
-		p.then(msg => {
-			this.inboundMessageStream.write({ timestamp, data: msg });
+		p.then(data => {
 			this._socket.emit('message', { data, isBinary });	
-		}).catch(err => {
-			this._inboundProcessedMessageCount++;
-
+			return this.handleInboudMessage({ data, timestamp });
+		})
+		.then(resolve)
+		.catch(err => {
+			reject(err);
 			if (!(err instanceof MiddlewareBlockedError)) {
 				this.onError(err);
 			}
+		}).finally(() => {
+			this._inboundProcessedMessageCount++;
 		});
 	}
 
@@ -453,6 +386,18 @@ export class SocketTransport<T extends SocketMap> {
 		return false;
 	}
 
+	public ping(): Promise<void> {
+		return new Promise<void>((resolve, reject) => {
+			this.webSocket.ping(undefined, undefined, (err) => {
+				if (err) {
+					reject(err);
+				} else {
+					resolve();
+				}
+			});
+		});
+	}
+
 	protected resetPingTimeout(timeoutMs: number | false, code: number) {
 		if (this._pingTimeoutRef) {
 			clearTimeout(this._pingTimeoutRef);
@@ -466,43 +411,6 @@ export class SocketTransport<T extends SocketMap> {
 			this._pingTimeoutRef = setTimeout(() => {
 				this.webSocket.close(code);
 			}, timeoutMs);
-		}
-	}
-
-	public setReadyStatus(pingTimeoutMs: number, authError?: Error): void {
-		if (this._webSocket?.readyState !== ws.OPEN) {
-			throw new InvalidActionError('Cannot set status to OPEN before socket is connected.');
-		}
-
-		this._isReady = true;
-
-		for (const middleware of this.middleware) {
-			if (middleware.onReady) {
-				middleware.onReady({ socket: this.socket, transport: this });
-			}
-		}
-
-		this._socket.emit('connect', { id: this.id, pingTimeoutMs, isAuthenticated: !!this.signedAuthToken, authError });
-	}
-
-	public get status(): SocketStatus {
-		if (!this._webSocket) {
-			return 'closed';
-		}
-
-		if (this._isReady) {
-			return 'ready';
-		}
-
-		switch (this._webSocket.readyState) {
-			case ws.CONNECTING:
-			case ws.OPEN:
-				return 'connecting';				
-			case ws.CLOSING:
-				return 'closing';
-		
-			default:
-				return 'closed';
 		}
 	}
 
@@ -535,10 +443,8 @@ export class SocketTransport<T extends SocketMap> {
 		}
 
 		// Filter out any requests that have already timed out.
-		if (requests.some(request => 'callback' in request && request.callback === null)) {
-			requests = requests.filter(
-				request => !('callback' in request) || request.callback !== null
-			);
+		if (requests.some(request => isRequestDone(request))) {
+			requests = requests.filter(req => isRequestDone(req));
 
 			if (!requests.length) {
 				return;
@@ -569,7 +475,7 @@ export class SocketTransport<T extends SocketMap> {
 						}
 					}
 				}
-	
+
 				return;
 			}
 		}
@@ -584,7 +490,7 @@ export class SocketTransport<T extends SocketMap> {
 
 				this.onError(err);
 
-				if ('sentCallback' in request && request.sentCallback) {
+				if (request.sentCallback) {
 					request.sentCallback(err);
 				}
 
@@ -597,14 +503,14 @@ export class SocketTransport<T extends SocketMap> {
 
 		const encode = requests.map(req => {
 			if ('callback' in req) {
-				const { callback, timeoutId, ...rest } = req;
+				const { callback, promise, timeoutId, ...rest } = req;
 
 				this._callbackMap[req.cid] = {
 					method: ['service' in req ? req.service : '', req.method].filter(Boolean).join('.'),
 					timeoutId: req.timeoutId,
 					callback: req.callback
 				};
-				
+
 				return rest;
 			}
 
@@ -698,6 +604,100 @@ export class SocketTransport<T extends SocketMap> {
 		);
 	}
 
+	public async setAuthorization(authToken: AuthToken): Promise<boolean>;
+	public async setAuthorization(signedAuthToken: SignedAuthToken, authToken?: AuthToken): Promise<boolean>;
+	public async setAuthorization(signedAuthToken: AuthToken | SignedAuthToken, authToken?: AuthToken): Promise<boolean> {
+		if (typeof signedAuthToken !== 'string') {
+			throw new InvalidArgumentsError('SignedAuthToken must be type string.');
+		}
+
+		if (signedAuthToken !== this._signedAuthToken) {
+			if (!authToken) {
+				const extractedAuthToken = extractAuthTokenData(signedAuthToken);
+			
+				if (typeof extractedAuthToken === 'string') {
+					throw new InvalidArgumentsError('Invalid authToken.');
+				}
+	
+				authToken = extractedAuthToken;
+			}
+
+			this._authToken = authToken;
+			this._signedAuthToken = signedAuthToken;
+
+			return true;
+		}
+
+		return false;
+	}
+
+	public setReadyStatus(pingTimeoutMs: number, authError?: Error): void {
+		if (this._webSocket?.readyState !== ws.OPEN) {
+			throw new InvalidActionError('Cannot set status to OPEN before socket is connected.');
+		}
+
+		this._isReady = true;
+
+		for (const middleware of this.middleware) {
+			if (middleware.onReady) {
+				middleware.onReady({ socket: this.socket, transport: this });
+			}
+		}
+
+		this._socket.emit('connect', { id: this.id, pingTimeoutMs, isAuthenticated: !!this.signedAuthToken, authError });
+	}
+
+	public get signedAuthToken(): SignedAuthToken {
+		return this._signedAuthToken;
+	}
+
+	public get socket(): Socket<T> {
+		return this._socket;
+	}
+
+	public set socket(value: Socket<T>) {
+		this._socket = value;
+	}
+
+	public get status(): SocketStatus {
+		if (!this._webSocket) {
+			return 'closed';
+		}
+
+		if (this._isReady) {
+			return 'ready';
+		}
+
+		switch (this._webSocket.readyState) {
+			case ws.CONNECTING:
+			case ws.OPEN:
+				return 'connecting';				
+			case ws.CLOSING:
+				return 'closing';
+		
+			default:
+				return 'closed';
+		}
+	}
+
+	public triggerAuthenticationEvents(wasSigned: boolean, wasAuthenticated: boolean): void {
+		this._socket.emit(
+			'authStateChange',
+			{ wasAuthenticated, isAuthenticated: true, authToken: this._authToken, signedAuthToken: this._signedAuthToken }
+		);
+
+		this._socket.emit(
+			'authenticate',
+			{ wasSigned, signedAuthToken: this._signedAuthToken, authToken:this._authToken }
+		);
+
+		for (const middleware of this.middleware) {
+			if (middleware.onAuthenticated) {
+				middleware.onAuthenticated({ socket: this.socket, transport: this });
+			}
+		}
+	}
+
 	public transmit<TMethod extends keyof T['Outgoing']>(
 		method: TMethod, arg?: Parameters<T['Outgoing'][TMethod]>[0]): Promise<void>;
 	public transmit<TService extends keyof T['Service'], TMethod extends keyof T['Service'][TService]>(
@@ -727,13 +727,15 @@ export class SocketTransport<T extends SocketMap> {
 			service ? {
 				service,
 				method: serviceMethod,
+				promise: null,
 				data: arg as Parameters<T['Service'][TService][TServiceMethod]>[0]
 			} : {
+				data: arg as Parameters<T['Outgoing'][TMethod]>[0],
 				method,
-				data: arg as Parameters<T['Outgoing'][TMethod]>[0]
+				promise: null
 			};
 
-		const promise = new Promise<void>((resolve, reject) => {
+		const promise = request.promise = new Promise<void>((resolve, reject) => {
 			request.sentCallback = (err?: Error) => {
 				delete request.sentCallback;
 				this._outboundSentMessageCount++;
@@ -807,7 +809,8 @@ export class SocketTransport<T extends SocketMap> {
 				{
 					cid: this._callIdGenerator(),
 					ackTimeoutMs: ackTimeoutMs ?? this.ackTimeoutMs,
-					callback: null
+					callback: null,
+					promise: null
 				},
 				service ? {
 					service,
@@ -821,7 +824,7 @@ export class SocketTransport<T extends SocketMap> {
 
 		let abort: () => void;
 
-		const promise = new Promise<FunctionReturnType<T['Service'][TService][TServiceMethod] | T['Outgoing'][TMethod] | T['PrivateOutgoing'][TPrivateMethod]>>((resolve, reject) => {
+		const promise = request.promise = new Promise<FunctionReturnType<T['Service'][TService][TServiceMethod] | T['Outgoing'][TMethod] | T['PrivateOutgoing'][TPrivateMethod]>>((resolve, reject) => {
 			if (request.ackTimeoutMs) {
 				request.timeoutId = setTimeout(
 					() => {
