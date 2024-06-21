@@ -2035,45 +2035,66 @@ describe('Integration tests', function () {
 			assert.strictEqual(backpressureHistory[19], 1);
 		});
 	});
-/*
+
 	describe('Socket pub/sub', function () {
 		it('Should maintain order of publish and subscribe', async function () {
-			server = listen(PORT_NUMBER, {
-				authKey: serverOptions.authKey
-//        wsEngine: WS_ENGINE
-			});
+			server = listen(PORT_NUMBER, serverOptions);
 			bindFailureHandlers(server);
 
-			(async () => {
-				for await (let {socket} of server.listen('connection')) {
-					connectionHandler(socket);
-				}
-			})();
+			await server.listen('ready').once(100);
 
-			await server.listen('ready').once();
+			client = new ClientSocket(clientOptions);
 
-			client = create({
-				hostname: clientOptions.hostname,
-				port: PORT_NUMBER,
-				authTokenName: 'socketcluster.authToken'
-			});
+			await client.listen('connect').once(100);
 
-			await client.listen('connect').once();
-
-			let receivedMessages: unknown[] = [];
+			const receivedMessages: string[] = [];
 
 			(async () => {
-				for await (let data of client.subscribe('foo')) {
+				for await (let data of client.channels.subscribe('foo')) {
 					receivedMessages.push(data);
 				}
 			})();
 
-			await client.invokePublish('foo', 123);
+			await client.channels.invokePublish('foo', 123);
 
-			assert.strictEqual(client.state, SocketState.OPEN);
+			assert.strictEqual(client.status, 'ready');
 			await wait(100);
 			assert.strictEqual(receivedMessages.length, 1);
 		});
+
+		it('Should maintain order of publish and subscribe when client starts out as disconnected', async function () {
+			server = listen(PORT_NUMBER, serverOptions);
+			bindFailureHandlers(server);
+
+			await server.listen('ready').once();
+
+			client = new ClientSocket(
+				Object.assign<
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>
+				>(
+					{
+						autoConnect: false
+					},
+					clientOptions
+				)
+			);
+
+			assert.strictEqual(client.status, 'closed');
+
+			let receivedMessages: number[] = [];
+
+			(async () => {
+				for await (let data of client.channels.subscribe<number>('foo')) {
+					receivedMessages.push(data);
+				}
+			})();
+
+			client.channels.invokePublish('foo', 123);
+
+			await wait(100);
+			assert.strictEqual(client.status, 'ready');
+			assert.strictEqual(receivedMessages.length, 1);
+		});		
 	});
-*/
 });
