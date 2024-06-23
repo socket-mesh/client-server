@@ -2095,6 +2095,73 @@ describe('Integration tests', function () {
 			await wait(100);
 			assert.strictEqual(client.status, 'ready');
 			assert.strictEqual(receivedMessages.length, 1);
-		});		
+		});
+
+		it('Client should not be able to subscribe to a channel before the handshake has completed', async function () {
+			let isSubscribed = false;
+			let error: Error | null = null;
+
+			server = listen(
+				PORT_NUMBER,
+				Object.assign<
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>>(
+					{
+						authEngine: {
+							async verifyToken() {
+								await wait(500);
+								return {};
+							},
+							signToken: async function() {
+								return '';
+							}
+						}
+					},
+					serverOptions
+				)
+			);
+
+			bindFailureHandlers(server);
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(
+				Object.assign<
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>
+				>(
+					{
+						middleware: [
+							{
+								type: 'Subscribe handshake test',
+								onOpen({ transport }) {
+									// Hack to capture the error without relying on the standard client flow.
+									(transport as any)._callbackMap[2] = {
+										method: '#subscribe',
+										callback: (err: Error) => {
+											error = err;
+										}
+									};
+
+									transport.send('{"cid":2,"method":"#subscribe","data":{"channel":"someChannel"}}');
+								}
+							}
+						]
+					},
+					clientOptions
+				)
+			);
+
+			(async () => {
+				for await (let event of server.exchange.listen('subscription')) {
+					isSubscribed = true;
+				}
+			})();
+
+			await wait(200);
+			assert.strictEqual(isSubscribed, false);
+			assert.notEqual(error, null);
+			assert.strictEqual(error!.name, 'BadConnectionError');
+		});
 	});
 });

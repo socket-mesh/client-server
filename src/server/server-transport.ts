@@ -115,18 +115,6 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		super.onMessage(data, isBinary);
 	}
 
-	protected override async onRequest(packet: AnyPacket<SocketMapFromServer<T>>, timestamp: Date): Promise<boolean> {
-		let wasHandled = false;
-
-		if (!this.service || !('service' in packet) || packet.service === this.service) {
-			wasHandled = await super.onRequest(packet, timestamp);
-		} else {
-			wasHandled = this.onUnhandledRequest(packet);
-		}
-
-		return wasHandled;
-	}
-
 	protected override onPing(data: Buffer): void {
 		if (this.state.server.strictHandshake && this.status === 'connecting') {
 			this.disconnect(4009);
@@ -141,6 +129,23 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		this.resetPingTimeout(this.state.server.isPingTimeoutDisabled ? false : this.state.server.pingTimeoutMs, 4001);
 		super.onPong(data);
 		this.state.server.emit('socketPong', { socket: this.socket, data });
+	}
+
+	protected override async onRequest(packet: AnyPacket<SocketMapFromServer<T>>, timestamp: Date): Promise<boolean> {
+		let wasHandled = false;
+
+		if (!this.service || !('service' in packet) || packet.service === this.service) {
+			if (this.state.server.strictHandshake && this.status === 'connecting' && packet.method !== '#handshake') {
+				this.disconnect(4009);
+				return true;
+			}
+
+			wasHandled = await super.onRequest(packet, timestamp);
+		} else {
+			wasHandled = this.onUnhandledRequest(packet);
+		}
+
+		return wasHandled;
 	}
 	
 	protected override onResponse(response: AnyResponse<SocketMapFromServer<T>>): void {

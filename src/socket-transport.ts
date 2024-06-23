@@ -514,7 +514,9 @@ export class SocketTransport<T extends SocketMap> {
 				return rest;
 			}
 
-			return req;
+			const { promise, ...rest } = req;
+
+			return rest;
 		});
 
 		this._webSocket.send(

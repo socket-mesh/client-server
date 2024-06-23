@@ -30,6 +30,7 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 	constructor(options: ClientSocketOptions<T>) {
 		super(options);
 
+		this.type = 'client';
 		this._uri = typeof options.address === 'string' ? new URL(options.address) : options.address;
 		this.authEngine =
 			isAuthEngine(options.authEngine) ?
