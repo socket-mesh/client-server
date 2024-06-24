@@ -21,6 +21,12 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		this.type = 'server';
 		this.service = options.service;
 		this.webSocket = options.socket;
+
+		// Server is not set on socket until the socket constructor is completed so pull it from the options.
+		this.resetPingTimeout(
+			options.server.isPingTimeoutDisabled ? false : options.server.pingTimeoutMs,
+			4001
+		);
 	}
 
 	public override async changeToUnauthenticatedState(): Promise<boolean> {
@@ -28,11 +34,11 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 			const authToken = this.authToken;
 			const signedAuthToken = this.signedAuthToken;
 
-			this.socket.state.server.emit('socketAuthStateChange', { socket: this.socket, wasAuthenticated: true, isAuthenticated: false });
+			this.socket.server.emit('socketAuthStateChange', { socket: this.socket, wasAuthenticated: true, isAuthenticated: false });
 
 			await super.changeToUnauthenticatedState();
 
-			this.socket.state.server.emit('socketDeauthenticate', { socket: this.socket, signedAuthToken, authToken });
+			this.socket.server.emit('socketDeauthenticate', { socket: this.socket, signedAuthToken, authToken });
 
 			return true;
 		}
@@ -43,7 +49,7 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 	protected override decode(data: string | RawData): AnyPacket<SocketMapFromServer<T>> | AnyPacket<SocketMapFromServer<T>>[] | AnyResponse<SocketMapFromServer<T>> | AnyResponse<SocketMapFromServer<T>>[] | null {
 		const packet = super.decode(data);
 
-		if ((packet === null || typeof packet !== 'object') && this.socket.state.server.strictHandshake && this.status === 'connecting') {
+		if ((packet === null || typeof packet !== 'object') && this.socket.server.strictHandshake && this.status === 'connecting') {
 			this.disconnect(4009);
 			return null;
 		}
@@ -57,28 +63,28 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 
 		super.onClose(code, reason);
 
-		this.socket.state.server.emit('socketClose', { socket: this.socket, code, reason: strReason });
+		this.socket.server.emit('socketClose', { socket: this.socket, code, reason: strReason });
 
 		this.onDisconnect(status, code, strReason);
 	}
 	
 	protected override onDisconnect(status: SocketStatus, code: number, reason?: string): void {
 		if (status === 'ready') {
-			this.socket.state.server.emit('socketDisconnect', { socket: this.socket, code, reason });
+			this.socket.server.emit('socketDisconnect', { socket: this.socket, code, reason });
 		} else {
-			this.socket.state.server.emit('socketConnectAbort', { socket: this.socket, code, reason });
+			this.socket.server.emit('socketConnectAbort', { socket: this.socket, code, reason });
 		}
 
 		super.onDisconnect(status, code, reason);
 
-		if (!!this.socket.state.server.clients[this.id]) {
-			delete this.socket.state.server.clients[this.id];
-			this.socket.state.server.clientCount--;
+		if (!!this.socket.server.clients[this.id]) {
+			delete this.socket.server.clients[this.id];
+			this.socket.server.clientCount--;
 		}
 
-		if (!!this.socket.state.server.pendingClients[this.id]) {
-			delete this.socket.state.server.pendingClients[this.id];
-			this.socket.state.server.pendingClientCount--;
+		if (!!this.socket.server.pendingClients[this.id]) {
+			delete this.socket.server.pendingClients[this.id];
+			this.socket.server.pendingClientCount--;
 		}
 
 		if (this.socket.state.channelSubscriptions) {
@@ -112,35 +118,35 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 
 	public override onError(error: Error): void {
 		super.onError(error);
-		this.socket.state.server.emit('socketError', { socket: this.socket, error });
+		this.socket.server.emit('socketError', { socket: this.socket, error });
 	}
 	
 	protected override onMessage(data: RawData, isBinary: boolean): void {
-		this.socket.state.server.emit('socketMessage', { socket: this.socket, data, isBinary });
+		this.socket.server.emit('socketMessage', { socket: this.socket, data, isBinary });
 		super.onMessage(data, isBinary);
 	}
 
 	protected override onPing(data: Buffer): void {
-		if (this.socket.state.server.strictHandshake && this.status === 'connecting') {
+		if (this.socket.server.strictHandshake && this.status === 'connecting') {
 			this.disconnect(4009);
 			return;
 		}
 
 		super.onPing(data);
-		this.socket.state.server.emit('socketPing', { socket: this.socket, data });	
+		this.socket.server.emit('socketPing', { socket: this.socket, data });	
 	}
 
 	protected override onPong(data: Buffer): void {
-		this.resetPingTimeout(this.socket.state.server.isPingTimeoutDisabled ? false : this.socket.state.server.pingTimeoutMs, 4001);
+		this.resetPingTimeout(this.socket.server.isPingTimeoutDisabled ? false : this.socket.server.pingTimeoutMs, 4001);
 		super.onPong(data);
-		this.socket.state.server.emit('socketPong', { socket: this.socket, data });
+		this.socket.server.emit('socketPong', { socket: this.socket, data });
 	}
 
 	protected override async onRequest(packet: AnyPacket<SocketMapFromServer<T>>, timestamp: Date): Promise<boolean> {
 		let wasHandled = false;
 
 		if (!this.service || !('service' in packet) || packet.service === this.service) {
-			if (this.socket.state.server.strictHandshake && this.status === 'connecting' && packet.method !== '#handshake') {
+			if (this.socket.server.strictHandshake && this.status === 'connecting' && packet.method !== '#handshake') {
 				this.disconnect(4009);
 				return true;
 			}
@@ -155,17 +161,17 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 	
 	protected override onResponse(response: AnyResponse<SocketMapFromServer<T>>): void {
 		super.onResponse(response);
-		this.socket.state.server.emit('socketResponse', { socket: this.socket, response });
+		this.socket.server.emit('socketResponse', { socket: this.socket, response });
 	}
 
 	protected override onUpgrade(request: IncomingMessage): void {
 		super.onUpgrade(request);
-		this.socket.state.server.emit('socketUpgrade', { socket: this.socket, request });
+		this.socket.server.emit('socketUpgrade', { socket: this.socket, request });
 	}
 	
 	protected override onUnexpectedResponse(request: ClientRequest, response: IncomingMessage): void {
 		super.onUnexpectedResponse(request, response);
-		this.socket.state.server.emit('socketUnexpectedResponse', { socket: this.socket, request, response });
+		this.socket.server.emit('socketUnexpectedResponse', { socket: this.socket, request, response });
 	}
 
 	public override async setAuthorization(authToken: AuthToken, options?: AuthTokenOptions): Promise<boolean>;
@@ -183,7 +189,7 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 			return changed;
 		}
 
-		const auth = this.socket.state.server.auth;
+		const auth = this.socket.server.auth;
 		const rejectOnFailedDelivery = options?.rejectOnFailedDelivery;
 		let signedAuthToken: string;
 
@@ -237,7 +243,7 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 
 	public override setReadyStatus(pingTimeoutMs: number, authError?: Error): void {
 		super.setReadyStatus(pingTimeoutMs, authError);
-		this.socket.state.server.emit('socketConnect', { socket: this.socket, pingTimeoutMs, id: this.socket.id, isAuthenticated: !!this.signedAuthToken, authError });
+		this.socket.server.emit('socketConnect', { socket: this.socket, pingTimeoutMs, id: this.socket.id, isAuthenticated: !!this.signedAuthToken, authError });
 	}
 
 	public override get socket(): ServerSocket<T> {
@@ -246,22 +252,17 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 
 	public override set socket(value: ServerSocket<T>) {
 		super.socket = value;
-
-		this.resetPingTimeout(
-			value.state.server.isPingTimeoutDisabled ? false : value.state.server.pingTimeoutMs,
-			4001
-		);
 	}
 
 	public override triggerAuthenticationEvents(wasSigned: boolean, wasAuthenticated: boolean): void {
 		super.triggerAuthenticationEvents(wasSigned, wasAuthenticated);
 
-		this.socket.state.server.emit(
+		this.socket.server.emit(
 			'socketAuthStateChange',
 			{ socket: this.socket, wasAuthenticated, isAuthenticated: true, authToken: this.authToken, signedAuthToken: this.signedAuthToken }
 		);
 
-		this.socket.state.server.emit(
+		this.socket.server.emit(
 			'socketAuthenticate',
 			{ socket: this.socket, wasSigned, signedAuthToken: this.signedAuthToken, authToken: this.authToken }
 		);
@@ -284,7 +285,7 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		}
 
 		try {
-			const server = this.socket.state.server;
+			const server = this.socket.server;
 			await server.brokerEngine.unsubscribe(this, channel);
 			delete this.socket.state.channelSubscriptions[channel];
 	

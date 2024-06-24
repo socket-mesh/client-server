@@ -166,11 +166,9 @@ async function loginWithIssAndIssuerHandler(
 }
 
 async function setAuthKeyHandler(
-	{ socket, options: secret }: RequestHandlerArgs<jwt.Secret, BasicSocketMapServer>
+	{ socket, options: secret }: RequestHandlerArgs<jwt.Secret, BasicSocketMapServer, ServerSocket<BasicServerMap>>
 ): Promise<void> {
-	const server = socket.state.server;
-
-	server!.auth.authKey = secret;
+	socket.server!.auth.authKey = secret;
 }
 
 async function procHandler(

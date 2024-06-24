@@ -3,9 +3,10 @@ import jwt from "jsonwebtoken";
 import { AuthTokenError, AuthTokenExpiredError, AuthTokenInvalidError, AuthTokenNotBeforeError, InvalidActionError } from "@socket-mesh/errors";
 import { AuthEngine } from "../auth-engine.js";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
-import { Socket } from "../../socket.js";
 import { SocketTransport } from "../../socket-transport.js";
 import { BasicSocketMapServer } from "../../client/maps/socket-map.js";
+import { ServerSocket } from "../server-socket.js";
+import { BasicServerMap } from "../../client/maps/server-map.js";
 
 const HANDSHAKE_REJECTION_STATUS_CODE = 4008;
 
@@ -22,7 +23,7 @@ export interface ValidAuthInfo {
 }
 
 export async function authenticateHandler(
-	{ isRpc, options: signedAuthToken, socket, transport }: RequestHandlerArgs<string, BasicSocketMapServer>
+	{ isRpc, options: signedAuthToken, socket, transport }: RequestHandlerArgs<string, BasicSocketMapServer, ServerSocket<BasicServerMap>>
 ): Promise<void> {
 	if (!isRpc) {
 		socket.disconnect(HANDSHAKE_REJECTION_STATUS_CODE);
@@ -30,9 +31,7 @@ export async function authenticateHandler(
 		throw new InvalidActionError('Handshake request was malformatted');
 	}
 
-	const state = socket.state;
-	const server = state.server;
-	const authInfo = await validateAuthToken(server.auth, signedAuthToken);
+	const authInfo = await validateAuthToken(socket.server.auth, signedAuthToken);
 
 	await processAuthentication(socket, transport, authInfo);
 }
@@ -70,7 +69,7 @@ function processTokenError(err: jwt.VerifyErrors): AuthTokenError {
 }
 
 export async function processAuthentication(
-	socket: Socket<BasicSocketMapServer>,
+	socket: ServerSocket<BasicServerMap>,
 	transport: SocketTransport<BasicSocketMapServer>,
 	authInfo: AuthInfo
 ): Promise<boolean> {
@@ -90,7 +89,7 @@ export async function processAuthentication(
 		throw authInfo.authError;
 	}
 
-	for (const middleware of socket.state.server.middleware) {
+	for (const middleware of socket.server.middleware) {
 		if (middleware.onAuthenticate) {
 			try {
 				middleware.onAuthenticate(authInfo);

@@ -181,7 +181,8 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 			middleware: this.middleware,
 			onUnhandledRequest: this.onUnhandledRequest.bind(this),
 			socket: wsSocket,
-			state: { server: this },
+			server: this,
+			state: {},
 			streamCleanupMode: this.socketStreamCleanupMode
 		});
 
@@ -192,26 +193,6 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 
 		this.emit('connection', { socket, upgradeReq });
 
-		//agSocket.exchange = this.exchange;
-/*
-		const inboundRawMiddleware = this._middleware[MiddlewareType.MIDDLEWARE_INBOUND_RAW];
-
-		if (inboundRawMiddleware) {
-			inboundRawMiddleware(socket.middlewareInboundRawStream);
-		}
-
-		const inboundMiddleware = this._middleware[MiddlewareType.MIDDLEWARE_INBOUND];
-
-		if (inboundMiddleware) {
-			inboundMiddleware(socket.middlewareInboundStream);
-		}
-
-		const outboundMiddleware = this._middleware[MiddlewareType.MIDDLEWARE_OUTBOUND];
-
-		if (outboundMiddleware) {
-			outboundMiddleware(socket.middlewareOutboundStream);
-		}
-*/
 		// Emit event to signal that a socket handshake has been initiated.
 		this.emit('handshake', { socket });
 	}

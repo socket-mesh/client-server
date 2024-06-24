@@ -2,14 +2,13 @@ import { RequestHandlerArgs } from "../../request-handler.js";
 import { BasicSocketMapServer } from "../../client/maps/socket-map.js";
 import { InvalidActionError } from "@socket-mesh/errors";
 import { PublishOptions } from "../../channels/channels.js";
+import { ServerSocket } from "../server-socket.js";
+import { BasicServerMap } from "../../client/maps/server-map.js";
 
 export async function publishHandler(
-	{ socket, options }: RequestHandlerArgs<PublishOptions, BasicSocketMapServer<{}, { [channel: string]: any }>>
+	{ socket, options }: RequestHandlerArgs<PublishOptions, BasicSocketMapServer<{}, { [channel: string]: any }>, ServerSocket<BasicServerMap>>
 ): Promise<void> {
-	const state = socket.state;
-	const server = state.server;
-
-	if (!server.allowClientPublish) {
+	if (!socket.server.allowClientPublish) {
 		throw new InvalidActionError('Client publish feature is disabled');
 	}
 
@@ -17,5 +16,5 @@ export async function publishHandler(
 		throw new InvalidActionError('Publish channel name was malformatted');
 	}
 
-	await server.exchange.invokePublish(options.channel, options.data);
+	await socket.server.exchange.invokePublish(options.channel, options.data);
 }

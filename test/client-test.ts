@@ -3,7 +3,7 @@ import { beforeEach, afterEach, describe, it, mock } from "node:test";
 import { ClientSocket } from '../src/client/client-socket.js';
 import { SocketStatus } from '../src/socket.js';
 import { AuthStateChangeEvent, CloseEvent, DisconnectEvent } from '../src/socket-event.js';
-import { Server, listen } from '../src/index.js';
+import { Server, ServerSocket, listen } from '../src/index.js';
 import localStorage from '@socket-mesh/local-storage';
 import { RequestHandlerArgs } from '../src/request-handler.js';
 import { ClientSocketOptions } from '../src/client/client-socket-options.js';
@@ -82,11 +82,9 @@ async function performTaskHandler({ options }: RequestHandlerArgs<number>): Prom
 }
 
 async function setAuthKeyHandler(
-	{ socket, options: secret }: RequestHandlerArgs<jwt.Secret, BasicSocketMapServer>
+	{ socket, options: secret }: RequestHandlerArgs<jwt.Secret, BasicSocketMapServer, ServerSocket<BasicServerMap>>
 ): Promise<void> {
-	const server = socket.state.server;
-
-	server!.auth.authKey = secret;
+	socket.server!.auth.authKey = secret;
 }
 
 const clientOptions: ClientSocketOptions<MyClientMap> = {

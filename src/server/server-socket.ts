@@ -5,14 +5,17 @@ import { ServerTransport } from "./server-transport.js";
 import { SocketMapFromServer } from "../client/maps/socket-map.js";
 import { ServerMap } from "../client/maps/server-map.js";
 import { Exchange } from "./broker/exchange.js";
+import { Server } from "./server.js";
 
 export interface ServerSocketOptions<T extends ServerMap> extends SocketOptions<SocketMapFromServer<T>> {
 	handlers: HandlerMap<SocketMapFromServer<T>>,
 	service?: string,
+	server: Server<T>,
 	socket: ws.WebSocket
 }
 
 export class ServerSocket<T extends ServerMap> extends Socket<SocketMapFromServer<T>> {
+	public readonly server: Server<T>;
 	private _serverTransport: ServerTransport<T>;
 
 	constructor(options: ServerSocketOptions<T>) {
@@ -20,6 +23,7 @@ export class ServerSocket<T extends ServerMap> extends Socket<SocketMapFromServe
 
 		super(transport, options);
 
+		this.server = options.server;
 		this._serverTransport = transport;
 	}
 
@@ -46,7 +50,7 @@ export class ServerSocket<T extends ServerMap> extends Socket<SocketMapFromServe
 	}
 
 	public get exchange(): Exchange<T['Channel']> {
-		return this.state.server.exchange;
+		return this.server.exchange;
 	}
 
 	get service(): string {

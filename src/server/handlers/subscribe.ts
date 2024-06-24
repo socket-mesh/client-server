@@ -1,10 +1,11 @@
 import { BrokerError, InvalidActionError } from "@socket-mesh/errors";
-import { SubscribeOptions } from "../../client/maps/server-map.js";
+import { BasicServerMap, SubscribeOptions } from "../../client/maps/server-map.js";
 import { RequestHandlerArgs } from "../../request-handler.js";
 import { BasicSocketMapServer } from "../../client/maps/socket-map.js";
+import { ServerSocket } from "../server-socket.js";
 
 export async function subscribeHandler(
-	{ socket, transport, options }: RequestHandlerArgs<SubscribeOptions, BasicSocketMapServer>
+	{ socket, transport, options }: RequestHandlerArgs<SubscribeOptions, BasicSocketMapServer, ServerSocket<BasicServerMap>>
 ): Promise<void> {
 	if (socket.status !== 'ready') {
 		// This is an invalid state; it means the client tried to subscribe before
@@ -13,7 +14,7 @@ export async function subscribeHandler(
 	}
 
 	const state = socket.state;
-	const server = state.server;
+	const server = socket.server;
 
 	if (server.socketChannelLimit && state.channelSubscriptionsCount >= server.socketChannelLimit) {
 		throw new InvalidActionError(
