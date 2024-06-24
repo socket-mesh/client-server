@@ -13,7 +13,7 @@ export class SimpleExchange<T extends ChannelMap> extends Exchange<T> {
 		this._broker = broker;
 	}
 
-	protected trySubscribe(channel: ChannelDetails) {
+	protected async trySubscribe(channel: ChannelDetails): Promise<void> {
 		channel.state = 'subscribed';
 
 		this._channelEventDemux.write(`${channel.name}/subscribe`, { channel: channel.name });
@@ -21,12 +21,12 @@ export class SimpleExchange<T extends ChannelMap> extends Exchange<T> {
 		this.emit('subscribe', { channel: channel.name, options: channel.options });
 	}
 
-	protected tryUnsubscribe(channel: ChannelDetails) {
+	protected async tryUnsubscribe(channel: ChannelDetails): Promise<void> {
 		delete this._channelMap[channel.name];
 
 		if (channel.state === 'subscribed') {
 			this._channelEventDemux.write(`${channel.name}/unsubscribe`, { channel: channel.name });
-			this._broker.unsubscribe(this, channel.name);
+			await this._broker.unsubscribe(this, channel.name);
 			this.emit('unsubscribe', { channel: channel.name });
 		}
 	}

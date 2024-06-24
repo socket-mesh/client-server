@@ -13,7 +13,7 @@ import { AuthInfo } from "../src/server/handlers/authenticate";
 import assert from "node:assert";
 import localStorage from '@socket-mesh/local-storage';
 import { wait } from "../src/utils";
-import { AuthStateChangeEvent, AuthenticatedChangeEvent, CloseEvent, ConnectEvent } from "../src/socket-event";
+import { AuthStateChangeEvent, AuthenticatedChangeEvent, CloseEvent, ConnectEvent, DisconnectEvent } from "../src/socket-event";
 import { ConnectionEvent, SocketAuthStateChangeEvent } from "../src/server/server-event";
 import { MiddlewareBlockedError } from "@socket-mesh/errors";
 import { AuthOptions } from "../src/server/auth-engine";
@@ -24,6 +24,9 @@ import { AnyRequest } from "../src/request";
 import { isRequestPacket } from "../src/packet";
 import { isPublishOptions } from "../src/channels/channels";
 import { WritableConsumableStream } from "@socket-mesh/writable-consumable-stream";
+import { UnsubscribeEvent } from "../src/channels/channel-events";
+import { SimpleBroker } from "../src/server/broker/simple-broker";
+import { ExchangeClient } from "../src/server/broker/exchange-client";
 
 // Add to the global scope like in browser.
 global.localStorage = localStorage;
@@ -2163,5 +2166,459 @@ describe('Integration tests', function () {
 			assert.notEqual(error, null);
 			assert.strictEqual(error!.name, 'BadConnectionError');
 		});
+
+		it('Server should be able to handle invalid #subscribe and #unsubscribe and #publish events without crashing', async function () {
+			let nullInChannelArrayError: Error | null = null;
+			let objectAsChannelNameError: Error | null = null;
+			let nullChannelNameError: Error | null = null;
+			let nullUnsubscribeError: Error | null = null;
+
+			let undefinedPublishError: Error | null = null;
+			let objectAsChannelNamePublishError: Error | null = null;
+			let nullPublishError: Error | null = null;
+
+			server = listen(PORT_NUMBER, serverOptions);
+			bindFailureHandlers(server);
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(
+				Object.assign<
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>
+				>(
+					{
+						middleware: [
+							{
+								type: 'Subscribe handshake test',
+								onOpen({ transport }) {
+									// Hacks to capture the errors without relying on the standard client flow.
+									(transport as any)._callbackMap[2] = {
+										method: '#subscribe',
+										data: [null],
+										callback: function (err: Error) {
+											nullInChannelArrayError = err;
+										}
+									};
+									(transport as any)._callbackMap[3] = {
+										method: '#subscribe',
+										data: {"channel": {"hello": 123}},
+										callback: function (err: Error) {
+											objectAsChannelNameError = err;
+										}
+									};
+									(transport as any)._callbackMap[4] = {
+										method: '#subscribe',
+										data: null,
+										callback: function (err: Error) {
+											nullChannelNameError = err;
+										}
+									};
+									(transport as any)._callbackMap[5] = {
+										method: '#unsubscribe',
+										data: [null],
+										callback: function (err: Error) {
+											nullUnsubscribeError = err;
+										}
+									};
+									(transport as any)._callbackMap[6] = {
+										method: '#publish',
+										data: null,
+										callback: function (err: Error) {
+											undefinedPublishError = err;
+										}
+									};
+									(transport as any)._callbackMap[7] = {
+										method: '#publish',
+										data: {"channel": {"hello": 123}},
+										callback: function (err: Error) {
+											objectAsChannelNamePublishError = err;
+										}
+									};
+									(transport as any)._callbackMap[8] = {
+										method: '#publish',
+										data: {"channel": null},
+										callback: function (err: Error) {
+											nullPublishError = err;
+										}
+									};
+
+									// Trick the server by sending a fake subscribe before the handshake is done.
+									transport.send('{"method":"#subscribe","data":[null],"cid":2}');
+									transport.send('{"method":"#subscribe","data":{"channel":{"hello":123}},"cid":3}');
+									transport.send('{"method":"#subscribe","data":null,"cid":4}');
+									transport.send('{"method":"#unsubscribe","data":[null],"cid":5}');
+									transport.send('{"method":"#publish","data":null,"cid":6}');
+									transport.send('{"method":"#publish","data":{"channel":{"hello":123}},"cid":7}');
+									transport.send('{"method":"#publish","data":{"channel":null},"cid":8}');									
+								}
+							}
+						]
+					},
+					clientOptions
+				)
+			);
+
+			await wait(300);
+
+			assert.notEqual(nullInChannelArrayError, null);
+			assert.notEqual(objectAsChannelNameError, null);
+			assert.notEqual(nullChannelNameError, null);
+			assert.notEqual(nullUnsubscribeError, null);
+			assert.notEqual(undefinedPublishError, null);
+			assert.notEqual(objectAsChannelNamePublishError, null);
+			assert.notEqual(nullPublishError, null);
+		});
+
+		it('When default SimpleBroker broker engine is used, disconnect event should trigger before unsubscribe event', async function () {
+			server = listen(PORT_NUMBER, serverOptions);
+			bindFailureHandlers(server);
+
+			const eventList: ((UnsubscribeEvent | DisconnectEvent) & { type: string })[] = [];
+
+			(async () => {
+				await server.listen('ready').once(100);
+
+				client = new ClientSocket(clientOptions);
+
+				await client.channels.subscribe('foo').listen('subscribe').once(100);
+				await wait(200);
+				client.disconnect();
+			})();
+
+			const { socket } = await server.listen('connection').once(100);
+
+			(async () => {
+				for await (let event of socket.exchange.listen('unsubscribe')) {
+					eventList.push({
+						type: 'unsubscribe',
+						channel: event.channel
+					});
+				}
+			})();
+
+			(async () => {
+				for await (let disconnectPacket of socket.listen('disconnect')) {
+					eventList.push({
+						type: 'disconnect',
+						code: disconnectPacket.code,
+						reason: disconnectPacket.reason
+					});
+				}
+			})();
+
+			await wait(300);
+
+			assert.strictEqual(eventList[0].type, 'disconnect');
+			assert.strictEqual(eventList[1].type, 'unsubscribe');
+			assert.strictEqual((eventList[1] as UnsubscribeEvent).channel, 'foo');
+		});
+
+		it('When default SimpleBroker broker engine is used, server.exchange should support consuming data from a channel', async function () {
+			server = listen(PORT_NUMBER, serverOptions);
+			bindFailureHandlers(server);
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(clientOptions);
+
+			(async () => {
+				await client.listen('connect').once(100);
+
+				client.channels.transmitPublish('foo', 'hi1');
+				await wait(10);
+				client.channels.transmitPublish('foo', 'hi2');
+			})();
+
+			const receivedSubscribedData: string[] = [];
+			const receivedChannelData: string[] = [];
+
+			(async () => {
+				const subscription = server.exchange.subscribe<string>('foo');
+
+				for await (let data of subscription) {
+					receivedSubscribedData.push(data);
+				}
+			})();
+
+			const channel = server.exchange.channel<string>('foo');
+
+			for await (let data of channel) {
+				receivedChannelData.push(data);
+				if (receivedChannelData.length > 1) {
+					break;
+				}
+			}
+
+			assert.strictEqual(server.exchange.isSubscribed('foo'), true);
+			assert.strictEqual(server.exchange.subscriptions().join(','), 'foo');
+
+			assert.strictEqual(receivedSubscribedData[0], 'hi1');
+			assert.strictEqual(receivedSubscribedData[1], 'hi2');
+			assert.strictEqual(receivedChannelData[0], 'hi1');
+			assert.strictEqual(receivedChannelData[1], 'hi2');
+		});
+
+		it('When default SimpleBroker broker engine is used, server.exchange should support publishing data to a channel', async function () {
+			server = listen(PORT_NUMBER, serverOptions);
+			bindFailureHandlers(server);
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(clientOptions);
+
+			(async () => {
+				await client.channels.listen('subscribe').once(100);
+				server.exchange.transmitPublish('bar', 'hello1');
+				await wait(10);
+				server.exchange.transmitPublish('bar', 'hello2');
+			})();
+
+			const receivedSubscribedData: string[] = [];
+			const receivedChannelData: string[] = [];
+
+			(async () => {
+				const subscription = client.channels.subscribe<string>('bar');
+				for await (let data of subscription) {
+					receivedSubscribedData.push(data);
+				}
+			})();
+
+			const channel = client.channels.channel<string>('bar');
+
+			for await (let data of channel) {
+				receivedChannelData.push(data);
+				if (receivedChannelData.length > 1) {
+					break;
+				}
+			}
+
+			assert.strictEqual(receivedSubscribedData[0], 'hello1');
+			assert.strictEqual(receivedSubscribedData[1], 'hello2');
+			assert.strictEqual(receivedChannelData[0], 'hello1');
+			assert.strictEqual(receivedChannelData[1], 'hello2');
+		});
+
+		it('When disconnecting a socket, the unsubscribe event should trigger after the disconnect and close events', async function () {
+			class CustomBrokerEngine extends SimpleBroker<MyChannels> {
+				async unsubscribe(client: ExchangeClient, channel: string): Promise<void> {
+					await wait(100);
+					return super.unsubscribe(client, channel);
+				}
+			}
+
+			server = listen(
+				PORT_NUMBER,
+				Object.assign<
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
+				>(
+					{
+						brokerEngine: new CustomBrokerEngine()
+					},
+					serverOptions
+				)
+			);
+
+			bindFailureHandlers(server);
+
+			const eventList: ((UnsubscribeEvent | DisconnectEvent | CloseEvent) & { type: string })[] = [];
+
+			(async () => {
+				await server.listen('ready').once(100);
+				client = new ClientSocket(clientOptions);
+
+				for await (let event of client.channels.subscribe('foo').listen('subscribe')) {
+					(async () => {
+						await wait(200);
+						client.disconnect();
+					})();
+				}
+			})();
+
+			const { socket } = await server.listen('connection').once(100);
+
+			(async () => {
+				for await (let event of socket.exchange.listen('unsubscribe')) {
+					eventList.push({
+						type: 'unsubscribe',
+						channel: event.channel
+					});
+				}
+			})();
+
+			(async () => {
+				for await (let event of socket.listen('disconnect')) {
+					eventList.push({
+						type: 'disconnect',
+						code: event.code,
+						reason: event.reason
+					});
+				}
+			})();
+
+			(async () => {
+				for await (let event of socket.listen('close')) {
+					eventList.push({
+						type: 'close',
+						code: event.code,
+						reason: event.reason
+					});
+				}
+			})();
+
+			await wait(700);
+			assert.strictEqual(eventList[0].type, 'close');
+			assert.strictEqual(eventList[1].type, 'disconnect');
+			assert.strictEqual(eventList[2].type, 'unsubscribe');
+			assert.strictEqual((eventList[2] as UnsubscribeEvent).channel, 'foo');
+		});
+
+		it('Socket should emit an error when trying to unsubscribe from a channel which it is not subscribed to', async function () {
+			server = listen( PORT_NUMBER, serverOptions);
+
+			bindFailureHandlers(server);
+
+			const errorList: Error [] = [];
+
+			(async () => {
+				for await (let {socket} of server.listen('connection')) {
+					(async () => {
+						for await (let { error } of socket.listen('error')) {
+							errorList.push(error);
+						}
+					})();
+				}
+			})();
+
+			await server.listen('ready').once();
+
+			client = new ClientSocket(clientOptions);
+
+			await client.listen('connect').once(100);
+
+			let error: Error | null = null;
+
+			try {
+				await client.invoke('#unsubscribe' as any, 'bar');
+			} catch (err) {
+				error = err;
+			}
+
+			assert.notEqual(error, null);
+			assert.strictEqual(error!.name, 'BrokerError');
+
+			await wait(100);
+			assert.strictEqual(errorList.length, 1);
+			assert.strictEqual(errorList[0].name, 'BrokerError');
+		});
+
+		it('Socket should not receive messages from a channel which it has only just unsubscribed from (accounting for delayed unsubscribe by brokerEngine)', async function () {
+			class CustomBrokerEngine extends SimpleBroker<MyChannels> {
+				async unsubscribe(client: ExchangeClient, channel: string): Promise<void> {
+					await wait(100);
+					return super.unsubscribe(client, channel);
+				}
+			}
+
+			server = listen(
+				PORT_NUMBER,
+				Object.assign<
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
+				>(
+					{
+						brokerEngine: new CustomBrokerEngine()
+					},
+					serverOptions
+				)
+			);
+
+			bindFailureHandlers(server);
+
+			(async () => {
+				for await (let {socket} of server.listen('connection')) {
+					(async () => {
+						for await (let event of socket.exchange.listen('unsubscribe')) {
+							if (event.channel === 'foo') {
+								server.exchange.transmitPublish('foo', 'hello');
+							}
+						}
+					})();
+				}
+			})();
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(clientOptions);
+
+			// Stub the isSubscribed method so that it always returns true.
+			// That way the client will always invoke watchers whenever
+			// it receives a #publish event.
+			client.channels.isSubscribed = function () { return true; };
+
+			let messageList: string[] = [];
+
+			let fooChannel = client.channels.subscribe<string>('foo');
+
+			(async () => {
+				for await (let data of fooChannel) {
+					messageList.push(data);
+				}
+			})();
+
+			(async () => {
+				for await (let event of fooChannel.listen('subscribe')) {
+					client.invoke('#unsubscribe' as any, 'foo');
+				}
+			})();
+
+			await wait(400);
+			assert.strictEqual(messageList.length, 0);
+		});
+/*
+		it('Socket channelSubscriptions and channelSubscriptionsCount should update when socket.kickOut(channel) is called', async function () {
+			server = listen(PORT_NUMBER, serverOptions);
+			bindFailureHandlers(server);
+
+			const errorList: Error[] = [];
+			let serverSocket: ServerSocket<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>;
+			let wasKickOutCalled = false;
+
+			(async () => {
+				for await (let {socket} of server.listen('connection')) {
+					serverSocket = socket;
+
+					(async () => {
+						for await (let {error} of socket.listen('error')) {
+							errorList.push(error);
+						}
+					})();
+
+					(async () => {
+						for await (let event of socket.exchange.listen('subscribe')) {
+							if (event.channel === 'foo') {
+								await wait(50);
+								wasKickOutCalled = true;
+								socket.kickOut('foo', 'Socket was kicked out of the channel');
+							}
+						}
+					})();
+				}
+			})();
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(clientOptions);
+
+			client.channels.subscribe('foo');
+
+			await wait(100);
+			assert.strictEqual(errorList.length, 0);
+			assert.strictEqual(wasKickOutCalled, true);
+			assert.strictEqual(serverSocket!.channelSubscriptionCount, 0);
+			assert.strictEqual(Object.keys(serverSocket!.channelSubscriptions).length, 0);
+		});
+*/
 	});
 });

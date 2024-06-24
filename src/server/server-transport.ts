@@ -3,7 +3,7 @@ import { ServerMap } from "../client/maps/server-map.js";
 import { ServerSocket, ServerSocketOptions } from "./server-socket.js";
 import { SocketTransport } from "../socket-transport.js";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
-import { AuthError, socketProtocolErrorStatuses } from "@socket-mesh/errors";
+import { AuthError, BrokerError, InvalidActionError, socketProtocolErrorStatuses } from "@socket-mesh/errors";
 import { SocketMapFromServer } from "../client/maps/socket-map.js";
 import jwt from 'jsonwebtoken';
 import { AuthTokenOptions } from "./auth-engine.js";
@@ -80,6 +80,12 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		if (!!this.state.server.pendingClients[this.id]) {
 			delete this.state.server.pendingClients[this.id];
 			this.state.server.pendingClientCount--;
+		}
+
+		if (this.state.channelSubscriptions) {
+			const channels = Object.keys(this.state.channelSubscriptions);
+
+			channels.map((channel) => this.unsubscribe(channel));	
 		}
 
 		if (this.streamCleanupMode !== 'none') {
@@ -259,4 +265,32 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 	}
 
 	public type: 'server'
+
+	public async unsubscribe(channel: string): Promise<void> {
+		if (typeof channel !== 'string') {
+			throw new InvalidActionError(
+				`Socket ${this.id} tried to unsubscribe from an invalid channel name`
+			);
+		}
+	
+		if (!this.state.channelSubscriptions?.[channel]) {
+			throw new InvalidActionError(
+				`Socket ${this.id} tried to unsubscribe from a channel which it is not subscribed to`
+			);
+		}
+
+		try {
+			const server = this.state.server;
+			await server.brokerEngine.unsubscribe(this, channel);
+			delete this.state.channelSubscriptions[channel];
+	
+			if (this.state.channelSubscriptionsCount != null) {
+				this.state.channelSubscriptionsCount--;
+			}
+	
+			server.exchange.emit('unsubscribe', { channel });
+		} catch (err) {
+			throw new BrokerError(`Failed to unsubscribe socket from the ${channel} channel - ${err}`);
+		}		
+	}
 }

@@ -17,7 +17,7 @@ export class SimpleBroker<T extends ChannelMap> extends Broker<T> {
 		this._clientSubscribersCounter = {};
 	}
 
-	subscribe(client: ExchangeClient, channelName: string): void {
+	async subscribe(client: ExchangeClient, channelName: string): Promise<void> {
 		if (!this._clientSubscribers[channelName]) {
 			this._clientSubscribers[channelName] = {};
 			this._clientSubscribersCounter[channelName] = 0;
@@ -29,7 +29,7 @@ export class SimpleBroker<T extends ChannelMap> extends Broker<T> {
 		this._clientSubscribers[channelName][client.id] = client;
 	}
 
-	unsubscribe(client: ExchangeClient, channelName: string): void {
+	async unsubscribe(client: ExchangeClient, channelName: string): Promise<void> {
 		if (this._clientSubscribers[channelName]) {
 			if (this._clientSubscribers[channelName][client.id]) {
 				this._clientSubscribersCounter[channelName]--;

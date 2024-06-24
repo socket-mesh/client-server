@@ -38,7 +38,7 @@ export async function subscribeHandler(
 		}
 
 		try {
-			server.brokerEngine.subscribe(transport, channel);
+			await server.brokerEngine.subscribe(transport, channel);
 		} catch (error) {
 			delete state.channelSubscriptions[channel];
 			state.channelSubscriptionsCount--;

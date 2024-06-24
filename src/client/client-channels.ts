@@ -143,12 +143,15 @@ export class ClientChannels<T extends ClientMap> extends Channels<T['Channel']> 
 			// If there is a pending subscribe action, cancel the callback
 			this.cancelPendingSubscribeCallback(channel);
 
+			const decoratedChannelName = this.decorateChannelName(channel.name);
+
 			// This operation cannot fail because the TCP protocol guarantees delivery
 			// so long as the connection remains open. If the connection closes,
 			// the server will automatically unsubscribe the client and thus complete
 			// the operation on the server side.
-			const decoratedChannelName = this.decorateChannelName(channel.name);
-			this._transport.transmit('#unsubscribe', decoratedChannelName);
+			this._transport
+				.transmit('#unsubscribe', decoratedChannelName)
+				.catch(err => {});
 		}
 	}
 
