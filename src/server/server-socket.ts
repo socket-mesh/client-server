@@ -49,6 +49,15 @@ export class ServerSocket<T extends ServerMap> extends Socket<SocketMapFromServe
 		}
 	}
 
+	kickOut(channel: string, message: string): Promise<void[]> {
+		const channels = channel ? [channel] : Object.keys(this.state.channelSubscriptions);
+
+		return Promise.all(channels.map((channelName) => {
+			this.transmit('#kickOut', { channel: channelName, message });
+			return this._serverTransport.unsubscribe(channelName);
+		}));
+	}
+
 	public get exchange(): Exchange<T['Channel']> {
 		return this.server.exchange;
 	}

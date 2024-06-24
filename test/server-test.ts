@@ -2574,7 +2574,7 @@ describe('Integration tests', function () {
 			await wait(400);
 			assert.strictEqual(messageList.length, 0);
 		});
-/*
+
 		it('Socket channelSubscriptions and channelSubscriptionsCount should update when socket.kickOut(channel) is called', async function () {
 			server = listen(PORT_NUMBER, serverOptions);
 			bindFailureHandlers(server);
@@ -2614,9 +2614,8 @@ describe('Integration tests', function () {
 			await wait(100);
 			assert.strictEqual(errorList.length, 0);
 			assert.strictEqual(wasKickOutCalled, true);
-			assert.strictEqual(serverSocket!.channelSubscriptionCount, 0);
-			assert.strictEqual(Object.keys(serverSocket!.channelSubscriptions).length, 0);
+			assert.strictEqual(serverSocket!.state.channelSubscriptionsCount, 0);
+			assert.strictEqual(Object.keys(serverSocket!.state.channelSubscriptions || {}).length, 0);
 		});
-*/
 	});
 });
