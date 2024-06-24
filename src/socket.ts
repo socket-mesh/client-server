@@ -51,10 +51,12 @@ export interface InvokeServiceOptions<TServiceMap extends ServiceMap, TService e
 
 export class Socket<T extends SocketMap> extends AsyncStreamEmitter<SocketEvent<T>> {
 	private readonly _transport: SocketTransport<T>;
+	public readonly state: Partial<T['State']>;
 
-	protected constructor(transport: SocketTransport<T>) {
+	protected constructor(transport: SocketTransport<T>, options?: SocketOptions<T>) {
 		super();
 
+		this.state = options?.state || {};
 		transport.socket = this;
 		this._transport = transport;
 	}

@@ -12,7 +12,7 @@ export async function subscribeHandler(
 		throw new InvalidActionError('Cannot subscribe socket to a channel before it has completed the handshake');
 	}
 
-	const state = transport.state;
+	const state = socket.state;
 	const server = state.server;
 
 	if (server.socketChannelLimit && state.channelSubscriptionsCount >= server.socketChannelLimit) {

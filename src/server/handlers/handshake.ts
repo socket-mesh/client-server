@@ -12,7 +12,7 @@ export async function handshakeHandler(
 	{ options, socket, transport }: RequestHandlerArgs<HandshakeOptions, BasicSocketMapServer, ServerSocket<BasicServerMap>>
 ): Promise<HandshakeStatus> {
 
-	const state = transport.state;
+	const state = socket.state;
 	const server = state.server;
 	const wasAuthenticated = !!transport.signedAuthToken;
 	const authInfo = await validateAuthToken(server.auth, options.authToken);

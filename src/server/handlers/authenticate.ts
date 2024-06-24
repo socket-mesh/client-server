@@ -30,7 +30,7 @@ export async function authenticateHandler(
 		throw new InvalidActionError('Handshake request was malformatted');
 	}
 
-	const state = transport.state;
+	const state = socket.state;
 	const server = state.server;
 	const authInfo = await validateAuthToken(server.auth, signedAuthToken);
 
@@ -90,7 +90,7 @@ export async function processAuthentication(
 		throw authInfo.authError;
 	}
 
-	for (const middleware of transport.state.server.middleware) {
+	for (const middleware of socket.state.server.middleware) {
 		if (middleware.onAuthenticate) {
 			try {
 				middleware.onAuthenticate(authInfo);

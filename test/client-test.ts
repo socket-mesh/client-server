@@ -82,9 +82,9 @@ async function performTaskHandler({ options }: RequestHandlerArgs<number>): Prom
 }
 
 async function setAuthKeyHandler(
-	{ transport, options: secret }: RequestHandlerArgs<jwt.Secret, BasicSocketMapServer>
+	{ socket, options: secret }: RequestHandlerArgs<jwt.Secret, BasicSocketMapServer>
 ): Promise<void> {
-	const server = transport.state.server;
+	const server = socket.state.server;
 
 	server!.auth.authKey = secret;
 }

@@ -4,9 +4,9 @@ import { InvalidActionError } from "@socket-mesh/errors";
 import { PublishOptions } from "../../channels/channels.js";
 
 export async function publishHandler(
-	{ transport, options }: RequestHandlerArgs<PublishOptions, BasicSocketMapServer<{}, { [channel: string]: any }>>
+	{ socket, options }: RequestHandlerArgs<PublishOptions, BasicSocketMapServer<{}, { [channel: string]: any }>>
 ): Promise<void> {
-	const state = transport.state;
+	const state = socket.state;
 	const server = state.server;
 
 	if (!server.allowClientPublish) {

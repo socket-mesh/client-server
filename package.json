@@ -22,11 +22,11 @@
 		"@types/base64id": "^2.0.2",
 		"@types/clone-deep": "^4.0.4",
 		"@types/jsonwebtoken": "^9.0.6",
-		"@types/node": "^20.12.8",
+		"@types/node": "^20.14.8",
 		"@types/ws": "^8.5.10",
 		"cross-env": "^7.0.3",
 		"ts-node": "^10.9.2",
-		"typescript": "^5.4.5"
+		"typescript": "^5.5.2"
 	},
 	"dependencies": {
 		"@socket-mesh/async-stream-emitter": "^7.1.0",

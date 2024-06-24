@@ -59,7 +59,6 @@ export class SocketTransport<T extends SocketMap> {
 	private _onUnhandledRequest: (socket: SocketTransport<T>, packet: AnyPacket<T>) => boolean;
 	public readonly codecEngine: CodecEngine;
 	public readonly middleware: Middleware<T>[];
-	public readonly state: Partial<T['State']>;
 	public streamCleanupMode: StreamCleanupMode;
 	public id: string;
 	public ackTimeoutMs: number;
@@ -84,7 +83,6 @@ export class SocketTransport<T extends SocketMap> {
 		this._outboundPreparedMessageCount = 0;
 		this._outboundSentMessageCount = 0;
 		this.middleware = options?.middleware || [];
-		this.state = options?.state || {};
 		this.streamCleanupMode = options?.streamCleanupMode || 'kill';
 	}
 

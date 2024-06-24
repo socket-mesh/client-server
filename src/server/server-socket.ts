@@ -18,7 +18,7 @@ export class ServerSocket<T extends ServerMap> extends Socket<SocketMapFromServe
 	constructor(options: ServerSocketOptions<T>) {
 		const transport = new ServerTransport<T>(options);
 
-		super(transport);
+		super(transport, options);
 
 		this._serverTransport = transport;
 	}
@@ -46,7 +46,7 @@ export class ServerSocket<T extends ServerMap> extends Socket<SocketMapFromServe
 	}
 
 	public get exchange(): Exchange<T['Channel']> {
-		return this._serverTransport.state.server.exchange;
+		return this.state.server.exchange;
 	}
 
 	get service(): string {
