@@ -150,7 +150,10 @@ describe('Integration tests', function () {
 
 		it('Should not automatically connect socket if autoConnect is set to false', async function () {
 			client = new ClientSocket(
-				Object.assign(
+				Object.assign<
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>
+				>(
 					{
 						autoConnect: false
 					},
@@ -365,7 +368,11 @@ describe('Integration tests', function () {
 			);
 
 			client = new ClientSocket(
-				Object.assign({}, clientOptions, { authEngine })
+				Object.assign<
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>
+				>({}, clientOptions, { authEngine })
 			);
 
 			let caughtError: Error;
@@ -617,7 +624,11 @@ describe('Integration tests', function () {
 		it('Subscriptions (including those with waitForAuth option) should have priority over the authenticate action', async function () {
 			global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
 			client = new ClientSocket(
-				Object.assign(
+				Object.assign<
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>
+				>(
 					{},
 					clientOptions,
 					{
@@ -1037,9 +1048,12 @@ describe('Integration tests', function () {
 
 		it('Should resolve invoke Promise with BadConnectionError before triggering the disconnect event', async function () {
 			client = new ClientSocket(
-				Object.assign(
-					{
-					},
+				Object.assign<
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>
+				>(
+					{},
 					clientOptions,
 					{
 						middleware: [new OfflineMiddleware()],
@@ -1288,7 +1302,10 @@ describe('Integration tests', function () {
 	describe('Ping/pong', function () {
 		it('Should close if ping is not received before timeout', async function () {
 			client = new ClientSocket(
-				Object.assign(
+				Object.assign<
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>
+				>(
 					{
 						connectTimeoutMs: 500
 					},
@@ -1340,7 +1357,10 @@ describe('Integration tests', function () {
 
 		it('Should not close if ping is not received before timeout when pingTimeoutDisabled is true', async function () {
 			client = new ClientSocket(
-				Object.assign(
+				Object.assign<
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>
+				>(
 					{
 						connectTimeoutMs: 500,
 						isPingTimeoutDisabled: true

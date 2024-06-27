@@ -1,6 +1,6 @@
 import { EmptySocketMap, SocketMap } from "../client/maps/socket-map.js";
 import { AnyPacket } from "../packet.js";
-import { AnyRequest, RequestCollection } from "../request.js";
+import { AnyRequest } from "../request.js";
 import { AnyResponse } from "../response.js";
 import { SocketTransport } from "../socket-transport.js";
 import { Socket, SocketStatus } from "../socket.js";

@@ -142,7 +142,7 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		this.socket.server.emit('socketPong', { socket: this.socket, data });
 	}
 
-	protected override async onRequest(packet: AnyPacket<SocketMapFromServer<T>>, timestamp: Date): Promise<boolean> {
+	protected override async onRequest(packet: AnyPacket<SocketMapFromServer<T>>, timestamp: Date, middlewareError?: Error): Promise<boolean> {
 		let wasHandled = false;
 
 		if (!this.service || !('service' in packet) || packet.service === this.service) {
@@ -151,7 +151,7 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 				return true;
 			}
 
-			wasHandled = await super.onRequest(packet, timestamp);
+			wasHandled = await super.onRequest(packet, timestamp, middlewareError);
 		} else {
 			wasHandled = this.onUnhandledRequest(packet);
 		}

@@ -172,18 +172,24 @@ export class SocketTransport<T extends SocketMap> {
 
 		packet = toArray<AnyPacket<T> | AnyResponse<T>>(packet);
 
-		for (const curPacket of packet) {
-			for (const middleware of this.middleware) {
-				if (middleware.onMessage) {
-					packet = await middleware.onMessage({ socket: this.socket, transport: this, packet: curPacket, timestamp: timestamp })
-				}
+		for (let curPacket of packet) {
+			let middlewareError: Error;
+
+			try {
+				for (const middleware of this.middleware) {
+					if (middleware.onMessage) {
+						curPacket = await middleware.onMessage({ socket: this.socket, transport: this, packet: curPacket, timestamp: timestamp })
+					}
+				}					
+			} catch (err) {
+				middlewareError = err;
 			}
 
 			// Check to see if it is a request or response packet. 
 			if (isResponsePacket(curPacket)) {
-				this.onResponse(curPacket);
+				this.onResponse(curPacket, middlewareError);
 			} else if (isRequestPacket(curPacket)) {
-				await this.onRequest(curPacket, timestamp);
+				await this.onRequest(curPacket, timestamp, middlewareError);
 			} else {
 				// TODO: Handle non packets here (binary data)
 			}
@@ -299,7 +305,7 @@ export class SocketTransport<T extends SocketMap> {
 		this._socket.emit('pong', { data });
 	}
 
-	protected onResponse(response: AnyResponse<T>) {
+	protected onResponse(response: AnyResponse<T>, middlewareError?: Error) {
 		const map = this._callbackMap[response.rid];
 
 		if (map) {
@@ -308,61 +314,72 @@ export class SocketTransport<T extends SocketMap> {
 				delete map.timeoutId;
 			}
 
-			if ('error' in response) {
+			if (middlewareError) {
+				map.callback(middlewareError);
+			} else if ('error' in response) {
 				map.callback(response.error);
 			} else {
 				map.callback(null, 'data' in response ? response.data : undefined);
 			}
 		}
 
-		this._socket.emit('response', { response });
+		if (middlewareError) {
+			this._socket.emit('response', { response: { rid: response.rid, error: middlewareError } });
+		} else {
+			this._socket.emit('response', { response });
+		}
 	}
 
-	protected async onRequest(packet: AnyPacket<T>, timestamp: Date): Promise<boolean> {
+	protected async onRequest(packet: AnyPacket<T>, timestamp: Date, middlewareError?: Error): Promise<boolean> {
 		this._socket.emit('request', { request: packet });
 		
 		const timeoutAt = typeof packet.ackTimeoutMs === 'number' ? new Date(timestamp.valueOf() + packet.ackTimeoutMs) : null;
 		let wasHandled = false;
 
-		const handler = this._handlers[(packet as MethodPacket<T['Incoming']>).method];
+		let response: AnyResponse<T>;
+		let error: Error;
 
-		if (handler) {
+		if (middlewareError) {
 			wasHandled = true;
+			error = middlewareError;
+			response = { rid: packet.cid, timeoutAt, error: middlewareError };
+		} else {
+			const handler = this._handlers[(packet as MethodPacket<T['Incoming']>).method];
 
-			try {
-				const data = await handler(
-					new RequestHandlerArgs({
-						isRpc: !!packet.cid,
-						method: packet.method.toString(),
-						timeoutMs: packet.ackTimeoutMs,
-						socket: this._socket,
-						transport: this,
-						options: packet.data
-					})
-				);
-				
-				if (packet.cid) {
-					this.sendResponse([
-						{
-							rid: packet.cid,
-							timeoutAt,
-							data
-						} as MethodDataResponse<T['Incoming']>
-					]);
-				}					
-			} catch (error) {
-				if (packet.cid) {
-					this.sendResponse([
-						{
-							rid: packet.cid,
-							timeoutAt,
-							error
-						}
-					]);
+			if (handler) {
+				wasHandled = true;
+	
+				try {
+					const data = await handler(
+						new RequestHandlerArgs({
+							isRpc: !!packet.cid,
+							method: packet.method.toString(),
+							timeoutMs: packet.ackTimeoutMs,
+							socket: this._socket,
+							transport: this,
+							options: packet.data
+						})
+					);
+					
+					if (packet.cid) {
+						response = { rid: packet.cid, timeoutAt, data } as MethodDataResponse<T['Incoming']>;
+					}					
+				} catch (err) {
+					error = err;
+
+					if (packet.cid) {
+						response = { rid: packet.cid, timeoutAt, error };
+					}
 				}
-
-				this.onError(error);				
 			}
+		}
+
+		if (response) {
+			this.sendResponse([response]);
+		}
+
+		if (error) {
+			this.onError(error);
 		}
 
 		if (!wasHandled) {

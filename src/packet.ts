@@ -32,7 +32,7 @@ export interface ServiceRequestPacket<
 
 export interface MethodRequestPacket<TMethodMap extends MethodMap, TMethod extends keyof TMethodMap> extends RequestPacket {
 	method: TMethod,
-	data?: Parameters<TMethodMap[TMethod]>[0],
+	data: Parameters<TMethodMap[TMethod]>[0],
 	ackTimeoutMs?: number | boolean
 }
 

@@ -17,9 +17,7 @@ import { AuthStateChangeEvent, AuthenticatedChangeEvent, CloseEvent, ConnectEven
 import { ConnectionEvent, SocketAuthStateChangeEvent } from "../src/server/server-event";
 import { MiddlewareBlockedError } from "@socket-mesh/errors";
 import { AuthOptions } from "../src/server/auth-engine";
-import { OfflineMiddleware } from "../src/middleware/offline-middleware";
-import { InOrderMiddleware } from "../src/middleware/in-order-middleware";
-import { MiddlewareArgs, SendRequestMiddlewareArgs } from "../src/middleware/middleware";
+import { InOrderMiddleware, MiddlewareArgs, OfflineMiddleware, RequestBatchingMiddleware, ResponseBatchingMiddleware, SendRequestMiddlewareArgs } from "../src/middleware";
 import { AnyRequest } from "../src/request";
 import { isRequestPacket } from "../src/packet";
 import { isPublishOptions } from "../src/channels/channels";
@@ -27,6 +25,8 @@ import { WritableConsumableStream } from "@socket-mesh/writable-consumable-strea
 import { UnsubscribeEvent } from "../src/channels/channel-events";
 import { SimpleBroker } from "../src/server/broker/simple-broker";
 import { ExchangeClient } from "../src/server/broker/exchange-client";
+import { ChannelOptions } from "../src/channels/channel-options";
+import { Channel } from "../src/channels/channel";
 
 // Add to the global scope like in browser.
 global.localStorage = localStorage;
@@ -2616,6 +2616,186 @@ describe('Integration tests', function () {
 			assert.strictEqual(wasKickOutCalled, true);
 			assert.strictEqual(serverSocket!.state.channelSubscriptionsCount, 0);
 			assert.strictEqual(Object.keys(serverSocket!.state.channelSubscriptions || {}).length, 0);
+		});
+	});
+
+	describe('Batching', function () {
+		it('Should batch messages sent through sockets after the handshake when the batchOnHandshake option is true', async function () {
+			const receivedServerMessages: (string | ArrayBuffer | Buffer[])[] = [];
+			let subscribeMiddlewareCounter = 0;
+
+			server = listen(
+				PORT_NUMBER,
+				Object.assign<
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
+				>(
+					{
+						middleware: [
+							{
+								type: 'Received Server Messages',
+								async onMessageRaw({ message }) {
+									receivedServerMessages.push(message);
+									return message;
+								}
+							},
+							{
+								type: 'Inbound Packets',
+								// Each subscription should pass through the middleware individually, even
+								// though they were sent as a batch/array.
+								async onMessage({ packet }) {
+									if (isRequestPacket(packet) && packet.method === '#subscribe') {
+										subscribeMiddlewareCounter++;
+										assert.strictEqual(packet.data.channel.indexOf('my-channel-'), 0);
+										if (packet.data.channel === 'my-channel-10') {
+											assert.strictEqual(JSON.stringify(packet.data.data), JSON.stringify({foo: 123}));
+										} else if (packet.data.channel === 'my-channel-12') {
+
+											// Block my-channel-12
+											const err = new Error('You cannot subscribe to channel 12');
+											err.name = 'UnauthorizedSubscribeError';
+											throw err;
+										}
+									}
+
+									return packet;
+								}
+							},
+							new ResponseBatchingMiddleware({
+								batchOnHandshakeDuration: 400,
+								batchInterval: 50
+							})
+						]
+					},
+					serverOptions
+				)
+			);
+
+			bindFailureHandlers(server);
+
+			await server.listen('ready').once(100);
+
+			const receivedClientMessages: (string | ArrayBuffer | Buffer[])[] = [];
+
+			client = new ClientSocket(
+				Object.assign<
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>
+				>(
+					{
+						middleware: [
+							{
+								type: 'Received Client Messages',
+								async onMessageRaw({ message }) {
+									receivedClientMessages.push(message);
+									return message;
+								}
+							},
+							new RequestBatchingMiddleware({
+								batchOnHandshakeDuration: 100,
+								batchInterval: 50
+							})
+						]
+					},
+					clientOptions
+				)
+			);
+
+			const channelList:Channel<MyChannels, unknown>[] = [];
+
+			for (let i = 0; i < 20; i++) {
+				const subscriptionOptions: ChannelOptions = {};
+				if (i === 10) {
+					subscriptionOptions.data = {foo: 123};
+				}
+				channelList.push(
+					client.channels.subscribe('my-channel-' + i, subscriptionOptions)
+				);
+			}
+
+			(async () => {
+				for await (let event of channelList[12].listen('subscribe')) {
+					throw new Error('The my-channel-12 channel should have been blocked by MIDDLEWARE_SUBSCRIBE');
+				}
+			})();
+			
+			(async () => {
+				for await (let event of channelList[12].listen('subscribeFail')) {
+					assert.notEqual(event.error, null);
+					assert.strictEqual(event.error.name, 'UnauthorizedSubscribeError');
+				}
+			})();
+
+			(async () => {
+				for await (let event of channelList[19].listen('subscribe')) {
+					client.channels.transmitPublish('my-channel-19', 'Hello!');
+				}
+			})();
+
+			for await (let data of channelList[19]) {
+				assert.strictEqual(data, 'Hello!');
+				assert.strictEqual(subscribeMiddlewareCounter, 20);
+				break;
+			}
+
+			assert.notEqual(receivedServerMessages[1], null);
+			// All 20 subscriptions should arrive as a single message.
+			assert.strictEqual(JSON.parse(receivedServerMessages[1].toString()).length, 20);
+
+			assert.strictEqual(Array.isArray(JSON.parse(receivedClientMessages[0].toString())), false);
+			assert.strictEqual(JSON.parse(receivedClientMessages[1].toString()).length, 20);
+		});
+
+		it('The batchOnHandshake option should not break the order of subscribe and publish', async function () {
+			server = listen(
+				PORT_NUMBER,
+				Object.assign<
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
+				>(
+					{
+						middleware: [
+							new ResponseBatchingMiddleware({
+								batchOnHandshakeDuration: 400,
+								batchInterval: 50
+							})
+						]
+					},
+					serverOptions
+				)
+			);
+
+			bindFailureHandlers(server);
+
+			await server.listen('ready').once(100);
+
+			client = new ClientSocket(
+				Object.assign<
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>
+				>(
+					{
+						autoConnect: false,
+						middleware: [
+							new RequestBatchingMiddleware({
+								batchOnHandshakeDuration: 100,
+								batchInterval: 50
+							})
+						]
+					},
+					clientOptions
+				)
+			);
+
+			let receivedMessage: string;
+
+			let fooChannel = client.channels.subscribe('foo');
+			client.channels.transmitPublish('foo', 'bar');
+
+			for await (let data of fooChannel) {
+				receivedMessage = data;
+				break;
+			}
 		});
 	});
 });
