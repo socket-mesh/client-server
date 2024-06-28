@@ -19,7 +19,7 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 	private _wsOptions: ws.ClientOptions;
 
 	public connectTimeoutMs: number;
-	private _connectTimeoutRef: NodeJS.Timeout;
+	private _connectTimeoutRef: NodeJS.Timeout | null;
 
 	private _autoReconnect: AutoReconnectOptions | false;
 	private _connectAttempts: number;
@@ -52,7 +52,7 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 		this._connectAttempts = 0;
 		this._pendingReconnectTimeout = null;
 		this.autoReconnect = options.autoReconnect;
-		this.isPingTimeoutDisabled = (options.isPingTimeoutDisabled === false);
+		this.isPingTimeoutDisabled = (options.isPingTimeoutDisabled === true);
 	}
 
 	public get autoReconnect(): AutoReconnectOptions | false {
@@ -153,7 +153,8 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 	protected override onOpen() {
 		super.onOpen();
 
-		clearTimeout(this._connectTimeoutRef);		
+		clearTimeout(this._connectTimeoutRef);
+		this._connectTimeoutRef = null;
 		this.resetReconnect();
 		this.resetPingTimeout(this.isPingTimeoutDisabled ? false : this.pingTimeoutMs, 4000);
 
@@ -311,6 +312,7 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 		if (this.webSocket) {
 			if (this._connectTimeoutRef) {
 				clearTimeout(this._connectTimeoutRef);
+				this._connectTimeoutRef = null;
 			}
 		}
 

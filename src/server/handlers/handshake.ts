@@ -52,14 +52,6 @@ export async function handshakeHandler(
 		}
 	}
 
-	if (server.pendingClients[socket.id]) {
-		delete server.pendingClients[socket.id];
-		server.pendingClientCount--;
-	}
-
-	server.clients[socket.id] = socket;
-	server.clientCount++;
-
 	transport.setReadyStatus(server.pingTimeoutMs, authError);
 
 	// Needs to be executed after the connection event to allow consumers to be setup.

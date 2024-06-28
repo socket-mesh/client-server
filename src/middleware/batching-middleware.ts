@@ -90,9 +90,8 @@ export abstract class BatchingMiddleware<T extends SocketMap = EmptySocketMap> i
 
 		if (this._handshakeTimeoutId !== null) {
 			clearTimeout(this._handshakeTimeoutId);
+			this._handshakeTimeoutId = null;
 		}
-
-		this._handshakeTimeoutId = null;
 
 		this.flush();
 	}

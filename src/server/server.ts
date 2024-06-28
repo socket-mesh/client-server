@@ -31,6 +31,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 	private readonly _wss: ws.WebSocketServer;
 	private _isReady: boolean;
 	private _isListening: boolean;
+	private _pingIntervalRef: NodeJS.Timeout;	
 	private _handlers: HandlerMap<SocketMapFromServer<T>>;
 
 	//| ServerSocket<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TSocketState>
@@ -93,8 +94,8 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 		this.middleware = options.middleware || [];
 		this.pendingClients = {};
 		this.pendingClientCount = 0;
+		this.isPingTimeoutDisabled = (options.isPingTimeoutDisabled === true);
 		this.pingIntervalMs = options.pingIntervalMs || 8000;
-		this.isPingTimeoutDisabled = (options.pingTimeoutMs === false);
 		this.pingTimeoutMs = options.pingTimeoutMs || 20000;
 
 		this.socketChannelLimit = options.socketChannelLimit;
@@ -128,6 +129,59 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 				this.emit('ready', {});
 			})();
 		}
+	}
+
+	private bind(socket: ClientSocket<ClientMapFromServer<T>> | ServerSocket<T>) {
+		if (socket.type === 'client') {
+			(async () => {
+				for await (let event of socket.listen()) {
+					this.emit(
+						`socket${event.stream[0].toUpperCase()}${event.stream.substring(1)}` as any,
+						Object.assign(
+							{ socket },
+							event.value
+						)
+					);
+				}
+			})();
+	
+			(async () => {
+				for await (let event of socket.channels.listen()) {
+					this.emit(
+						`socket${event.stream[0].toUpperCase()}${event.stream.substring(1)}` as any,
+						Object.assign(
+							{ socket },
+							event.value
+						)
+					);
+				}
+			})();	
+		}
+
+		(async () => {
+			for await (let {} of socket.listen('connect')) {
+				if (this.pendingClients[socket.id]) {
+					delete this.pendingClients[socket.id];
+					this.pendingClientCount--;
+				}
+			
+				this.clients[socket.id] = socket;
+				this.clientCount++;
+				this.startPinging();
+			}
+		})();
+
+		(async () => {
+			for await (let {} of socket.listen('connectAbort')) {
+				this.socketDisconnected(socket);
+			}
+		})();
+
+		(async () => {
+			for await (let {} of socket.listen('disconnect')) {
+				this.socketDisconnected(socket);
+			}
+		})();
 	}
 
 	close(keepSocketsOpen?: boolean): Promise<void> {
@@ -197,42 +251,6 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 		this.emit('handshake', { socket });
 	}
 
-	private bind(socket: ClientSocket<ClientMapFromServer<T>> | ServerSocket<T>) {
-		if (socket.type === 'client') {
-			(async () => {
-				for await (let event of socket.listen()) {
-					if (event.stream === 'connectAbort') {
-						delete this.clients[socket.id];
-					}
-
-					if (event.stream === 'disconnect') {
-						delete this.clients[socket.id];
-					}
-
-					this.emit(
-						`socket${event.stream[0].toUpperCase()}${event.stream.substring(1)}` as any,
-						Object.assign(
-							{ socket },
-							event.value
-						)
-					);
-				}
-			})();
-	
-			(async () => {
-				for await (let event of socket.channels.listen()) {
-					this.emit(
-						`socket${event.stream[0].toUpperCase()}${event.stream.substring(1)}` as any,
-						Object.assign(
-							{ socket },
-							event.value
-						)
-					);
-				}
-			})();	
-		}
-	}
-
 	private onError(error: Error | string): void {
 		if (typeof error === 'string') {
 			error = new ServerProtocolError(error);
@@ -257,6 +275,43 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 	): void {
 
 	}
+
+	private socketDisconnected(socket: ClientSocket<ClientMapFromServer<T>> | ServerSocket<T>): void {
+		if (!!this.pendingClients[socket.id]) {
+			delete this.pendingClients[socket.id];
+			this.pendingClientCount--;
+		}
+
+		if (!!this.clients[socket.id]) {
+			delete this.clients[socket.id];
+			this.clientCount--;
+		}
+
+		if (this.clientCount <= 0) {
+			this.stopPinging();
+		}
+	}
+
+	private startPinging(): void {
+		if (!this._pingIntervalRef && !this.isPingTimeoutDisabled) {
+			this._pingIntervalRef = setInterval(() => {
+				for (const id in this.clients) {
+					this.clients[id]
+						.ping()
+						.catch(err => {
+							this.onError(err);
+						});
+				}
+			}, this.pingIntervalMs);
+		}
+	}
+
+	private stopPinging(): void {
+		if (this._pingIntervalRef) {
+			clearInterval(this._pingIntervalRef);
+			this._pingIntervalRef = null;
+		}
+	}	
 
 	emit(event: "close", data: CloseEvent): void;
 	emit(event: "connection", data: ConnectionEvent<T>): void;

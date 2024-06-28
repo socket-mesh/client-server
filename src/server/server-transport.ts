@@ -77,16 +77,6 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 
 		super.onDisconnect(status, code, reason);
 
-		if (!!this.socket.server.clients[this.id]) {
-			delete this.socket.server.clients[this.id];
-			this.socket.server.clientCount--;
-		}
-
-		if (!!this.socket.server.pendingClients[this.id]) {
-			delete this.socket.server.pendingClients[this.id];
-			this.socket.server.pendingClientCount--;
-		}
-
 		if (this.socket.state.channelSubscriptions) {
 			const channels = Object.keys(this.socket.state.channelSubscriptions);
 

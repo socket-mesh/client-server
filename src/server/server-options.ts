@@ -37,7 +37,9 @@ export interface ServerOptions<T extends ServerMap> extends ws.ServerOptions {
 	// it is still alive.
 	pingIntervalMs?: number,
 
-	pingTimeoutMs?: number | false,
+	isPingTimeoutDisabled?: boolean,
+
+	pingTimeoutMs?: number,
 
 	// The maximum number of unique channels which a single socket can subscribe to.
 	socketChannelLimit?: number,

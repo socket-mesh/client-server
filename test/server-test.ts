@@ -2798,4 +2798,213 @@ describe('Integration tests', function () {
 			}
 		});
 	});
+
+	describe('Socket Ping/pong', function () {
+		describe('When pingTimeoutDisabled is not set', function () {
+			beforeEach(async function () {
+				// Intentionally make pingInterval higher than pingTimeout, that
+				// way the client will never receive a ping or send back a pong.
+				server = listen(
+					PORT_NUMBER,
+					Object.assign<
+						ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+						ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
+					>(
+						{
+							pingIntervalMs: 5000,
+							pingTimeoutMs: 500
+						},
+						serverOptions
+					)
+				);
+
+				bindFailureHandlers(server);
+
+				await server.listen('ready').once(100);
+			});
+
+			it('Should disconnect socket if server does not receive a pong from client before timeout', async function () {
+				client = new ClientSocket(clientOptions);
+
+				let serverWarning: Error | null = null;
+				(async () => {
+					for await (let {error} of server.listen('socketError')) {
+						serverWarning = error;
+					}
+				})();
+
+				let serverDisconnectionCode: number | null = null;
+				(async () => {
+					for await (let event of server.listen('socketDisconnect')) {
+						serverDisconnectionCode = event.code;
+					}
+				})();
+
+				let clientError: Error | null = null;
+				(async () => {
+					for await (let {error} of client.listen('error')) {
+						clientError = error;
+					}
+				})();
+
+				let clientDisconnectCode = 0;
+
+				(async () => {
+					for await (let event of client.listen('disconnect')) {
+						clientDisconnectCode = event.code;
+					}
+				})();
+
+				await wait(1000);
+
+				assert.notEqual(clientError, null);
+				assert.strictEqual(clientError!.name, 'SocketProtocolError');
+				assert.strictEqual(clientDisconnectCode === 4000 || clientDisconnectCode === 4001, true);
+
+				assert.notEqual(serverWarning, null);
+				assert.strictEqual(serverWarning!.name, 'SocketProtocolError');
+				assert.strictEqual(clientDisconnectCode === 4000 || clientDisconnectCode === 4001, true);
+			});
+		});
+
+		describe('When pingTimeoutDisabled is true', function () {
+			beforeEach(async function () {
+				// Intentionally make pingInterval higher than pingTimeout, that
+				// way the client will never receive a ping or send back a pong.
+				server = listen(
+					PORT_NUMBER,
+					Object.assign<
+						ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+						ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
+					>(
+						{
+							isPingTimeoutDisabled: true,
+							pingIntervalMs: 1000,
+							pingTimeoutMs: 500
+						},
+						serverOptions
+					)
+				);
+				bindFailureHandlers(server);
+
+				await server.listen('ready').once(100);
+			});
+
+			it('Should not disconnect socket if server does not receive a pong from client before timeout', async function () {
+				client = new ClientSocket(
+					Object.assign<
+						ClientSocketOptions<MyClientMap>,
+						ClientSocketOptions<MyClientMap>
+					>(
+						{
+							isPingTimeoutDisabled: true
+						},
+						clientOptions
+					)
+				);
+
+				let serverWarning: Error | null = null;
+				(async () => {
+					for await (let {error} of server.listen('socketError')) {
+						serverWarning = error;
+					}
+				})();
+
+				let serverDisconnectionCode: number | null = null;
+				(async () => {
+					for await (let event of server.listen('socketDisconnect')) {
+						serverDisconnectionCode = event.code;
+					}
+				})();
+
+				let clientError: Error | null = null;
+				(async () => {
+					for await (let {error} of client.listen('error')) {
+						clientError = error;
+					}
+				})();
+
+				let clientDisconnectCode: number | null = null;
+
+				(async () => {
+					for await (let event of client.listen('disconnect')) {
+						clientDisconnectCode = event.code;
+					}
+				})();
+
+				await wait(1000);
+
+				assert.strictEqual(clientError, null);
+				assert.strictEqual(clientDisconnectCode, null);
+
+				assert.strictEqual(serverWarning, null);
+				assert.strictEqual(serverDisconnectionCode, null);
+			});
+		});
+
+		describe('When pingTimeout is greater than pingInterval', function () {
+			beforeEach(async function () {
+				// Intentionally make pingInterval higher than pingTimeout, that
+				// way the client will never receive a ping or send back a pong.
+				server = listen(
+					PORT_NUMBER,
+					Object.assign<
+						ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+						ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
+					>(
+						{
+							pingIntervalMs: 400,
+							pingTimeoutMs: 1000
+						},
+						serverOptions
+					)
+				);
+
+				bindFailureHandlers(server);
+
+				await server.listen('ready').once(100);
+			});
+
+			it('Should not disconnect socket if server receives a pong from client before timeout', async function () {
+				client = new ClientSocket(clientOptions);
+
+				let serverWarning: Error | null = null;
+				(async () => {
+					for await (let {error} of server.listen('socketError')) {
+						serverWarning = error;
+					}
+				})();
+
+				let serverDisconnectionCode: number | null = null;
+				(async () => {
+					for await (let event of server.listen('socketDisconnect')) {
+						serverDisconnectionCode = event.code;
+					}
+				})();
+
+				let clientError: Error | null = null;
+
+				(async () => {
+					for await (let {error} of client.listen('error')) {
+						clientError = error;
+					}
+				})();
+
+				let clientDisconnectCode: number | null = null;
+
+				(async () => {
+					for await (let event of client.listen('disconnect')) {
+						clientDisconnectCode = event.code;
+					}
+				})();
+
+				await wait(2000);
+				assert.strictEqual(clientError, null);
+				assert.strictEqual(clientDisconnectCode, null);
+
+				assert.strictEqual(serverWarning, null);
+				assert.strictEqual(serverDisconnectionCode, null);
+			});
+		});
+	});	
 });

@@ -63,7 +63,7 @@ export class SocketTransport<T extends SocketMap> {
 	public id: string;
 	public ackTimeoutMs: number;
 
-	private _pingTimeoutRef: NodeJS.Timeout;
+	private _pingTimeoutRef: NodeJS.Timeout | null;
 
 	protected constructor(options?: SocketOptions<T>) {
 		let cid = 1;
@@ -82,6 +82,7 @@ export class SocketTransport<T extends SocketMap> {
 		this._inboundReceivedMessageCount = 0;
 		this._outboundPreparedMessageCount = 0;
 		this._outboundSentMessageCount = 0;
+		this._pingTimeoutRef = null;
 		this.middleware = options?.middleware || [];
 		this.streamCleanupMode = options?.streamCleanupMode || 'kill';
 	}
@@ -202,6 +203,8 @@ export class SocketTransport<T extends SocketMap> {
 		this._isReady = false;
 
 		clearTimeout(this._pingTimeoutRef);
+
+		this._pingTimeoutRef = null;
 
 		this.abortAllPendingCallbacksDueToBadConnection(prevStatus);
 
@@ -416,6 +419,7 @@ export class SocketTransport<T extends SocketMap> {
 	protected resetPingTimeout(timeoutMs: number | false, code: number) {
 		if (this._pingTimeoutRef) {
 			clearTimeout(this._pingTimeoutRef);
+			this._pingTimeoutRef = null;
 		}
 
 		if (timeoutMs !== false) {
@@ -848,6 +852,7 @@ export class SocketTransport<T extends SocketMap> {
 						delete callbackMap[request.cid];
 						request.callback = null;
 						clearTimeout(request.timeoutId);
+						delete request.timeoutId;
 						reject(new TimeoutError(`Method \'${[service, request.method].filter(Boolean).join('.')}\' timed out.`));
 					},
 					request.ackTimeoutMs
@@ -859,6 +864,7 @@ export class SocketTransport<T extends SocketMap> {
 
 				if (request.timeoutId) {
 					clearTimeout(request.timeoutId);
+					delete request.timeoutId;
 				}
 
 				if (request.callback) {
@@ -873,6 +879,7 @@ export class SocketTransport<T extends SocketMap> {
 
 				if (request.timeoutId) {
 					clearTimeout(request.timeoutId);
+					delete request.timeoutId;
 				}
 
 				if (err) {
