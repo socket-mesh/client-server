@@ -81,8 +81,8 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 		if (options) {
 			let changeOptions = false;
 
-			if (options.timeoutMs) {
-				timeoutMs = options.timeoutMs;
+			if (options.connectTimeoutMs) {
+				timeoutMs = options.connectTimeoutMs;
 			}
 
 			if (options.address) {
@@ -295,7 +295,7 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 
 		this._pendingReconnectTimeout = timeoutMs;
 
-		this.connect({ timeoutMs });
+		this.connect({ connectTimeoutMs: timeoutMs });
 	}
 
 	public type: 'client'

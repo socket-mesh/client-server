@@ -14,11 +14,13 @@ import { ClientRequest, IncomingMessage } from "http";
 
 export class ServerTransport<T extends ServerMap> extends SocketTransport<SocketMapFromServer<T>> {
 	readonly service?: string;
+	readonly request: IncomingMessage;
 
 	constructor(options: ServerSocketOptions<T>) {
 		super(options);
 
 		this.type = 'server';
+		this.request = options.request;
 		this.service = options.service;
 		this.webSocket = options.socket;
 
@@ -177,6 +179,13 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 			}
 			
 			return changed;
+		}
+
+		if (this.status === 'connecting') {
+			const err = new InvalidActionError(
+				'Cannot call setAuthToken before completing the handshake'
+			);
+			throw err;
 		}
 
 		const auth = this.socket.server.auth;

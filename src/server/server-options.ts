@@ -31,13 +31,16 @@ export interface ServerOptions<T extends ServerMap> extends ws.ServerOptions {
 
 	handlers?: HandlerMap<EmptySocketMap>;
 
+	isPingTimeoutDisabled?: boolean,
+
 	middleware?: ServerMiddleware<T>[],
+
+	// Origins which are allowed to connect to the server.
+	origins?: string;
 
 	// The interval in milliseconds on which to send a ping to the client to check that
 	// it is still alive.
 	pingIntervalMs?: number,
-
-	isPingTimeoutDisabled?: boolean,
 
 	pingTimeoutMs?: number,
 

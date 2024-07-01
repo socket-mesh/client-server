@@ -6,11 +6,13 @@ import { SocketMapFromServer } from "../client/maps/socket-map.js";
 import { ServerMap } from "../client/maps/server-map.js";
 import { Exchange } from "./broker/exchange.js";
 import { Server } from "./server.js";
+import { IncomingMessage } from "http";
 
 export interface ServerSocketOptions<T extends ServerMap> extends SocketOptions<SocketMapFromServer<T>> {
 	handlers: HandlerMap<SocketMapFromServer<T>>,
 	service?: string,
 	server: Server<T>,
+	request: IncomingMessage,
 	socket: ws.WebSocket
 }
 

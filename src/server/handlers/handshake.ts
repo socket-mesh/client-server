@@ -1,15 +1,16 @@
 import { RequestHandlerArgs } from "../../request-handler.js";
-import { BasicServerMap, HandshakeOptions, HandshakeStatus, ServerMap } from "../../client/maps/server-map.js";
+import { BasicServerMap, HandshakeOptions, HandshakeStatus } from "../../client/maps/server-map.js";
 import { processAuthentication, validateAuthToken } from "./authenticate.js";
 import { dehydrateError } from "@socket-mesh/errors";
 import { BasicSocketMapServer } from "../../client/maps/socket-map.js";
 import { wait } from "../../utils.js";
 import { ServerSocket } from "../server-socket.js";
+import { ServerTransport } from "../server-transport.js";
 
 const HANDSHAKE_REJECTION_STATUS_CODE = 4008;
 
 export async function handshakeHandler(
-	{ options, socket, transport }: RequestHandlerArgs<HandshakeOptions, BasicSocketMapServer, ServerSocket<BasicServerMap>>
+	{ options, socket, transport }: RequestHandlerArgs<HandshakeOptions, BasicSocketMapServer, ServerSocket<BasicServerMap>, ServerTransport<BasicServerMap>>
 ): Promise<HandshakeStatus> {
 
 	const server = socket.server;
@@ -19,18 +20,18 @@ export async function handshakeHandler(
 	for (const middleware of server.middleware) {
 		if (middleware.onHandshake) {
 			try {
-				middleware.onHandshake(
-					'authError' in authInfo ?
+				await middleware.onHandshake({
+					socket,
+					transport,
+					authInfo : 'authError' in authInfo ?
 						{ signedAuthToken: options.authToken, authError: authInfo.authError } :
 						{ signedAuthToken: options.authToken, authToken: authInfo.authToken }
-				);
+				});
 			} catch (err) {
 				if (err.statusCode == null) {
 					err.statusCode = HANDSHAKE_REJECTION_STATUS_CODE;
 				}
-				transport.onError(err);
-				socket.disconnect(err.statusCode);
-				return;
+				throw err;
 			}
 		}
 	}
@@ -57,7 +58,9 @@ export async function handshakeHandler(
 	// Needs to be executed after the connection event to allow consumers to be setup.
 	await wait(0);
 
-	transport.triggerAuthenticationEvents(false, wasAuthenticated);
+	if (changed) {
+		transport.triggerAuthenticationEvents(false, wasAuthenticated);
+	}
 
 	if (authError) {
 		return {

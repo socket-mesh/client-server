@@ -3,7 +3,7 @@ import { ServerProtocolError } from "@socket-mesh/errors";
 import { CallIdGenerator, StreamCleanupMode } from "../socket.js";
 import { ServerSocket } from "./server-socket.js";
 import { ClientSocket } from "../client/client-socket.js";
-import { IncomingMessage, Server as HttpServer } from 'http';
+import { IncomingMessage, Server as HttpServer, OutgoingHttpHeaders } from 'http';
 import defaultCodec, { CodecEngine } from "@socket-mesh/formatter";
 import { HandlerMap } from "../client/maps/handler-map.js";
 import { AnyPacket } from "../packet.js";
@@ -39,6 +39,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 	public allowClientPublish: boolean;
 	public pingIntervalMs: number;
 	public isPingTimeoutDisabled: boolean;
+	public origins: string;
 	public pingTimeoutMs: number;
 	public socketChannelLimit?: number;
 	public strictHandshake: boolean;
@@ -92,6 +93,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 		this.httpServer = options.server;
 
 		this.middleware = options.middleware || [];
+		this.origins = options.origins || '*:*';
 		this.pendingClients = {};
 		this.pendingClientCount = 0;
 		this.isPingTimeoutDisabled = (options.isPingTimeoutDisabled === true);
@@ -101,6 +103,8 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 		this.socketChannelLimit = options.socketChannelLimit;
 		this.socketStreamCleanupMode = options.socketStreamCleanupMode || 'kill';
 		this.strictHandshake = options.strictHandshake ?? true;
+
+		options.verifyClient = this.verifyClient.bind(this);
 
 		this._wss = new ws.WebSocketServer(options);
 
@@ -129,6 +133,10 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 				this.emit('ready', {});
 			})();
 		}
+	}
+
+	public addMiddleware(middleware: ServerMiddleware<T>): void {
+		this.middleware.push(middleware);
 	}
 
 	private bind(socket: ClientSocket<ClientMapFromServer<T>> | ServerSocket<T>) {
@@ -234,6 +242,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 			handlers: this._handlers,
 			middleware: this.middleware,
 			onUnhandledRequest: this.onUnhandledRequest.bind(this),
+			request: upgradeReq,
 			socket: wsSocket,
 			server: this,
 			state: {},
@@ -256,7 +265,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 			error = new ServerProtocolError(error);
 		}
 
-		//this.emitError(error);
+		this.emit('error', { error });
 	}
 	
 	private onHeaders(headers: string[], request: IncomingMessage): void {
@@ -311,7 +320,59 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 			clearInterval(this._pingIntervalRef);
 			this._pingIntervalRef = null;
 		}
-	}	
+	}
+
+	private async verifyClient(
+		info: { origin: string; secure: boolean; req: IncomingMessage },
+		callback: (res: boolean, code?: number, message?: string, headers?: OutgoingHttpHeaders) => void
+	): Promise<void> {
+		try {
+			if (typeof info.origin !== 'string' || info.origin === 'null') {
+				info.origin = '*';
+			}
+
+			if (this.origins.indexOf('*:*') === -1) {
+				let ok = false;
+
+				try {
+					const url = new URL(info.origin);
+					url.port = url.port || (url.protocol === 'https:' ? '443' : '80');
+					ok = !!(~this.origins.indexOf(url.hostname + ':' + url.port) ||
+						~this.origins.indexOf(url.hostname + ':*') ||
+						~this.origins.indexOf('*:' + url.port));
+				} catch (e) {}
+
+				if (!ok) {
+					const error = new ServerProtocolError(
+						`Failed to authorize socket handshake - Invalid origin: ${info.origin}`
+					);
+			
+					this.emit('warning', { warning: error });
+			
+					callback(false, 403, error.message);
+					return;	
+				}
+			}
+
+			try {
+				for (const middleware of this.middleware) {
+					if (middleware.onConnection) {
+						await middleware.onConnection(info.req);
+					}
+				}
+			} catch (err) {
+				callback(false, 401, typeof err === 'string' ? err : err.message);
+				return;
+			}
+
+			callback(true);
+		} catch (err) {
+			this.onError(err);
+			this.emit('warning', { warning: err });
+
+			callback(false, 403, typeof err === 'string' ? err : err.message);
+		}
+	}
 
 	emit(event: "close", data: CloseEvent): void;
 	emit(event: "connection", data: ConnectionEvent<T>): void;

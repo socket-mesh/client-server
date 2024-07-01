@@ -179,8 +179,7 @@ async function procHandler(
 
 const clientOptions: ClientSocketOptions<MyClientMap> = {
 	authEngine: { authTokenName },
-	address: `ws://127.0.0.1:${PORT_NUMBER}`,
-	ackTimeoutMs: 200
+	address: `ws://127.0.0.1:${PORT_NUMBER}`
 }
 
 const serverOptions: ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>> = {
@@ -3006,5 +3005,286 @@ describe('Integration tests', function () {
 				assert.strictEqual(serverDisconnectionCode, null);
 			});
 		});
-	});	
+	});
+
+	describe('Middleware', function () {
+		beforeEach(async function () {
+			server = listen(PORT_NUMBER, serverOptions);
+
+			bindFailureHandlers(server);
+
+			await server.listen('ready').once(100);
+		});
+
+		describe('onConnection', function () {
+			it('Delaying handshake for one client should not affect other clients', async function () {
+				server.addMiddleware({
+					type: 'onConnection Delay',
+					async onConnection(req) {
+						if (req.url && req.url.indexOf('?delayMe=true') !== -1) {
+							// Long delay.
+							await wait(300);
+						}
+					}
+				});
+
+				const clientA = new ClientSocket(clientOptions);
+				const clientB = new ClientSocket(
+					Object.assign<
+						ClientSocketOptions<MyClientMap>,
+						ClientSocketOptions<MyClientMap>,
+						ClientSocketOptions<MyClientMap>
+					>(
+						{},
+						clientOptions,
+						{ address: `ws://127.0.0.1:${PORT_NUMBER}?delayMe=true` }
+					)
+				);
+
+				let clientAIsConnected = false;
+				let clientBIsConnected = false;
+
+				(async () => {
+					await clientA.listen('connect').once();
+					clientAIsConnected = true;
+				})();
+
+				(async () => {
+					await clientB.listen('connect').once();
+					clientBIsConnected = true;
+				})();
+
+				await wait(100);
+
+				assert.strictEqual(clientAIsConnected, true);
+				assert.strictEqual(clientBIsConnected, false);
+
+				clientA.disconnect();
+				clientB.disconnect();
+			});
+		});
+
+		describe('onHandshake', function () {
+			it('Should trigger correct events if handshake middleware blocks with an error', async function () {
+				let middlewareWasExecuted = false;
+				const serverWarnings: Error[] = [];
+				const clientErrors: Error[] = [];
+				let abortStatus: number | null = null;
+
+				server.addMiddleware({
+					type: 'Handshake Middleware',
+					async onHandshake() {
+						await wait(100);
+						middlewareWasExecuted = true;
+						const err = new Error('Handshake failed because the server was too lazy');
+						err.name = 'TooLazyHandshakeError';
+
+						throw err;
+					}
+				});
+
+				(async () => {
+					for await (let { error } of server.listen('socketError')) {
+						serverWarnings.push(error);
+					}
+				})();
+
+				client = new ClientSocket(clientOptions);
+
+				(async () => {
+					for await (let {error} of client.listen('error')) {
+						clientErrors.push(error);
+					}
+				})();
+
+				(async () => {
+					let event = await client.listen('connectAbort').once();
+					abortStatus = event.code;
+				})();
+
+				await wait(200);
+
+				assert.strictEqual(middlewareWasExecuted, true);
+				assert.notEqual(clientErrors[0], null);
+				assert.strictEqual(clientErrors[0].name, 'TooLazyHandshakeError');
+				assert.notEqual(clientErrors[1], null);
+				assert.strictEqual(clientErrors[1].name, 'SocketProtocolError');
+				assert.notEqual(serverWarnings[0], null);
+				assert.strictEqual(serverWarnings[0].name, 'TooLazyHandshakeError');
+				assert.notEqual(abortStatus, null);
+			});
+
+			it('Should send back default 4008 status code if handshake middleware blocks without providing a status code', async function () {
+				let middlewareWasExecuted = false;
+				let abortStatus = 0;
+				let abortReason: string | undefined = '';
+
+				server.addMiddleware({
+					type: 'Handshake Middleware',
+					async onHandshake() {
+						await wait(100);
+						middlewareWasExecuted = true;
+						const err = new Error('Handshake failed because the server was too lazy');
+						err.name = 'TooLazyHandshakeError';
+
+						throw err;
+					}
+				});
+
+				client = new ClientSocket(clientOptions);
+
+				(async () => {
+					const event = await client.listen('connectAbort').once();
+					abortStatus = event.code;
+					abortReason = event.reason;
+				})();
+
+				await wait(200);
+				assert.strictEqual(middlewareWasExecuted, true);
+				assert.strictEqual(abortStatus, 4008);
+				assert.strictEqual(abortReason, 'TooLazyHandshakeError: Handshake failed because the server was too lazy');
+			});
+
+			it('Should send back custom status code if handshake middleware blocks by providing a status code', async function () {
+				let middlewareWasExecuted = false;
+				let abortStatus: number;
+				let abortReason: string | undefined;
+
+				server.addMiddleware({
+					type: 'Handshake Middleware',
+					async onHandshake() {
+						await wait(100);
+						middlewareWasExecuted = true;
+						const err = new Error('Handshake failed because of invalid query auth parameters');
+						err.name = 'InvalidAuthQueryHandshakeError';
+						// Set custom 4501 status code as a property of the error.
+						// We will treat this code as a fatal authentication failure on the front end.
+						// A status code of 4500 or higher means that the client shouldn't try to reconnect.
+						(err as any).statusCode = 4501;
+
+						throw err;
+					}
+				});
+
+				client = new ClientSocket(clientOptions);
+
+				(async () => {
+					let event = await client.listen('connectAbort').once();
+					abortStatus = event.code;
+					abortReason = event.reason;
+				})();
+
+				await wait(200);
+				assert.strictEqual(middlewareWasExecuted, true);
+				assert.strictEqual(abortStatus!, 4501);
+				assert.strictEqual(abortReason!, 'InvalidAuthQueryHandshakeError: Handshake failed because of invalid query auth parameters');
+			});
+
+			it('Should connect with a delay if allow() is called after a timeout inside the middleware function', async function () {
+				let createConnectionTime: number | null = null;
+				let connectEventTime: number | null = null;
+				let abortStatus: number;
+				let abortReason: string | undefined;
+
+				server.addMiddleware({
+					type: 'Handshake Middleware',
+					async onHandshake() {
+						await wait(500);
+					}
+				});
+
+				createConnectionTime = Date.now();
+				client = new ClientSocket(clientOptions);
+
+				(async () => {
+					const event = await client.listen('connectAbort').once();
+					abortStatus = event.code;
+					abortReason = event.reason;
+				})();
+
+				await client.listen('connect').once(1000);
+				connectEventTime = Date.now();
+				assert.strictEqual(connectEventTime - createConnectionTime > 400, true);
+			});
+
+			it('Should not be allowed to call setAuthorization from inside middleware', async function () {
+				let didAuthenticationEventTrigger = false;
+				let setAuthTokenError: Error | null = null;
+
+				server.addMiddleware({
+					type: 'Handshake Middleware',
+					async onHandshake({ transport }) {
+						try {
+							await transport.setAuthorization({username: 'alice'});
+						} catch (error) {
+							setAuthTokenError = error;
+						}
+					}
+				});
+
+				(async () => {
+					let event = await server.listen('socketAuthenticate').once();
+
+					didAuthenticationEventTrigger = true;
+				})();
+
+				client = new ClientSocket(clientOptions);
+
+				const event = await client.listen('connect').once(100);
+
+				assert.strictEqual(event.isAuthenticated, false);
+				assert.strictEqual(client.signedAuthToken, undefined);
+				assert.strictEqual(client.authToken, undefined);
+				assert.strictEqual(didAuthenticationEventTrigger, false);
+				assert.notEqual(setAuthTokenError, undefined);
+				assert.strictEqual(setAuthTokenError!.name, 'InvalidActionError');
+			});
+
+			it('Delaying handshake for one client should not affect other clients', async function () {
+				server.addMiddleware({
+					type: 'Handshake Middleware',
+					async onHandshake({ transport }) {
+						if (transport.request.url && transport.request.url.indexOf('?delayMe=true') !== -1) {
+							// Long delay.
+							await wait(500);
+						}
+					}
+				});
+
+				const clientA = new ClientSocket(clientOptions);
+				const clientB = new ClientSocket(
+					Object.assign<
+						ClientSocketOptions<MyClientMap>,
+						ClientSocketOptions<MyClientMap>,
+						ClientSocketOptions<MyClientMap>
+					>(
+						{},
+						clientOptions,
+						{ address: `ws://127.0.0.1:${PORT_NUMBER}?delayMe=true` }
+					)
+				);
+
+				let clientAIsConnected = false;
+				let clientBIsConnected = false;
+
+				(async () => {
+					await clientA.listen('connect').once();
+					clientAIsConnected = true;
+				})();
+
+				(async () => {
+					await clientB.listen('connect').once();
+					clientBIsConnected = true;
+				})();
+
+				await wait(100);
+
+				assert.strictEqual(clientAIsConnected, true);
+				assert.strictEqual(clientBIsConnected, false);
+
+				clientA.disconnect();
+				clientB.disconnect();
+			});
+		});
+	});
 });

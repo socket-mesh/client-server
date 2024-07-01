@@ -25,7 +25,7 @@ export interface BasicServerMap<TIncoming extends PublicMethodMap = {}, TChannel
 	PrivateIncoming: ServerPrivateMap,
 	PrivateOutgoing: ClientPrivateMap,
 	ServerState: {},
-	State: TState & ServerSocketState<BasicServerMap<TIncoming, TChannels, TState>>
+	State: TState & ServerSocketState
 }
 
 export interface HandshakeOptions {

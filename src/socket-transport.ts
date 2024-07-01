@@ -3,7 +3,7 @@ import ws from "isomorphic-ws";
 import { Middleware } from "./middleware/middleware.js";
 import { AnyRequest, InvokeMethodRequest, InvokeServiceRequest, TransmitMethodRequest, TransmitServiceRequest, isRequestDone } from "./request.js";
 import { AnyPacket, MethodPacket, isRequestPacket } from "./packet.js";
-import { AbortError, BadConnectionError, InvalidActionError, InvalidArgumentsError, MiddlewareBlockedError, SocketProtocolError, TimeoutError, dehydrateError, socketProtocolErrorStatuses, socketProtocolIgnoreStatuses } from "@socket-mesh/errors";
+import { AbortError, BadConnectionError, InvalidActionError, InvalidArgumentsError, MiddlewareBlockedError, SocketProtocolError, TimeoutError, dehydrateError, hydrateError, socketProtocolErrorStatuses, socketProtocolIgnoreStatuses } from "@socket-mesh/errors";
 import { ClientRequest, IncomingMessage } from "http";
 import { FunctionReturnType, MethodMap, ServiceMap } from "./client/maps/method-map.js";
 import { AnyResponse, MethodDataResponse, isResponsePacket } from "./response.js";
@@ -308,31 +308,6 @@ export class SocketTransport<T extends SocketMap> {
 		this._socket.emit('pong', { data });
 	}
 
-	protected onResponse(response: AnyResponse<T>, middlewareError?: Error) {
-		const map = this._callbackMap[response.rid];
-
-		if (map) {
-			if (map.timeoutId) {
-				clearTimeout(map.timeoutId);
-				delete map.timeoutId;
-			}
-
-			if (middlewareError) {
-				map.callback(middlewareError);
-			} else if ('error' in response) {
-				map.callback(response.error);
-			} else {
-				map.callback(null, 'data' in response ? response.data : undefined);
-			}
-		}
-
-		if (middlewareError) {
-			this._socket.emit('response', { response: { rid: response.rid, error: middlewareError } });
-		} else {
-			this._socket.emit('response', { response });
-		}
-	}
-
 	protected async onRequest(packet: AnyPacket<T>, timestamp: Date, middlewareError?: Error): Promise<boolean> {
 		this._socket.emit('request', { request: packet });
 		
@@ -390,6 +365,31 @@ export class SocketTransport<T extends SocketMap> {
 		}
 
 		return wasHandled;
+	}
+
+	protected onResponse(response: AnyResponse<T>, middlewareError?: Error) {
+		const map = this._callbackMap[response.rid];
+
+		if (map) {
+			if (map.timeoutId) {
+				clearTimeout(map.timeoutId);
+				delete map.timeoutId;
+			}
+
+			if (middlewareError) {
+				map.callback(middlewareError);
+			} else if ('error' in response) {
+				map.callback(hydrateError(response.error));
+			} else {
+				map.callback(null, 'data' in response ? response.data : undefined);
+			}
+		}
+
+		if (middlewareError) {
+			this._socket.emit('response', { response: { rid: response.rid, error: middlewareError } });
+		} else {
+			this._socket.emit('response', { response });
+		}
 	}
 
 	protected onUnexpectedResponse(request: ClientRequest, response: IncomingMessage): void {
