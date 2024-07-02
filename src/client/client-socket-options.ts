@@ -43,5 +43,5 @@ export function parseClientOptions<T extends ClientMap>(options: ClientSocketOpt
 		options = { address: options } as ClientSocketOptions<T>;
 	}
 	
-	return options;
+	return Object.assign<ClientSocketOptions<T>, ClientSocketOptions<T>>({}, options);
 }

@@ -135,8 +135,8 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 		}
 	}
 
-	public addMiddleware(middleware: ServerMiddleware<T>): void {
-		this.middleware.push(middleware);
+	public addMiddleware(...middleware: ServerMiddleware<T>[]): void {
+		this.middleware.push(...middleware);
 	}
 
 	private bind(socket: ClientSocket<ClientMapFromServer<T>> | ServerSocket<T>) {

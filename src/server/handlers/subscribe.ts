@@ -3,9 +3,10 @@ import { BasicServerMap, SubscribeOptions } from "../../client/maps/server-map.j
 import { RequestHandlerArgs } from "../../request-handler.js";
 import { BasicSocketMapServer } from "../../client/maps/socket-map.js";
 import { ServerSocket } from "../server-socket.js";
+import { ServerTransport } from "../server-transport.js";
 
 export async function subscribeHandler(
-	{ socket, transport, options }: RequestHandlerArgs<SubscribeOptions, BasicSocketMapServer, ServerSocket<BasicServerMap>>
+	{ socket, transport, options }: RequestHandlerArgs<SubscribeOptions, BasicSocketMapServer, ServerSocket<BasicServerMap>, ServerTransport<BasicServerMap>>
 ): Promise<void> {
 	if (socket.status !== 'ready') {
 		// This is an invalid state; it means the client tried to subscribe before
@@ -22,9 +23,15 @@ export async function subscribeHandler(
 		);
 	}
 
-	try {
-		const { channel, ...channelOptions } = options;
+	const { channel, ...channelOptions } = options;
 
+	for (const middleware of socket.server.middleware) {
+		if (middleware.onSubscribe) {
+			await middleware.onSubscribe({ channel, options, socket, transport });
+		}
+	}
+
+	try {
 		if (state.channelSubscriptions == null) {
 			state.channelSubscriptions = {};
 		}

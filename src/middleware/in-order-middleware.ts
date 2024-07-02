@@ -1,9 +1,8 @@
 import { RawData } from "ws";
 import { EmptySocketMap, SocketMap } from "../client/maps/socket-map.js";
-import { MessageRawMiddlewareArgs, Middleware, MiddlewareArgs, SendRequestMiddlewareArgs } from "./middleware.js";
+import { MessageRawMiddlewareArgs, Middleware, MiddlewareArgs } from "./middleware.js";
 import { WritableConsumableStream } from "@socket-mesh/writable-consumable-stream";
 import ws from "isomorphic-ws";
-import { RequestCollection } from "../request.js";
 
 interface InboundMessage<T extends SocketMap> extends MessageRawMiddlewareArgs<T> {
 	callback: (err: Error | null, data: string | ws.RawData) => void
