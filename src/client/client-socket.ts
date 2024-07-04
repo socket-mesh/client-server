@@ -34,7 +34,7 @@ export class ClientSocket<T extends ClientMap> extends Socket<SocketMapFromClien
 
 		const clientTransport = new ClientTransport(options);
 
-		super(clientTransport);
+		super(clientTransport, options);
 
 		this._clientTransport = clientTransport;
 		this.channels = new ClientChannels<T>(this._clientTransport, options);

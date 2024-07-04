@@ -13,7 +13,7 @@ export interface AutoReconnectOptions {
 
 export interface ConnectOptions {
 	address?: string | URL,
-	timeoutMs?: number,
+	connectTimeoutMs?: number
 	wsOptions?: ws.ClientOptions
 }
 
@@ -22,11 +22,11 @@ export interface ClientSocketOptions<T extends ClientMap> extends SocketOptions<
 	autoConnect?: boolean,
 
 	// A custom engine to use for storing and loading JWT auth tokens on the client side.
-	authEngine?: ClientAuthEngine | LocalStorageAuthEngineOptions | null;
+	authEngine?: ClientAuthEngine | LocalStorageAuthEngineOptions | null,
 
 	// Whether or not to automatically reconnect the socket when it loses the connection. Default is true.
 	// Valid properties are: initialDelay (milliseconds), randomness (milliseconds), multiplier (decimal; default is 1.5) and maxDelay (milliseconds).
-	autoReconnect?: Partial<AutoReconnectOptions> | boolean
+	autoReconnect?: Partial<AutoReconnectOptions> | boolean,
 
 	// This is true by default. If you set this to false, then the socket will not automatically try to subscribe to pending subscriptions on
 	// connect - Instead, you will have to manually invoke the processSubscriptions callback from inside the 'connect' event handler on the client side.
@@ -35,10 +35,7 @@ export interface ClientSocketOptions<T extends ClientMap> extends SocketOptions<
 	autoSubscribeOnConnect?: boolean,
 
 	// A prefix to add to the channel names.
-	channelPrefix?: string;
-
-	// (milliseconds)
-	connectTimeoutMs?: number;
+	channelPrefix?: string,
 }
 
 export function parseClientOptions<T extends ClientMap>(options: ClientSocketOptions<T> | string | URL): ClientSocketOptions<T> {
@@ -46,5 +43,5 @@ export function parseClientOptions<T extends ClientMap>(options: ClientSocketOpt
 		options = { address: options } as ClientSocketOptions<T>;
 	}
 	
-	return options;
+	return Object.assign<ClientSocketOptions<T>, ClientSocketOptions<T>>({}, options);
 }

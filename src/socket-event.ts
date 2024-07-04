@@ -1,11 +1,8 @@
 import ws from "isomorphic-ws";
 import { ClientRequest, IncomingMessage } from "http";
-import { MethodPacket, ServicePacket } from "./request.js";
-import { PublicMethodMap, ServiceMap, MethodMap, PrivateMethodMap } from "./client/maps/method-map.js";
+import { MethodPacket, ServicePacket } from "./packet.js";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
 import { AnyResponse } from "./response.js";
-import { ChannelState } from "./channels/channel-state.js";
-import { ChannelOptions } from "./channels/channel-options.js";
 import { SocketMap } from "./client/maps/socket-map.js";
 
 export type SocketEvent<T extends SocketMap> =
@@ -22,8 +19,8 @@ export type SocketEvent<T extends SocketMap> =
 	MessageEvent |
 	PingEvent |
 	PongEvent |
-	RequestEvent<T['Service'], T['Incoming']> |
-	ResponseEvent<T['Service'], T['Outgoing'], T['PrivateOutgoing']> |
+	RequestEvent<T> |
+	ResponseEvent<T> |
 	UnexpectedResponseEvent |
 	UpgradeEvent;
 
@@ -53,7 +50,9 @@ export interface CloseEvent {
 }
 
 export interface ConnectEvent {
+	id: string,
 	isAuthenticated: boolean,
+	pingTimeoutMs: number,
 	authError?: Error
 }
 
@@ -80,7 +79,7 @@ export interface ErrorEvent {
 }
 
 export interface MessageEvent {
-	data: ws.RawData,
+	data: string | ws.RawData,
 	isBinary: boolean
 }
 
@@ -96,16 +95,12 @@ export interface RemoveAuthTokenEvent {
 	oldAuthToken: SignedAuthToken
 }
 
-export interface RequestEvent<TServiceMap extends ServiceMap, TIncomingMap extends MethodMap> {
-	request: ServicePacket<TServiceMap> | MethodPacket<TIncomingMap>
+export interface RequestEvent<T extends SocketMap> {
+	request: ServicePacket<T['Service']> | MethodPacket<T['Incoming']>
 }
 
-export interface ResponseEvent<
-	TServiceMap extends ServiceMap,
-	TOutgoingMap extends PublicMethodMap,
-	TPrivateOutgoingMap extends PrivateMethodMap
-> {
-	response: AnyResponse<TServiceMap, TOutgoingMap, TPrivateOutgoingMap>
+export interface ResponseEvent<T extends SocketMap> {
+	response: AnyResponse<T>
 }
 
 export interface UnexpectedResponseEvent {

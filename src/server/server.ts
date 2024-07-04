@@ -1,12 +1,12 @@
 import ws from "ws";
 import { ServerProtocolError } from "@socket-mesh/errors";
-import { CallIdGenerator } from "../socket.js";
+import { CallIdGenerator, StreamCleanupMode } from "../socket.js";
 import { ServerSocket } from "./server-socket.js";
 import { ClientSocket } from "../client/client-socket.js";
-import { IncomingMessage, Server as HttpServer } from 'http';
+import { IncomingMessage, Server as HttpServer, OutgoingHttpHeaders } from 'http';
 import defaultCodec, { CodecEngine } from "@socket-mesh/formatter";
 import { HandlerMap } from "../client/maps/handler-map.js";
-import { AnyPacket } from "../request.js";
+import { AnyPacket } from "../packet.js";
 import { AuthEngine, defaultAuthEngine, isAuthEngine } from "./auth-engine.js";
 import { handshakeHandler } from "./handlers/handshake.js";
 import { ServerMiddleware } from "./middleware/server-middleware.js";
@@ -31,6 +31,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 	private readonly _wss: ws.WebSocketServer;
 	private _isReady: boolean;
 	private _isListening: boolean;
+	private _pingIntervalRef: NodeJS.Timeout;	
 	private _handlers: HandlerMap<SocketMapFromServer<T>>;
 
 	//| ServerSocket<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TSocketState>
@@ -38,8 +39,10 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 	public allowClientPublish: boolean;
 	public pingIntervalMs: number;
 	public isPingTimeoutDisabled: boolean;
+	public origins: string;
 	public pingTimeoutMs: number;
 	public socketChannelLimit?: number;
+	public strictHandshake: boolean;
 
 	public readonly auth: AuthEngine;
 	public readonly brokerEngine: Broker<T['Channel']>;
@@ -48,6 +51,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 	public readonly codecEngine: CodecEngine;
 	public readonly pendingClients: { [ id: string ]: ClientSocket<ClientMapFromServer<T>> | ServerSocket<T> };	
 	public pendingClientCount: number;
+	public readonly socketStreamCleanupMode: StreamCleanupMode;
 	public readonly httpServer: HttpServer;
 
 	public readonly middleware: ServerMiddleware<T>[];
@@ -63,26 +67,18 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 
 		options.clientTracking = true;
 
-		this.clients = {};
-		this.clientCount = 0;
-		this.pendingClients = {};
-		this.pendingClientCount = 0;
 		this.ackTimeoutMs = options.ackTimeoutMs || 10000;
 		this.allowClientPublish = options.allowClientPublish ?? true;
-		this.pingIntervalMs = options.pingIntervalMs || 8000;
-		this.isPingTimeoutDisabled = (options.pingTimeoutMs === false);
-		this.pingTimeoutMs = options.pingTimeoutMs || 20000;
-
+		this.auth = isAuthEngine(options.authEngine) ? options.authEngine : defaultAuthEngine(options.authEngine);
+		this.brokerEngine = options.brokerEngine || new SimpleBroker<T['Channel']>();
 		this._callIdGenerator = options.callIdGenerator || (() => {
 			return cid++;
 		});
-
-		this.auth = isAuthEngine(options.authEngine) ? options.authEngine : defaultAuthEngine(options.authEngine);
-		this.brokerEngine = options.brokerEngine || new SimpleBroker<T['Channel']>();
+		
+		this.clients = {};
+		this.clientCount = 0;
 		this.codecEngine = options.codecEngine || defaultCodec;
-		this.middleware = options.middleware || [];
-		this.socketChannelLimit = options.socketChannelLimit;
-		this.httpServer = options.server;
+
 		this._handlers = Object.assign(
 			{
 				"#authenticate": authenticateHandler,
@@ -94,6 +90,21 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 			},
 			options.handlers
 		);
+		this.httpServer = options.server;
+
+		this.middleware = options.middleware || [];
+		this.origins = options.origins || '*:*';
+		this.pendingClients = {};
+		this.pendingClientCount = 0;
+		this.isPingTimeoutDisabled = (options.isPingTimeoutDisabled === true);
+		this.pingIntervalMs = options.pingIntervalMs || 8000;
+		this.pingTimeoutMs = options.pingTimeoutMs || 20000;
+
+		this.socketChannelLimit = options.socketChannelLimit;
+		this.socketStreamCleanupMode = options.socketStreamCleanupMode || 'kill';
+		this.strictHandshake = options.strictHandshake ?? true;
+
+		options.verifyClient = this.verifyClient.bind(this);
 
 		this._wss = new ws.WebSocketServer(options);
 
@@ -122,6 +133,63 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 				this.emit('ready', {});
 			})();
 		}
+	}
+
+	public addMiddleware(...middleware: ServerMiddleware<T>[]): void {
+		this.middleware.push(...middleware);
+	}
+
+	private bind(socket: ClientSocket<ClientMapFromServer<T>> | ServerSocket<T>) {
+		if (socket.type === 'client') {
+			(async () => {
+				for await (let event of socket.listen()) {
+					this.emit(
+						`socket${event.stream[0].toUpperCase()}${event.stream.substring(1)}` as any,
+						Object.assign(
+							{ socket },
+							event.value
+						)
+					);
+				}
+			})();
+	
+			(async () => {
+				for await (let event of socket.channels.listen()) {
+					this.emit(
+						`socket${event.stream[0].toUpperCase()}${event.stream.substring(1)}` as any,
+						Object.assign(
+							{ socket },
+							event.value
+						)
+					);
+				}
+			})();	
+		}
+
+		(async () => {
+			for await (let {} of socket.listen('connect')) {
+				if (this.pendingClients[socket.id]) {
+					delete this.pendingClients[socket.id];
+					this.pendingClientCount--;
+				}
+			
+				this.clients[socket.id] = socket;
+				this.clientCount++;
+				this.startPinging();
+			}
+		})();
+
+		(async () => {
+			for await (let {} of socket.listen('connectAbort')) {
+				this.socketDisconnected(socket);
+			}
+		})();
+
+		(async () => {
+			for await (let {} of socket.listen('disconnect')) {
+				this.socketDisconnected(socket);
+			}
+		})();
 	}
 
 	close(keepSocketsOpen?: boolean): Promise<void> {
@@ -171,11 +239,14 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 			ackTimeoutMs: this.ackTimeoutMs,
 			callIdGenerator: this._callIdGenerator,
 			codecEngine: this.codecEngine,
-			middleware: this.middleware,
-			socket: wsSocket,
-			state: { server: this },
 			handlers: this._handlers,
-			onUnhandledRequest: this.onUnhandledRequest.bind(this)
+			middleware: this.middleware,
+			onUnhandledRequest: this.onUnhandledRequest.bind(this),
+			request: upgradeReq,
+			socket: wsSocket,
+			server: this,
+			state: {},
+			streamCleanupMode: this.socketStreamCleanupMode
 		});
 
 		this.pendingClientCount++;
@@ -185,64 +256,8 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 
 		this.emit('connection', { socket, upgradeReq });
 
-		//agSocket.exchange = this.exchange;
-/*
-		const inboundRawMiddleware = this._middleware[MiddlewareType.MIDDLEWARE_INBOUND_RAW];
-
-		if (inboundRawMiddleware) {
-			inboundRawMiddleware(socket.middlewareInboundRawStream);
-		}
-
-		const inboundMiddleware = this._middleware[MiddlewareType.MIDDLEWARE_INBOUND];
-
-		if (inboundMiddleware) {
-			inboundMiddleware(socket.middlewareInboundStream);
-		}
-
-		const outboundMiddleware = this._middleware[MiddlewareType.MIDDLEWARE_OUTBOUND];
-
-		if (outboundMiddleware) {
-			outboundMiddleware(socket.middlewareOutboundStream);
-		}
-*/
 		// Emit event to signal that a socket handshake has been initiated.
 		this.emit('handshake', { socket });
-	}
-
-	private bind(socket: ClientSocket<ClientMapFromServer<T>> | ServerSocket<T>) {
-		if (socket.type === 'client') {
-			(async () => {
-				for await (let event of socket.listen()) {
-					if (event.stream === 'connectAbort') {
-						delete this.clients[socket.id];
-					}
-
-					if (event.stream === 'disconnect') {
-						delete this.clients[socket.id];
-					}
-
-					this.emit(
-						`socket${event.stream[0].toUpperCase()}${event.stream.substring(1)}` as any,
-						Object.assign(
-							{ socket },
-							event.value
-						)
-					);
-				}
-			})();
-	
-			(async () => {
-				for await (let event of socket.channels.listen()) {
-					this.emit(
-						`socket${event.stream[0].toUpperCase()}${event.stream.substring(1)}` as any,
-						Object.assign(
-							{ socket },
-							event.value
-						)
-					);
-				}
-			})();	
-		}
 	}
 
 	private onError(error: Error | string): void {
@@ -250,7 +265,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 			error = new ServerProtocolError(error);
 		}
 
-		//this.emitError(error);
+		this.emit('error', { error });
 	}
 	
 	private onHeaders(headers: string[], request: IncomingMessage): void {
@@ -265,9 +280,98 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 
 	private onUnhandledRequest(
 		socket: ServerSocket<T> | ClientSocket<ClientMapFromServer<T>>,
-		packet: AnyPacket<T['Service'], T['Incoming']>
+		packet: AnyPacket<SocketMapFromServer<T>>
 	): void {
 
+	}
+
+	private socketDisconnected(socket: ClientSocket<ClientMapFromServer<T>> | ServerSocket<T>): void {
+		if (!!this.pendingClients[socket.id]) {
+			delete this.pendingClients[socket.id];
+			this.pendingClientCount--;
+		}
+
+		if (!!this.clients[socket.id]) {
+			delete this.clients[socket.id];
+			this.clientCount--;
+		}
+
+		if (this.clientCount <= 0) {
+			this.stopPinging();
+		}
+	}
+
+	private startPinging(): void {
+		if (!this._pingIntervalRef && !this.isPingTimeoutDisabled) {
+			this._pingIntervalRef = setInterval(() => {
+				for (const id in this.clients) {
+					this.clients[id]
+						.ping()
+						.catch(err => {
+							this.onError(err);
+						});
+				}
+			}, this.pingIntervalMs);
+		}
+	}
+
+	private stopPinging(): void {
+		if (this._pingIntervalRef) {
+			clearInterval(this._pingIntervalRef);
+			this._pingIntervalRef = null;
+		}
+	}
+
+	private async verifyClient(
+		info: { origin: string; secure: boolean; req: IncomingMessage },
+		callback: (res: boolean, code?: number, message?: string, headers?: OutgoingHttpHeaders) => void
+	): Promise<void> {
+		try {
+			if (typeof info.origin !== 'string' || info.origin === 'null') {
+				info.origin = '*';
+			}
+
+			if (this.origins.indexOf('*:*') === -1) {
+				let ok = false;
+
+				try {
+					const url = new URL(info.origin);
+					url.port = url.port || (url.protocol === 'https:' ? '443' : '80');
+					ok = !!(~this.origins.indexOf(url.hostname + ':' + url.port) ||
+						~this.origins.indexOf(url.hostname + ':*') ||
+						~this.origins.indexOf('*:' + url.port));
+				} catch (e) {}
+
+				if (!ok) {
+					const error = new ServerProtocolError(
+						`Failed to authorize socket handshake - Invalid origin: ${info.origin}`
+					);
+			
+					this.emit('warning', { warning: error });
+			
+					callback(false, 403, error.message);
+					return;	
+				}
+			}
+
+			try {
+				for (const middleware of this.middleware) {
+					if (middleware.onConnection) {
+						await middleware.onConnection(info.req);
+					}
+				}
+			} catch (err) {
+				callback(false, 401, typeof err === 'string' ? err : err.message);
+				return;
+			}
+
+			callback(true);
+		} catch (err) {
+			this.onError(err);
+			this.emit('warning', { warning: err });
+
+			callback(false, 403, typeof err === 'string' ? err : err.message);
+		}
 	}
 
 	emit(event: "close", data: CloseEvent): void;

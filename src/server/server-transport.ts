@@ -1,9 +1,9 @@
-import { AnyPacket } from "../request.js";
+import { AnyPacket } from "../packet.js";
 import { ServerMap } from "../client/maps/server-map.js";
 import { ServerSocket, ServerSocketOptions } from "./server-socket.js";
 import { SocketTransport } from "../socket-transport.js";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
-import { AuthError, socketProtocolErrorStatuses } from "@socket-mesh/errors";
+import { AuthError, BrokerError, InvalidActionError, socketProtocolErrorStatuses } from "@socket-mesh/errors";
 import { SocketMapFromServer } from "../client/maps/socket-map.js";
 import jwt from 'jsonwebtoken';
 import { AuthTokenOptions } from "./auth-engine.js";
@@ -11,17 +11,29 @@ import { SocketStatus } from "../socket.js";
 import { RawData } from "ws";
 import { AnyResponse } from "../response.js";
 import { ClientRequest, IncomingMessage } from "http";
+import { abortRequest, InvokeMethodRequest, InvokeServiceRequest, TransmitMethodRequest, TransmitServiceRequest } from "../request.js";
+import { ServerMiddleware } from "./middleware/server-middleware.js";
+import { PublishOptions } from "../channels/channels.js";
 
 export class ServerTransport<T extends ServerMap> extends SocketTransport<SocketMapFromServer<T>> {
-	readonly service?: string;
+	public readonly middleware: ServerMiddleware<T>[];
+	public readonly service?: string;
+	public readonly request: IncomingMessage;
 
 	constructor(options: ServerSocketOptions<T>) {
 		super(options);
 
 		this.type = 'server';
+		this.request = options.request;
+		this.middleware = options.middleware;
 		this.service = options.service;
 		this.webSocket = options.socket;
-		this.resetPingTimeout(this.state.server.isPingTimeoutDisabled ? false : this.state.server.pingTimeoutMs, 4001);
+
+		// Server is not set on socket until the socket constructor is completed so pull it from the options.
+		this.resetPingTimeout(
+			options.server.isPingTimeoutDisabled ? false : options.server.pingTimeoutMs,
+			4001
+		);
 	}
 
 	public override async changeToUnauthenticatedState(): Promise<boolean> {
@@ -29,16 +41,27 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 			const authToken = this.authToken;
 			const signedAuthToken = this.signedAuthToken;
 
-			this.state.server.emit('socketAuthStateChange', { socket: this.socket, wasAuthenticated: true, isAuthenticated: false });
+			this.socket.server.emit('socketAuthStateChange', { socket: this.socket, wasAuthenticated: true, isAuthenticated: false });
 
 			await super.changeToUnauthenticatedState();
 
-			this.state.server.emit('socketDeauthenticate', { socket: this.socket, signedAuthToken, authToken });
+			this.socket.server.emit('socketDeauthenticate', { socket: this.socket, signedAuthToken, authToken });
 
 			return true;
 		}
 
 		return false;
+	}
+	
+	protected override decode(data: string | RawData): AnyPacket<SocketMapFromServer<T>> | AnyPacket<SocketMapFromServer<T>>[] | AnyResponse<SocketMapFromServer<T>> | AnyResponse<SocketMapFromServer<T>>[] | null {
+		const packet = super.decode(data);
+
+		if ((packet === null || typeof packet !== 'object') && this.socket.server.strictHandshake && this.status === 'connecting') {
+			this.disconnect(4009);
+			return null;
+		}
+
+		return packet;
 	}
 
 	protected override onClose(code: number, reason?: string | Buffer): void {
@@ -47,39 +70,43 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 
 		super.onClose(code, reason);
 
-		this.state.server.emit('socketClose', { socket: this.socket, code, reason: strReason });
+		this.socket.server.emit('socketClose', { socket: this.socket, code, reason: strReason });
 
 		this.onDisconnect(status, code, strReason);
 	}
 	
 	protected override onDisconnect(status: SocketStatus, code: number, reason?: string): void {
-		if (status === 'open') {
-			this.state.server.emit('socketDisconnect', { socket: this.socket, code, reason });
+		if (status === 'ready') {
+			this.socket.server.emit('socketDisconnect', { socket: this.socket, code, reason });
 		} else {
-			this.state.server.emit('socketConnectAbort', { socket: this.socket, code, reason });
+			this.socket.server.emit('socketConnectAbort', { socket: this.socket, code, reason });
 		}
 
 		super.onDisconnect(status, code, reason);
 
-		if (!!this.state.server.clients[this.id]) {
-			delete this.state.server.clients[this.id];
-			this.state.server.clientCount--;
+		if (this.socket.state.channelSubscriptions) {
+			const channels = Object.keys(this.socket.state.channelSubscriptions);
+
+			channels.map((channel) => this.unsubscribe(channel));	
 		}
 
-		if (!!this.state.server.pendingClients[this.id]) {
-			delete this.state.server.pendingClients[this.id];
-			this.state.server.pendingClientCount--;
-		}
+		if (this.streamCleanupMode !== 'none') {
+			(async () => {
+				await this.socket.listen('end').once();
 
-		if (this.streamCleanupMode === 'kill') {
-			(async () => {
-				await this.socket.listen('end').once();
-				this.socket.killListeners();
-			})();
-		} else if (this.streamCleanupMode === 'close') {
-			(async () => {
-				await this.socket.listen('end').once();
-				this.socket.closeListeners();
+				if (this.streamCleanupMode === 'kill') {
+					this.socket.killListeners();
+				} else if (this.streamCleanupMode === 'close') {
+					this.socket.closeListeners();
+				}
+			
+				for (let i = 0; i < this.middleware.length; i++) {
+					const middleware = this.middleware[i];
+		
+					if (middleware.onEnd) {
+						middleware.onEnd({ socket: this.socket, transport: this });
+					}
+				}
 			})();
 		}
 		
@@ -88,50 +115,109 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 
 	public override onError(error: Error): void {
 		super.onError(error);
-		this.state.server.emit('socketError', { socket: this.socket, error });
+		this.socket.server.emit('socketError', { socket: this.socket, error });
 	}
 	
+	protected override onInvoke<
+		TService extends keyof T["Service"],
+		TServiceMethod extends keyof T["Service"][TService],
+		TMethod extends keyof T["Outgoing"], TPrivateMethod extends keyof T["PrivateOutgoing"]
+	>(request: InvokeMethodRequest<T["Outgoing"], TMethod> | InvokeMethodRequest<T["PrivateOutgoing"], TPrivateMethod> | InvokeServiceRequest<T["Service"], TService, TServiceMethod>): void {
+		if (request.method !== '#publish') {
+			super.onInvoke(request);
+			return;
+		}
+
+		this.onPublish(request.data)
+			.then(() => {
+				super.onInvoke(request);
+			})
+			.catch(err => {
+				abortRequest(request as InvokeMethodRequest<T["Outgoing"], TMethod>, err);
+			});
+	}
+
 	protected override onMessage(data: RawData, isBinary: boolean): void {
-		this.state.server.emit('socketMessage', { socket: this.socket, data, isBinary });
+		this.socket.server.emit('socketMessage', { socket: this.socket, data, isBinary });
 		super.onMessage(data, isBinary);
 	}
 
-	protected override onRequest(packet: AnyPacket<T['Service'], SocketMapFromServer<T>['Incoming']>): boolean {
+	protected override onPing(data: Buffer): void {
+		if (this.socket.server.strictHandshake && this.status === 'connecting') {
+			this.disconnect(4009);
+			return;
+		}
+
+		super.onPing(data);
+		this.socket.server.emit('socketPing', { socket: this.socket, data });	
+	}
+
+	protected override onPong(data: Buffer): void {
+		this.resetPingTimeout(this.socket.server.isPingTimeoutDisabled ? false : this.socket.server.pingTimeoutMs, 4001);
+		super.onPong(data);
+		this.socket.server.emit('socketPong', { socket: this.socket, data });
+	}
+
+	protected async onPublish(options: PublishOptions): Promise<void> {
+		let data = options.data;
+
+		for (const middleware of this.middleware) {
+			if ('onPublishOut' in middleware) {
+				data = await middleware.onPublishOut({ socket: this.socket, transport: this, channel: options.channel, data });
+			}
+		}
+
+		options.data = data;
+	}
+
+	protected override async onRequest(packet: AnyPacket<SocketMapFromServer<T>>, timestamp: Date, middlewareError?: Error): Promise<boolean> {
 		let wasHandled = false;
 
 		if (!this.service || !('service' in packet) || packet.service === this.service) {
-			wasHandled = super.onRequest(packet);
+			if (this.socket.server.strictHandshake && this.status === 'connecting' && packet.method !== '#handshake') {
+				this.disconnect(4009);
+				return true;
+			}
+
+			wasHandled = await super.onRequest(packet, timestamp, middlewareError);
 		} else {
 			wasHandled = this.onUnhandledRequest(packet);
 		}
 
 		return wasHandled;
 	}
-
-	protected override onPing(data: Buffer): void {
-		super.onPing(data);
-		this.state.server.emit('socketPing', { socket: this.socket, data });	
-	}
-
-	protected override onPong(data: Buffer): void {
-		this.resetPingTimeout(this.state.server.isPingTimeoutDisabled ? false : this.state.server.pingTimeoutMs, 4001);
-		super.onPong(data);
-		this.state.server.emit('socketPong', { socket: this.socket, data });
-	}
 	
-	protected override onResponse(response: AnyResponse<T["Service"], SocketMapFromServer<T>['Outgoing']>): void {
+	protected override onResponse(response: AnyResponse<SocketMapFromServer<T>>): void {
 		super.onResponse(response);
-		this.state.server.emit('socketResponse', { socket: this.socket, response });
+		this.socket.server.emit('socketResponse', { socket: this.socket, response });
+	}
+
+	protected override onTransmit<
+		TService extends keyof T["Service"],
+		TServiceMethod extends keyof T["Service"][TService],
+		TMethod extends keyof T["Outgoing"]
+	>(request: TransmitMethodRequest<T["Outgoing"], TMethod> | TransmitServiceRequest<T["Service"], TService, TServiceMethod>): void {
+		if (request.method !== '#publish') {
+			super.onTransmit(request);
+			return;
+		}
+		this.onPublish(request.data)
+			.then(() => {
+				super.onTransmit(request);
+			})
+			.catch(err => {
+				abortRequest(request as TransmitMethodRequest<T["Outgoing"], TMethod>, err);
+			});
 	}
 
 	protected override onUpgrade(request: IncomingMessage): void {
 		super.onUpgrade(request);
-		this.state.server.emit('socketUpgrade', { socket: this.socket, request });
+		this.socket.server.emit('socketUpgrade', { socket: this.socket, request });
 	}
 	
 	protected override onUnexpectedResponse(request: ClientRequest, response: IncomingMessage): void {
 		super.onUnexpectedResponse(request, response);
-		this.state.server.emit('socketUnexpectedResponse', { socket: this.socket, request, response });
+		this.socket.server.emit('socketUnexpectedResponse', { socket: this.socket, request, response });
 	}
 
 	public override async setAuthorization(authToken: AuthToken, options?: AuthTokenOptions): Promise<boolean>;
@@ -142,14 +228,21 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		if (typeof authToken === 'string') {
 			const changed = await super.setAuthorization(authToken, options as AuthToken);
 
-			if (changed && this.status === 'open') {
+			if (changed && this.status === 'ready') {
 				this.triggerAuthenticationEvents(false, wasAuthenticated);
 			}
 			
 			return changed;
 		}
 
-		const auth = this.state.server.auth;
+		if (this.status === 'connecting') {
+			const err = new InvalidActionError(
+				'Cannot call setAuthToken before completing the handshake'
+			);
+			throw err;
+		}
+
+		const auth = this.socket.server.auth;
 		const rejectOnFailedDelivery = options?.rejectOnFailedDelivery;
 		let signedAuthToken: string;
 
@@ -163,9 +256,9 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 			throw err;
 		}
 
-		const changed = super.setAuthorization(signedAuthToken, authToken);
+		const changed = await super.setAuthorization(signedAuthToken, authToken);
 
-		if (changed && this.status === 'open') {
+		if (changed && this.status === 'ready') {
 			this.triggerAuthenticationEvents(true, wasAuthenticated);
 		}
 
@@ -201,9 +294,9 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		return changed;
 	}
 
-	public override setOpenStatus(authError?: Error): void {
-		super.setOpenStatus(authError);
-		this.state.server.emit('socketConnect', { socket: this.socket, isAuthenticated: !!this.signedAuthToken, authError });
+	public override setReadyStatus(pingTimeoutMs: number, authError?: Error): void {
+		super.setReadyStatus(pingTimeoutMs, authError);
+		this.socket.server.emit('socketConnect', { socket: this.socket, pingTimeoutMs, id: this.socket.id, isAuthenticated: !!this.signedAuthToken, authError });
 	}
 
 	public override get socket(): ServerSocket<T> {
@@ -217,12 +310,12 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 	public override triggerAuthenticationEvents(wasSigned: boolean, wasAuthenticated: boolean): void {
 		super.triggerAuthenticationEvents(wasSigned, wasAuthenticated);
 
-		this.state.server.emit(
+		this.socket.server.emit(
 			'socketAuthStateChange',
 			{ socket: this.socket, wasAuthenticated, isAuthenticated: true, authToken: this.authToken, signedAuthToken: this.signedAuthToken }
 		);
 
-		this.state.server.emit(
+		this.socket.server.emit(
 			'socketAuthenticate',
 			{ socket: this.socket, wasSigned, signedAuthToken: this.signedAuthToken, authToken: this.authToken }
 		);
@@ -230,4 +323,32 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 	}
 
 	public type: 'server'
+
+	public async unsubscribe(channel: string): Promise<void> {
+		if (typeof channel !== 'string') {
+			throw new InvalidActionError(
+				`Socket ${this.id} tried to unsubscribe from an invalid channel name`
+			);
+		}
+	
+		if (!this.socket.state.channelSubscriptions?.[channel]) {
+			throw new InvalidActionError(
+				`Socket ${this.id} tried to unsubscribe from a channel which it is not subscribed to`
+			);
+		}
+
+		try {
+			const server = this.socket.server;
+			await server.brokerEngine.unsubscribe(this, channel);
+			delete this.socket.state.channelSubscriptions[channel];
+	
+			if (this.socket.state.channelSubscriptionsCount != null) {
+				this.socket.state.channelSubscriptionsCount--;
+			}
+	
+			server.exchange.emit('unsubscribe', { channel });
+		} catch (err) {
+			throw new BrokerError(`Failed to unsubscribe socket from the ${channel} channel - ${err}`);
+		}		
+	}
 }

@@ -3,7 +3,7 @@ import { beforeEach, afterEach, describe, it, mock } from "node:test";
 import { ClientSocket } from '../src/client/client-socket.js';
 import { SocketStatus } from '../src/socket.js';
 import { AuthStateChangeEvent, CloseEvent, DisconnectEvent } from '../src/socket-event.js';
-import { Server, listen } from '../src/index.js';
+import { Server, ServerSocket, listen } from '../src/index.js';
 import localStorage from '@socket-mesh/local-storage';
 import { RequestHandlerArgs } from '../src/request-handler.js';
 import { ClientSocketOptions } from '../src/client/client-socket-options.js';
@@ -82,11 +82,9 @@ async function performTaskHandler({ options }: RequestHandlerArgs<number>): Prom
 }
 
 async function setAuthKeyHandler(
-	{ transport, options: secret }: RequestHandlerArgs<jwt.Secret, BasicSocketMapServer>
+	{ socket, options: secret }: RequestHandlerArgs<jwt.Secret, BasicSocketMapServer, ServerSocket<BasicServerMap>>
 ): Promise<void> {
-	const server = transport.state.server;
-
-	server!.auth.authKey = secret;
+	socket.server!.auth.authKey = secret;
 }
 
 const clientOptions: ClientSocketOptions<MyClientMap> = {
@@ -152,7 +150,10 @@ describe('Integration tests', function () {
 
 		it('Should not automatically connect socket if autoConnect is set to false', async function () {
 			client = new ClientSocket(
-				Object.assign(
+				Object.assign<
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>
+				>(
 					{
 						autoConnect: false
 					},
@@ -367,7 +368,11 @@ describe('Integration tests', function () {
 			);
 
 			client = new ClientSocket(
-				Object.assign({}, clientOptions, { authEngine })
+				Object.assign<
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>
+				>({}, clientOptions, { authEngine })
 			);
 
 			let caughtError: Error;
@@ -619,7 +624,11 @@ describe('Integration tests', function () {
 		it('Subscriptions (including those with waitForAuth option) should have priority over the authenticate action', async function () {
 			global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
 			client = new ClientSocket(
-				Object.assign(
+				Object.assign<
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>
+				>(
 					{},
 					clientOptions,
 					{
@@ -1039,9 +1048,12 @@ describe('Integration tests', function () {
 
 		it('Should resolve invoke Promise with BadConnectionError before triggering the disconnect event', async function () {
 			client = new ClientSocket(
-				Object.assign(
-					{
-					},
+				Object.assign<
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>
+				>(
+					{},
 					clientOptions,
 					{
 						middleware: [new OfflineMiddleware()],
@@ -1290,7 +1302,10 @@ describe('Integration tests', function () {
 	describe('Ping/pong', function () {
 		it('Should close if ping is not received before timeout', async function () {
 			client = new ClientSocket(
-				Object.assign(
+				Object.assign<
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>
+				>(
 					{
 						connectTimeoutMs: 500
 					},
@@ -1342,7 +1357,10 @@ describe('Integration tests', function () {
 
 		it('Should not close if ping is not received before timeout when pingTimeoutDisabled is true', async function () {
 			client = new ClientSocket(
-				Object.assign(
+				Object.assign<
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>
+				>(
 					{
 						connectTimeoutMs: 500,
 						isPingTimeoutDisabled: true

@@ -33,7 +33,7 @@ export interface SocketMapFromServer<T extends ServerMap> {
 	Service: T['Service'],
 	Outgoing: T['Outgoing'],
 	PrivateOutgoing: T['PrivateOutgoing'] & ClientPrivateMap,
-	State: T['State'] & ServerSocketState<T>
+	State: T['State'] & ServerSocketState
 }
 
 export interface SocketMapClientFromServer<T extends ServerMap> {
@@ -41,15 +41,15 @@ export interface SocketMapClientFromServer<T extends ServerMap> {
 	Service: T['Service'],
 	Outgoing: T['Incoming'],
 	PrivateOutgoing: T['PrivateIncoming'] & ClientPrivateMap,
-	State: T['State'] & ServerSocketState<T>
+	State: T['State'] & ServerSocketState
 }
 
-export interface BasicSocketMapServer<TIncoming extends PublicMethodMap = {}, TChannels extends ChannelMap = {}, TState extends object = {}> {
+export interface BasicSocketMapServer<TIncoming extends PublicMethodMap = {}, TChannels extends ChannelMap = {}, TState extends object = {}, TOutgoing extends object = {}> {
 	Incoming: TIncoming & ServerPrivateMap,
 	Service: {},
-	Outgoing: {},
+	Outgoing: TOutgoing,
 	PrivateOutgoing: ClientPrivateMap,
-	State: TState & ServerSocketState<BasicServerMap<TIncoming, TChannels, TState>>
+	State: TState & ServerSocketState
 }
 
 export interface BasicSocketMapClient<TOutgoing extends PublicMethodMap = {}, TState extends object = {}> {

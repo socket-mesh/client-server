@@ -17,15 +17,15 @@ export interface ServerMap {
 	State: object
 }
 
-export interface BasicServerMap<TIncoming extends PublicMethodMap = {}, TChannels extends ChannelMap = {}, TState extends object = {}> {
+export interface BasicServerMap<TIncoming extends PublicMethodMap = {}, TChannels extends ChannelMap = {}, TState extends object = {}, TOutgoing extends object = {}> {
 	Channel: TChannels,
 	Service: {},
 	Incoming: TIncoming,
-	Outgoing: {},
+	Outgoing: TOutgoing,
 	PrivateIncoming: ServerPrivateMap,
 	PrivateOutgoing: ClientPrivateMap,
 	ServerState: {},
-	State: TState & ServerSocketState<BasicServerMap<TIncoming, TChannels, TState>>
+	State: TState & ServerSocketState
 }
 
 export interface HandshakeOptions {

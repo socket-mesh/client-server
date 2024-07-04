@@ -1,36 +1,18 @@
 import { RequestHandlerArgs } from "../../request-handler.js";
 import { BasicSocketMapServer } from "../../client/maps/socket-map.js";
-import { BrokerError, InvalidActionError } from "@socket-mesh/errors";
+import { BrokerError } from "@socket-mesh/errors";
+import { ServerSocket } from "../server-socket.js";
+import { BasicServerMap } from "../../client/maps/server-map.js";
+import { ServerTransport } from "../server-transport.js";
 
 export async function unsubscribeHandler(
-	{ socket, transport, options: channel }: RequestHandlerArgs<string, BasicSocketMapServer>
+	{ transport, options: channel }: RequestHandlerArgs<string, BasicSocketMapServer, ServerSocket<BasicServerMap>, ServerTransport<BasicServerMap>>
 ): Promise<void> {
-	const state = transport.state;
-
-	if (typeof channel !== 'string') {
-		throw new InvalidActionError(
-			`Socket ${socket.id} tried to unsubscribe from an invalid channel name`
-		);
-	}
-
-	if (!state.channelSubscriptions?.[channel]) {
-		throw new InvalidActionError(
-			`Socket ${socket.id} tried to unsubscribe from a channel which it is not subscribed to`
-		);
-	}
-
 	try {
-		const server = state.server;
-
-		server.brokerEngine.unsubscribe(transport, channel);
-		delete state.channelSubscriptions[channel];
-
-		if (state.channelSubscriptionsCount != null) {
-			state.channelSubscriptionsCount--;
-		}
-
-		server.exchange.emit('unsubscribe', { channel });
+		await transport.unsubscribe(channel);
 	} catch (err) {
-		throw new BrokerError(`Failed to unsubscribe socket from the ${channel} channel - ${err}`);
+		throw new BrokerError(
+			`Failed to unsubscribe socket from the ${channel} channel - ${err}`
+		);
 	}
 }

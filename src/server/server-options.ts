@@ -31,13 +31,18 @@ export interface ServerOptions<T extends ServerMap> extends ws.ServerOptions {
 
 	handlers?: HandlerMap<EmptySocketMap>;
 
+	isPingTimeoutDisabled?: boolean,
+
 	middleware?: ServerMiddleware<T>[],
+
+	// Origins which are allowed to connect to the server.
+	origins?: string;
 
 	// The interval in milliseconds on which to send a ping to the client to check that
 	// it is still alive.
 	pingIntervalMs?: number,
 
-	pingTimeoutMs?: number | false,
+	pingTimeoutMs?: number,
 
 	// The maximum number of unique channels which a single socket can subscribe to.
 	socketChannelLimit?: number,
@@ -50,5 +55,7 @@ export interface ServerOptions<T extends ServerMap> extends ws.ServerOptions {
 	// Close mode means that consumers on the socket will
 	// be able to finish processing their stream backlogs
 	// bebfore they are ended.
-	socketStreamCleanupMode?: StreamCleanupMode
+	socketStreamCleanupMode?: StreamCleanupMode,
+
+	strictHandshake?: boolean
 }

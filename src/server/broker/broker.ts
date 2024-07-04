@@ -40,13 +40,13 @@ export abstract class Broker<T extends ChannelMap> extends AsyncStreamEmitter<Br
 
 	abstract readonly exchange: Exchange<T>;
 
-	abstract subscribe(socket: ExchangeClient, channelName: string): void;
+	abstract subscribe(socket: ExchangeClient, channelName: string): Promise<void>;
 
 	abstract subscriptions(): string[];
 	
 	abstract isSubscribed(channelName: string): boolean;
 
-	abstract unsubscribe(socket: ExchangeClient, channelName: string): void;
+	abstract unsubscribe(socket: ExchangeClient, channelName: string): Promise<void>;
 
 	abstract transmitPublish<U extends keyof T & string>(channelName: U, data: T[U], suppressEvent?: boolean): Promise<void>;
 

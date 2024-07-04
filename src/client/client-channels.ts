@@ -1,7 +1,5 @@
 import { ChannelOptions } from "../channels/channel-options.js";
-import { ChannelState } from "../channels/channel-state.js";
 import { ClientTransport } from "./client-transport.js";
-import { SubscribeStateChangeEvent } from "../channels/channel-events.js";
 import { ClientMap } from "./maps/client-map.js";
 import { ChannelDetails, Channels, ChannelsOptions } from "../channels/channels.js";
 
@@ -33,7 +31,7 @@ export class ClientChannels<T extends ClientMap> extends Channels<T['Channel']> 
 					this.processPendingSubscriptions();
 				}	
 			},
-			onOpen: () => {
+			onReady: () => {
 				if (this.autoSubscribeOnConnect) {
 					this.processPendingSubscriptions();
 				}		
@@ -55,7 +53,7 @@ export class ClientChannels<T extends ClientMap> extends Channels<T['Channel']> 
 
 		// We can only ever have one pending subscribe action at any given time on a channel
 		if (
-			this._transport.status === 'open' &&
+			this._transport.status === 'ready' &&
 			!this._preparingPendingSubscriptions &&
 			!channel.subscribePromise &&
 			meetsAuthRequirements
@@ -141,16 +139,19 @@ export class ClientChannels<T extends ClientMap> extends Channels<T['Channel']> 
 	protected tryUnsubscribe(channel: ChannelDetails): void {
 		this.triggerChannelUnsubscribe(channel);
 
-		if (this._transport.status === 'open') {
+		if (this._transport.status === 'ready') {
 			// If there is a pending subscribe action, cancel the callback
 			this.cancelPendingSubscribeCallback(channel);
+
+			const decoratedChannelName = this.decorateChannelName(channel.name);
 
 			// This operation cannot fail because the TCP protocol guarantees delivery
 			// so long as the connection remains open. If the connection closes,
 			// the server will automatically unsubscribe the client and thus complete
 			// the operation on the server side.
-			const decoratedChannelName = this.decorateChannelName(channel.name);
-			this._transport.transmit('#unsubscribe', decoratedChannelName);
+			this._transport
+				.transmit('#unsubscribe', decoratedChannelName)
+				.catch(err => {});
 		}
 	}
 

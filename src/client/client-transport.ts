@@ -9,6 +9,8 @@ import { AutoReconnectOptions, ClientSocketOptions, ConnectOptions } from "./cli
 import { AuthToken } from "@socket-mesh/auth";
 import { SocketMapFromClient } from "./maps/socket-map.js";
 import { ClientMap } from "./maps/client-map.js";
+import { AnyPacket } from "../packet.js";
+import { AnyResponse } from "../response.js";
 
 export class ClientTransport<T extends ClientMap> extends SocketTransport<SocketMapFromClient<T>> {
 	public readonly authEngine: ClientAuthEngine;
@@ -17,7 +19,7 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 	private _wsOptions: ws.ClientOptions;
 
 	public connectTimeoutMs: number;
-	private _connectTimeoutRef: NodeJS.Timeout;
+	private _connectTimeoutRef: NodeJS.Timeout | null;
 
 	private _autoReconnect: AutoReconnectOptions | false;
 	private _connectAttempts: number;
@@ -28,6 +30,7 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 	constructor(options: ClientSocketOptions<T>) {
 		super(options);
 
+		this.type = 'client';
 		this._uri = typeof options.address === 'string' ? new URL(options.address) : options.address;
 		this.authEngine =
 			isAuthEngine(options.authEngine) ?
@@ -49,7 +52,7 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 		this._connectAttempts = 0;
 		this._pendingReconnectTimeout = null;
 		this.autoReconnect = options.autoReconnect;
-		this.isPingTimeoutDisabled = (options.isPingTimeoutDisabled === false);
+		this.isPingTimeoutDisabled = (options.isPingTimeoutDisabled === true);
 	}
 
 	public get autoReconnect(): AutoReconnectOptions | false {
@@ -78,8 +81,8 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 		if (options) {
 			let changeOptions = false;
 
-			if (options.timeoutMs) {
-				timeoutMs = options.timeoutMs;
+			if (options.connectTimeoutMs) {
+				timeoutMs = options.connectTimeoutMs;
 			}
 
 			if (options.address) {
@@ -115,6 +118,13 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 		return this._connectAttempts;
 	}
 
+	protected override decode(data: string | ws.RawData):
+		AnyPacket<SocketMapFromClient<T>> | AnyPacket<SocketMapFromClient<T>>[] |
+		AnyResponse<SocketMapFromClient<T>> | AnyResponse<SocketMapFromClient<T>>[] {
+		
+		return super.decode(data);
+	}
+
 	public override disconnect(code=1000, reason?: string) {
 		if (code !== 4007) {
 			this.resetReconnect();
@@ -125,13 +135,12 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 
 	private async handshake(): Promise<HandshakeStatus> {
 		const token = await this.authEngine.loadToken();
-		// Don't wait for this.state to be 'open'.
+		// Don't wait for this.state to be 'ready'.
 		// The underlying WebSocket (this.socket) is already open.
 		// The casting to HandshakeStatus has to be here or typescript freaks out
 		const status = await this.invoke(
 			'#handshake',
-			{ authToken: token },
-			true
+			{ authToken: token }
 		)[0] as HandshakeStatus;
 
 		if ('authError' in status) {
@@ -142,7 +151,10 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 	}
 
 	protected override onOpen() {
-		clearTimeout(this._connectTimeoutRef);		
+		super.onOpen();
+
+		clearTimeout(this._connectTimeoutRef);
+		this._connectTimeoutRef = null;
 		this.resetReconnect();
 		this.resetPingTimeout(this.isPingTimeoutDisabled ? false : this.pingTimeoutMs, 4000);
 
@@ -164,8 +176,7 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 				return this.changeToUnauthenticatedState();
 			})
 			.then(() => {
-				this.setOpenStatus(authError);
-				super.onOpen();
+				this.setReadyStatus(this.pingTimeoutMs, authError);
 			})
 			.catch(err => {
 				if (err.statusCode == null) {
@@ -284,7 +295,7 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 
 		this._pendingReconnectTimeout = timeoutMs;
 
-		this.connect({ timeoutMs });
+		this.connect({ connectTimeoutMs: timeoutMs });
 	}
 
 	public type: 'client'
@@ -301,6 +312,7 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 		if (this.webSocket) {
 			if (this._connectTimeoutRef) {
 				clearTimeout(this._connectTimeoutRef);
+				this._connectTimeoutRef = null;
 			}
 		}
 
@@ -321,29 +333,28 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 		}
 	}
 
-	override transmit<TMethod extends keyof SocketMapFromClient<T>['Outgoing']>(method: TMethod, arg?: Parameters<SocketMapFromClient<T>['Outgoing'][TMethod]>[0], bypassMiddleware?: boolean): Promise<void>;
-	override transmit<TService extends keyof SocketMapFromClient<T>['Service'], TMethod extends keyof SocketMapFromClient<T>['Service'][TService]>(options: [TService, TMethod], arg?: Parameters<SocketMapFromClient<T>['Service'][TService][TMethod]>[0], bypassMiddleware?: boolean): Promise<void>;
-	override transmit<TMethod extends keyof (SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)>(method: TMethod, arg?: Parameters<(SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)[TMethod]>[0], bypassMiddleware?: boolean): Promise<void>;
-	override async transmit<TService extends keyof SocketMapFromClient<T>['Service'], TServiceMethod extends keyof SocketMapFromClient<T>['Service'][TService], TMethod extends keyof SocketMapFromClient<T>['Outgoing']>(serviceAndMethod: TMethod | [TService, TServiceMethod], arg?: (Parameters<SocketMapFromClient<T>['Outgoing'][TMethod]> | Parameters<SocketMapFromClient<T>['Service'][TService][TServiceMethod]>)[0], bypassMiddleware?: boolean): Promise<void> {
+	override transmit<TMethod extends keyof SocketMapFromClient<T>['Outgoing']>(method: TMethod, arg?: Parameters<SocketMapFromClient<T>['Outgoing'][TMethod]>[0]): Promise<void>;
+	override transmit<TService extends keyof SocketMapFromClient<T>['Service'], TMethod extends keyof SocketMapFromClient<T>['Service'][TService]>(options: [TService, TMethod], arg?: Parameters<SocketMapFromClient<T>['Service'][TService][TMethod]>[0]): Promise<void>;
+	override transmit<TMethod extends keyof (SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)>(method: TMethod, arg?: Parameters<(SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)[TMethod]>[0]): Promise<void>;
+	override async transmit<TService extends keyof SocketMapFromClient<T>['Service'], TServiceMethod extends keyof SocketMapFromClient<T>['Service'][TService], TMethod extends keyof SocketMapFromClient<T>['Outgoing']>(serviceAndMethod: TMethod | [TService, TServiceMethod], arg?: (Parameters<SocketMapFromClient<T>['Outgoing'][TMethod]> | Parameters<SocketMapFromClient<T>['Service'][TService][TServiceMethod]>)[0]): Promise<void> {
 		if (this.status === 'closed') {
 			this.connect();
 
 			await this.socket.listen('connect').once();
 		}
 
-		await super.transmit(serviceAndMethod as TMethod, arg, bypassMiddleware);
+		await super.transmit(serviceAndMethod as TMethod, arg);
 	}
 
-	override invoke<TMethod extends keyof SocketMapFromClient<T>['Outgoing']>(method: TMethod, arg?: Parameters<SocketMapFromClient<T>['Outgoing'][TMethod]>[0], bypassMiddleware?: boolean): [Promise<FunctionReturnType<SocketMapFromClient<T>['Outgoing'][TMethod]>>, () => void];
-	override invoke<TService extends keyof SocketMapFromClient<T>['Service'], TMethod extends keyof SocketMapFromClient<T>['Service'][TService]>(options: [TService, TMethod, (number | false)?], arg?: Parameters<SocketMapFromClient<T>['Service'][TService][TMethod]>[0], bypassMiddleware?: boolean): [Promise<FunctionReturnType<SocketMapFromClient<T>['Service'][TService][TMethod]>>, () => void];
-	override invoke<TService extends keyof SocketMapFromClient<T>['Service'], TMethod extends keyof SocketMapFromClient<T>['Service'][TService]>(options: InvokeServiceOptions<SocketMapFromClient<T>['Service'], TService, TMethod>, arg?: Parameters<SocketMapFromClient<T>['Service'][TService][TMethod]>[0], bypassMiddleware?: boolean): [Promise<FunctionReturnType<SocketMapFromClient<T>['Service'][TService][TMethod]>>, () => void];
-	override invoke<TMethod extends keyof SocketMapFromClient<T>['Outgoing']>(options: InvokeMethodOptions<SocketMapFromClient<T>['Outgoing'], TMethod>, arg?: Parameters<SocketMapFromClient<T>['Outgoing'][TMethod]>[0], bypassMiddleware?: boolean): [Promise<FunctionReturnType<SocketMapFromClient<T>['Outgoing'][TMethod]>>, () => void];
-	override invoke<TMethod extends keyof (SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)>(method: TMethod, arg: Parameters<(SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)[TMethod]>[0], bypassMiddleware?: boolean): [Promise<FunctionReturnType<(SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)[TMethod]>>, () => void];
-	override invoke<TMethod extends keyof (SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)>(options: InvokeMethodOptions<(SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap), TMethod>, arg?: Parameters<(SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)[TMethod]>[0], bypassMiddleware?: boolean): [Promise<FunctionReturnType<(SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)[TMethod]>>, () => void];
+	override invoke<TMethod extends keyof SocketMapFromClient<T>['Outgoing']>(method: TMethod, arg?: Parameters<SocketMapFromClient<T>['Outgoing'][TMethod]>[0]): [Promise<FunctionReturnType<SocketMapFromClient<T>['Outgoing'][TMethod]>>, () => void];
+	override invoke<TService extends keyof SocketMapFromClient<T>['Service'], TMethod extends keyof SocketMapFromClient<T>['Service'][TService]>(options: [TService, TMethod, (number | false)?], arg?: Parameters<SocketMapFromClient<T>['Service'][TService][TMethod]>[0]): [Promise<FunctionReturnType<SocketMapFromClient<T>['Service'][TService][TMethod]>>, () => void];
+	override invoke<TService extends keyof SocketMapFromClient<T>['Service'], TMethod extends keyof SocketMapFromClient<T>['Service'][TService]>(options: InvokeServiceOptions<SocketMapFromClient<T>['Service'], TService, TMethod>, arg?: Parameters<SocketMapFromClient<T>['Service'][TService][TMethod]>[0]): [Promise<FunctionReturnType<SocketMapFromClient<T>['Service'][TService][TMethod]>>, () => void];
+	override invoke<TMethod extends keyof SocketMapFromClient<T>['Outgoing']>(options: InvokeMethodOptions<SocketMapFromClient<T>['Outgoing'], TMethod>, arg?: Parameters<SocketMapFromClient<T>['Outgoing'][TMethod]>[0]): [Promise<FunctionReturnType<SocketMapFromClient<T>['Outgoing'][TMethod]>>, () => void];
+	override invoke<TMethod extends keyof (SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)>(method: TMethod, arg: Parameters<(SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)[TMethod]>[0]): [Promise<FunctionReturnType<(SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)[TMethod]>>, () => void];
+	override invoke<TMethod extends keyof (SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)>(options: InvokeMethodOptions<(SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap), TMethod>, arg?: Parameters<(SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)[TMethod]>[0]): [Promise<FunctionReturnType<(SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)[TMethod]>>, () => void];
 	override invoke<TService extends keyof SocketMapFromClient<T>['Service'], TServiceMethod extends keyof SocketMapFromClient<T>['Service'][TService], TMethod extends keyof SocketMapFromClient<T>['Outgoing'], TPrivateMethod extends keyof (SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)>(
 		methodOptions: TMethod | TPrivateMethod | [TService, TServiceMethod, (number | false)?] | InvokeServiceOptions<SocketMapFromClient<T>['Service'], TService, TServiceMethod> | InvokeMethodOptions<SocketMapFromClient<T>['Outgoing'], TMethod> | InvokeMethodOptions<(SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap), TPrivateMethod>,
-		arg?: (Parameters<SocketMapFromClient<T>['Outgoing'][TMethod]> | Parameters<(SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)[TPrivateMethod]> | Parameters<SocketMapFromClient<T>['Service'][TService][TServiceMethod]>)[0],
-		bypassMiddleware?: boolean
+		arg?: (Parameters<SocketMapFromClient<T>['Outgoing'][TMethod]> | Parameters<(SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)[TPrivateMethod]> | Parameters<SocketMapFromClient<T>['Service'][TService][TServiceMethod]>)[0]
 	): [Promise<FunctionReturnType<SocketMapFromClient<T>['Outgoing'][TMethod] | (SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)[TPrivateMethod] | SocketMapFromClient<T>['Service'][TService][TServiceMethod]>>, () => void] {
 		let abort: () => void;
 
@@ -357,8 +368,7 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 					}
 				})
 				.then(() => {
-					const result = super.invoke(methodOptions as TMethod, arg, bypassMiddleware);
-
+					const result = super.invoke(methodOptions as TMethod, arg);
 					abort = result[1];
 
 					return result[0];

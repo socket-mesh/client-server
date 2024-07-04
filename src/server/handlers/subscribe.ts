@@ -1,19 +1,21 @@
 import { BrokerError, InvalidActionError } from "@socket-mesh/errors";
-import { SubscribeOptions } from "../../client/maps/server-map.js";
+import { BasicServerMap, SubscribeOptions } from "../../client/maps/server-map.js";
 import { RequestHandlerArgs } from "../../request-handler.js";
 import { BasicSocketMapServer } from "../../client/maps/socket-map.js";
+import { ServerSocket } from "../server-socket.js";
+import { ServerTransport } from "../server-transport.js";
 
 export async function subscribeHandler(
-	{ socket, transport, options }: RequestHandlerArgs<SubscribeOptions, BasicSocketMapServer>
+	{ socket, transport, options }: RequestHandlerArgs<SubscribeOptions, BasicSocketMapServer, ServerSocket<BasicServerMap>, ServerTransport<BasicServerMap>>
 ): Promise<void> {
-	if (socket.status !== 'open') {
+	if (socket.status !== 'ready') {
 		// This is an invalid state; it means the client tried to subscribe before
 		// having completed the handshake.
 		throw new InvalidActionError('Cannot subscribe socket to a channel before it has completed the handshake');
 	}
 
-	const state = transport.state;
-	const server = state.server;
+	const state = socket.state;
+	const server = socket.server;
 
 	if (server.socketChannelLimit && state.channelSubscriptionsCount >= server.socketChannelLimit) {
 		throw new InvalidActionError(
@@ -21,9 +23,15 @@ export async function subscribeHandler(
 		);
 	}
 
-	try {
-		const { channel, ...channelOptions } = options;
+	const { channel, ...channelOptions } = options;
 
+	for (const middleware of socket.server.middleware) {
+		if (middleware.onSubscribe) {
+			await middleware.onSubscribe({ channel, options, socket, transport });
+		}
+	}
+
+	try {
 		if (state.channelSubscriptions == null) {
 			state.channelSubscriptions = {};
 		}
@@ -38,7 +46,7 @@ export async function subscribeHandler(
 		}
 
 		try {
-			server.brokerEngine.subscribe(transport, channel);
+			await server.brokerEngine.subscribe(transport, channel);
 		} catch (error) {
 			delete state.channelSubscriptions[channel];
 			state.channelSubscriptionsCount--;

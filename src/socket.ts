@@ -1,5 +1,5 @@
 import { CodecEngine } from "@socket-mesh/formatter";
-import { AnyPacket } from "./request";
+import { AnyPacket } from "./packet";
 import { AsyncStreamEmitter } from "@socket-mesh/async-stream-emitter";
 import { SocketEvent, AuthenticateEvent, BadAuthTokenEvent, CloseEvent, ConnectEvent, DisconnectEvent, ErrorEvent, MessageEvent, PingEvent, PongEvent, RequestEvent, UnexpectedResponseEvent, UpgradeEvent, ResponseEvent, AuthStateChangeEvent, RemoveAuthTokenEvent, ConnectingEvent, DeauthenticateEvent } from "./socket-event.js";
 import { FunctionReturnType, MethodMap, ServiceMap } from "./client/maps/method-map.js";
@@ -22,7 +22,7 @@ export interface SocketOptions<T extends SocketMap, TSocket extends Socket<T> = 
 	id?: string,
 	isPingTimeoutDisabled?: boolean;
 	middleware?: Middleware<T>[],
-	onUnhandledRequest?: (socket: TSocket, packet: AnyPacket<T['Service'], T['Incoming']>) => boolean,
+	onUnhandledRequest?: (socket: TSocket, packet: AnyPacket<T>) => boolean,
 	state?: T['State'],
 
 	// Lets you specify the default cleanup behaviour for
@@ -36,7 +36,7 @@ export interface SocketOptions<T extends SocketMap, TSocket extends Socket<T> = 
 	streamCleanupMode?: StreamCleanupMode
 }
 
-export type SocketStatus = 'connecting' | 'open' | 'closing' | 'closed';
+export type SocketStatus = 'connecting' | 'ready' | 'closing' | 'closed';
 
 export interface InvokeMethodOptions<TMethodMap extends MethodMap, TMethod extends keyof TMethodMap> {
 	method: TMethod,
@@ -51,10 +51,12 @@ export interface InvokeServiceOptions<TServiceMap extends ServiceMap, TService e
 
 export class Socket<T extends SocketMap> extends AsyncStreamEmitter<SocketEvent<T>> {
 	private readonly _transport: SocketTransport<T>;
+	public readonly state: Partial<T['State']>;
 
-	protected constructor(transport: SocketTransport<T>) {
+	protected constructor(transport: SocketTransport<T>, options?: SocketOptions<T>) {
 		super();
 
+		this.state = options?.state || {};
 		transport.socket = this;
 		this._transport = transport;
 	}
@@ -79,8 +81,21 @@ export class Socket<T extends SocketMap> extends AsyncStreamEmitter<SocketEvent<
 		this._transport.disconnect(code, reason);
 	}
 
-	public ping(): Promise<void> {
-		return this._transport.ping();
+	public getBackpressure(): number {
+		return Math.max(
+			this._transport.getBackpressure(),
+			this.getListenerBackpressure(),
+			//this.receiver.getBackpressure(),
+			//this.procedure.getBackpressure()
+		);
+	}
+
+	public getInboundBackpressure(): number {
+		return this._transport.getInboundBackpressure();
+	}
+
+	public getOutboundBackpressure(): number {
+		return this._transport.getOutboundBackpressure();
 	}
 
 	emit(event: 'authStateChange', data: AuthStateChangeEvent): void;
@@ -98,8 +113,8 @@ export class Socket<T extends SocketMap> extends AsyncStreamEmitter<SocketEvent<
 	emit(event: 'ping', data: PingEvent): void;
 	emit(event: 'pong', data: PongEvent): void;
 	emit(event: 'removeAuthToken', data: RemoveAuthTokenEvent): void;
-	emit(event: 'request', data: RequestEvent<T['Service'], T['Incoming']>): void;
-	emit(event: 'response', data: ResponseEvent<T['Service'], T['Outgoing'], T['PrivateOutgoing']>): void;
+	emit(event: 'request', data: RequestEvent<T>): void;
+	emit(event: 'response', data: ResponseEvent<T>): void;
 	emit(event: 'unexpectedResponse', data: UnexpectedResponseEvent): void;
 	emit(event: 'upgrade', data: UpgradeEvent): void;
 	emit(event: string, data?: SocketEvent<T>): void {
@@ -122,8 +137,8 @@ export class Socket<T extends SocketMap> extends AsyncStreamEmitter<SocketEvent<
 	listen(event: 'ping'): DemuxedConsumableStream<PingEvent>;
 	listen(event: 'pong'): DemuxedConsumableStream<PongEvent>;
 	listen(event: 'removeAuthToken'): DemuxedConsumableStream<RemoveAuthTokenEvent>;
-	listen(event: 'request'): DemuxedConsumableStream<RequestEvent<T['Service'], T['Incoming']>>;
-	listen(event: 'response'): DemuxedConsumableStream<ResponseEvent<T['Service'], T['Outgoing'], T['PrivateOutgoing']>>;
+	listen(event: 'request'): DemuxedConsumableStream<RequestEvent<T>>;
+	listen(event: 'response'): DemuxedConsumableStream<ResponseEvent<T>>;
 	listen(event: 'unexpectedResponse'): DemuxedConsumableStream<UnexpectedResponseEvent>;
 	listen(event: 'upgrade'): DemuxedConsumableStream<UpgradeEvent>;
 	listen<U extends SocketEvent<T>, V = U>(event: string): DemuxedConsumableStream<V>;
@@ -131,12 +146,16 @@ export class Socket<T extends SocketMap> extends AsyncStreamEmitter<SocketEvent<
 		return super.listen(event);
 	}
 
-	public get url(): string {
-		return this._transport.url;
+	public ping(): Promise<void> {
+		return this._transport.ping();
 	}
 
 	public get status(): SocketStatus {
 		return this._transport.status;
+	}
+
+	public get url(): string {
+		return this._transport.url;
 	}
 
 	public transmit<TMethod extends keyof T['Outgoing']>(
