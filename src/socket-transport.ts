@@ -1,7 +1,7 @@
 import defaultCodec, { CodecEngine } from "@socket-mesh/formatter";
 import ws from "isomorphic-ws";
 import { Middleware } from "./middleware/middleware.js";
-import { AnyRequest, InvokeMethodRequest, InvokeServiceRequest, TransmitMethodRequest, TransmitServiceRequest, isRequestDone } from "./request.js";
+import { AnyRequest, InvokeMethodRequest, InvokeServiceRequest, TransmitMethodRequest, TransmitServiceRequest, abortRequest, isRequestDone } from "./request.js";
 import { AnyPacket, MethodPacket, isRequestPacket } from "./packet.js";
 import { AbortError, BadConnectionError, InvalidActionError, InvalidArgumentsError, MiddlewareBlockedError, SocketProtocolError, TimeoutError, dehydrateError, hydrateError, socketProtocolErrorStatuses, socketProtocolIgnoreStatuses } from "@socket-mesh/errors";
 import { ClientRequest, IncomingMessage } from "http";
@@ -249,8 +249,15 @@ export class SocketTransport<T extends SocketMap> {
 		this._socket.emit('error', { error });
 	}
 
-	protected onUpgrade(request: IncomingMessage): void {
-		this._socket.emit('upgrade', { request });
+	protected onInvoke<
+		TService extends keyof T['Service'],
+		TServiceMethod extends keyof T['Service'][TService],
+		TMethod extends keyof T['Outgoing'],
+		TPrivateMethod extends keyof T['PrivateOutgoing']
+	>(
+		request: InvokeMethodRequest<T["Outgoing"], TMethod> | InvokeMethodRequest<T["PrivateOutgoing"], TPrivateMethod> | InvokeServiceRequest<T["Service"], TService, TServiceMethod>
+	): void {
+		this.sendRequest([request as AnyRequest<T>]);
 	}
 
 	protected onMessage(data: ws.RawData, isBinary: boolean): void {
@@ -392,6 +399,16 @@ export class SocketTransport<T extends SocketMap> {
 		}
 	}
 
+	protected onTransmit<
+		TService extends keyof T['Service'],
+		TServiceMethod extends keyof T['Service'][TService],
+		TMethod extends keyof T['Outgoing']
+	>(
+		request: TransmitMethodRequest<T['Outgoing'], TMethod> | TransmitServiceRequest<T['Service'], TService, TServiceMethod>
+	): void {
+		this.sendRequest([request as TransmitMethodRequest<T["Outgoing"], TMethod>]);
+	}
+
 	protected onUnexpectedResponse(request: ClientRequest, response: IncomingMessage): void {
 		this._socket.emit('unexpectedResponse', { request, response });
 	}
@@ -402,6 +419,10 @@ export class SocketTransport<T extends SocketMap> {
 		}
 
 		return false;
+	}
+
+	protected onUpgrade(request: IncomingMessage): void {
+		this._socket.emit('upgrade', { request });
 	}
 
 	public ping(): Promise<void> {
@@ -485,13 +506,7 @@ export class SocketTransport<T extends SocketMap> {
 					});
 				} catch (err) {
 					for (const req of requests) {
-						if (req.sentCallback) {
-							req.sentCallback(err);
-						}
-
-						if ('callback' in req) {
-							req.callback(err);
-						}
+						abortRequest(req, err);
 					}
 				}
 
@@ -501,21 +516,15 @@ export class SocketTransport<T extends SocketMap> {
 
 		// If the socket is closed we need to call them back with an error.
 		if (this.status === 'closed') {
-			for (const request of requests) {
+			for (const req of requests) {
 				const err = new BadConnectionError(
-					`Socket ${'callback' in request ? 'invoke' : 'transmit' } ${String(request.method)} event was aborted due to a bad connection`,
+					`Socket ${'callback' in req ? 'invoke' : 'transmit' } ${String(req.method)} event was aborted due to a bad connection`,
 					'connectAbort'
 				);
 
 				this.onError(err);
 
-				if (request.sentCallback) {
-					request.sentCallback(err);
-				}
-
-				if ('callback' in request && request.callback) {
-					request.callback(err);
-				}
+				abortRequest(req, err);
 			}
 			return;
 		}
@@ -540,7 +549,7 @@ export class SocketTransport<T extends SocketMap> {
 
 		this._webSocket.send(
 			this.codecEngine.encode(encode.length === 1 ? encode[0] : encode),
-			(err: WebSocketError) => {
+			(err?: WebSocketError) => {
 				for (const req of requests) {
 					if (err?.code === 'ECONNRESET') {
 						err = new BadConnectionError(
@@ -772,7 +781,7 @@ export class SocketTransport<T extends SocketMap> {
 
 		this._outboundPreparedMessageCount++;
 
-		this.sendRequest([request as any]);
+		this.onTransmit(request as TransmitMethodRequest<T['Outgoing'], TMethod>);
 
 		return promise;
 	}
@@ -898,7 +907,7 @@ export class SocketTransport<T extends SocketMap> {
 
 		this._outboundPreparedMessageCount++;
 
-		this.sendRequest([request as any]);
+		this.onInvoke(request as InvokeMethodRequest<T['Outgoing'], TMethod>);
 
 		return [promise, abort];
 	}

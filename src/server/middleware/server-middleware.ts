@@ -32,5 +32,6 @@ export interface ServerMiddleware<T extends ServerMap> extends Middleware<Socket
 	onConnection?: (request: IncomingMessage) => Promise<void>,
 	onHandshake?: (options: HandshakeMiddlewareArgs<T>) => Promise<void>,
 	onPublishIn?: (options: PublishMiddlewareArgs<T>) => Promise<any>,
+	onPublishOut?: (options: PublishMiddlewareArgs<T>) => Promise<any>,
 	onSubscribe?: (options: SubscribeMiddlewareArgs<T>) => Promise<void>
 };

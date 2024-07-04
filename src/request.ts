@@ -5,6 +5,16 @@ import { toArray } from "./utils.js";
 export type AnyRequest<T extends SocketMap> =
 	ServiceRequest<T['Service']> | MethodRequest<T['PrivateOutgoing']> | MethodRequest<T['Outgoing']>;
 
+export function abortRequest<T extends SocketMap>(request: AnyRequest<T>, err: Error): void {
+	if (request.sentCallback) {
+		request.sentCallback(err);
+	}
+
+	if ('callback' in request && request.callback) {
+		request.callback(err);
+	}
+}
+
 export class RequestCollection<T extends SocketMap> {
 	private readonly _requests: AnyRequest<T>[];
 	private readonly _callbacks: (() => void)[];

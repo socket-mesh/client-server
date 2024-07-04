@@ -7,9 +7,11 @@ import { ServerMap } from "../client/maps/server-map.js";
 import { Exchange } from "./broker/exchange.js";
 import { Server } from "./server.js";
 import { IncomingMessage } from "http";
+import { ServerMiddleware } from "./middleware/server-middleware.js";
 
 export interface ServerSocketOptions<T extends ServerMap> extends SocketOptions<SocketMapFromServer<T>> {
 	handlers: HandlerMap<SocketMapFromServer<T>>,
+	middleware?: ServerMiddleware<T>[],
 	service?: string,
 	server: Server<T>,
 	request: IncomingMessage,

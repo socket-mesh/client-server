@@ -11,16 +11,21 @@ import { SocketStatus } from "../socket.js";
 import { RawData } from "ws";
 import { AnyResponse } from "../response.js";
 import { ClientRequest, IncomingMessage } from "http";
+import { abortRequest, InvokeMethodRequest, InvokeServiceRequest, TransmitMethodRequest, TransmitServiceRequest } from "../request.js";
+import { ServerMiddleware } from "./middleware/server-middleware.js";
+import { PublishOptions } from "../channels/channels.js";
 
 export class ServerTransport<T extends ServerMap> extends SocketTransport<SocketMapFromServer<T>> {
-	readonly service?: string;
-	readonly request: IncomingMessage;
+	public readonly middleware: ServerMiddleware<T>[];
+	public readonly service?: string;
+	public readonly request: IncomingMessage;
 
 	constructor(options: ServerSocketOptions<T>) {
 		super(options);
 
 		this.type = 'server';
 		this.request = options.request;
+		this.middleware = options.middleware;
 		this.service = options.service;
 		this.webSocket = options.socket;
 
@@ -113,6 +118,25 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		this.socket.server.emit('socketError', { socket: this.socket, error });
 	}
 	
+	protected override onInvoke<
+		TService extends keyof T["Service"],
+		TServiceMethod extends keyof T["Service"][TService],
+		TMethod extends keyof T["Outgoing"], TPrivateMethod extends keyof T["PrivateOutgoing"]
+	>(request: InvokeMethodRequest<T["Outgoing"], TMethod> | InvokeMethodRequest<T["PrivateOutgoing"], TPrivateMethod> | InvokeServiceRequest<T["Service"], TService, TServiceMethod>): void {
+		if (request.method !== '#publish') {
+			super.onInvoke(request);
+			return;
+		}
+
+		this.onPublish(request.data)
+			.then(() => {
+				super.onInvoke(request);
+			})
+			.catch(err => {
+				abortRequest(request as InvokeMethodRequest<T["Outgoing"], TMethod>, err);
+			});
+	}
+
 	protected override onMessage(data: RawData, isBinary: boolean): void {
 		this.socket.server.emit('socketMessage', { socket: this.socket, data, isBinary });
 		super.onMessage(data, isBinary);
@@ -132,6 +156,18 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		this.resetPingTimeout(this.socket.server.isPingTimeoutDisabled ? false : this.socket.server.pingTimeoutMs, 4001);
 		super.onPong(data);
 		this.socket.server.emit('socketPong', { socket: this.socket, data });
+	}
+
+	protected async onPublish(options: PublishOptions): Promise<void> {
+		let data = options.data;
+
+		for (const middleware of this.middleware) {
+			if ('onPublishOut' in middleware) {
+				data = await middleware.onPublishOut({ socket: this.socket, transport: this, channel: options.channel, data });
+			}
+		}
+
+		options.data = data;
 	}
 
 	protected override async onRequest(packet: AnyPacket<SocketMapFromServer<T>>, timestamp: Date, middlewareError?: Error): Promise<boolean> {
@@ -154,6 +190,24 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 	protected override onResponse(response: AnyResponse<SocketMapFromServer<T>>): void {
 		super.onResponse(response);
 		this.socket.server.emit('socketResponse', { socket: this.socket, response });
+	}
+
+	protected override onTransmit<
+		TService extends keyof T["Service"],
+		TServiceMethod extends keyof T["Service"][TService],
+		TMethod extends keyof T["Outgoing"]
+	>(request: TransmitMethodRequest<T["Outgoing"], TMethod> | TransmitServiceRequest<T["Service"], TService, TServiceMethod>): void {
+		if (request.method !== '#publish') {
+			super.onTransmit(request);
+			return;
+		}
+		this.onPublish(request.data)
+			.then(() => {
+				super.onTransmit(request);
+			})
+			.catch(err => {
+				abortRequest(request as TransmitMethodRequest<T["Outgoing"], TMethod>, err);
+			});
 	}
 
 	protected override onUpgrade(request: IncomingMessage): void {

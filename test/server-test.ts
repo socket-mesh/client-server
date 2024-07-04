@@ -3287,388 +3287,413 @@ describe('Integration tests', function () {
 			});
 		});
 
-		describe('Inbound Middleware', function () {
-			describe('onMessage', function () {
-				it('Should run INVOKE action in middleware if client invokes an RPC', async function () {
-					let middlewareWasExecuted = false;
-					let middlewarePacket: MethodRequestPacket<ServerIncomingMap & ServerPrivateMap, "proc"> | null = null;
+		describe('onMessage', function () {
+			it('Should run INVOKE action in middleware if client invokes an RPC', async function () {
+				let middlewareWasExecuted = false;
+				let middlewarePacket: MethodRequestPacket<ServerIncomingMap & ServerPrivateMap, "proc"> | null = null;
 
-					server.addMiddleware({
-						type: 'onMessage',
-						async onMessage({ packet }) {
-							if (isRequestPacket(packet) && packet.method === 'proc') {
-								middlewarePacket = packet;
-								middlewareWasExecuted = true;
-							}
-
-							return packet;
+				server.addMiddleware({
+					type: 'onMessage',
+					async onMessage({ packet }) {
+						if (isRequestPacket(packet) && packet.method === 'proc') {
+							middlewarePacket = packet;
+							middlewareWasExecuted = true;
 						}
-					});
 
-					client = new ClientSocket(clientOptions);
-
-					await client.listen('connect').once(100);
-
-					const result = await client.invoke('proc', 123);
-
-					assert.strictEqual(middlewareWasExecuted, true);
-					assert.notEqual(middlewarePacket, null);
-					assert.strictEqual(result, 'success 123');
-				});
-
-				it('Should send back custom Error if INVOKE action in middleware blocks the client RPC', async function () {
-					let middlewareWasExecuted = false;
-					let middlewarePacket: AnyPacket<SocketMapFromServer<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>> | null = null;
-
-					server.addMiddleware({
-						type: 'onMessage',
-						async onMessage({ packet }) {
-							if (isRequestPacket(packet) && packet.method === 'proc') {
-								middlewarePacket = packet;
-								middlewareWasExecuted = true;
-
-								const customError = new Error('Invoke action was blocked');
-								customError.name = 'BlockedInvokeError';
-								throw customError;
-							}
-
-							return packet;
-						}
-					});
-
-					client = new ClientSocket(clientOptions);
-
-					await client.listen('connect').once(100);
-
-					let result: string | undefined;
-					let error: Error | null = null;
-
-					try {
-						result = await client.invoke('proc', 123);
-					} catch (err) {
-						error = err;
+						return packet;
 					}
-
-					assert.strictEqual(result, undefined);
-					assert.notEqual(error, null);
-					assert.strictEqual(error!.name, 'BlockedInvokeError');
 				});
+
+				client = new ClientSocket(clientOptions);
+
+				await client.listen('connect').once(100);
+
+				const result = await client.invoke('proc', 123);
+
+				assert.strictEqual(middlewareWasExecuted, true);
+				assert.notEqual(middlewarePacket, null);
+				assert.strictEqual(result, 'success 123');
 			});
 
-			describe('onAuthenticate', function () {
-				it('Should not run onAuthenticate in middleware if JWT token does not exist', async function () {
-					let middlewareWasExecuted = false;
+			it('Should send back custom Error if INVOKE action in middleware blocks the client RPC', async function () {
+				let middlewareWasExecuted = false;
+				let middlewarePacket: AnyPacket<SocketMapFromServer<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>> | null = null;
 
-					server.addMiddleware({
-						type: 'onAuthenticate',
-						onAuthenticate() {
+				server.addMiddleware({
+					type: 'onMessage',
+					async onMessage({ packet }) {
+						if (isRequestPacket(packet) && packet.method === 'proc') {
+							middlewarePacket = packet;
 							middlewareWasExecuted = true;
-						},
-					});
 
-					client = new ClientSocket(clientOptions);
-
-					await client.listen('connect').once(100);
-					assert.notEqual(middlewareWasExecuted, true);
-				});
-
-				it('Should run onAuthenticate in middleware if JWT token exists', async function () {
-					global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
-					let middlewareWasExecuted = false;
-
-					server.addMiddleware({
-						type: 'onAuthenticate',
-						onAuthenticate() {
-							middlewareWasExecuted = true;
-						},
-					});
-
-					client = new ClientSocket(clientOptions);
-
-					await client.listen('connect').once(100);
-
-					(async () => {
-						try {
-							await client.invoke('login', {username: 'bob'});
-						} catch (err) {}
-					})();
-
-					await client.listen('authenticate').once(100);
-
-					assert.strictEqual(middlewareWasExecuted, true);
-				});
-			});
-
-			describe('onPublishIn', function () {
-				it('Should run onPublishIn in middleware if client publishes to a channel', async function () {
-					let middlewareWasExecuted = false;
-					let middlewareDetails: { channel: string, data: string } | null = null;
-
-					server.addMiddleware({
-						type: 'Publish In',
-						async onPublishIn({ socket, transport, ...etc }) {
-							middlewareWasExecuted = true;
-							middlewareDetails = etc;
-							
-							return etc.data;
+							const customError = new Error('Invoke action was blocked');
+							customError.name = 'BlockedInvokeError';
+							throw customError;
 						}
-					});
 
-					client = new ClientSocket(clientOptions);
+						return packet;
+					}
+				});
 
-					await client.listen('connect').once(100);
+				client = new ClientSocket(clientOptions);
 
+				await client.listen('connect').once(100);
+
+				let result: string | undefined;
+				let error: Error | null = null;
+
+				try {
+					result = await client.invoke('proc', 123);
+				} catch (err) {
+					error = err;
+				}
+
+				assert.strictEqual(result, undefined);
+				assert.notEqual(error, null);
+				assert.strictEqual(error!.name, 'BlockedInvokeError');
+			});
+		});
+
+		describe('onAuthenticate', function () {
+			it('Should not run onAuthenticate in middleware if JWT token does not exist', async function () {
+				let middlewareWasExecuted = false;
+
+				server.addMiddleware({
+					type: 'onAuthenticate',
+					onAuthenticate() {
+						middlewareWasExecuted = true;
+					},
+				});
+
+				client = new ClientSocket(clientOptions);
+
+				await client.listen('connect').once(100);
+				assert.notEqual(middlewareWasExecuted, true);
+			});
+
+			it('Should run onAuthenticate in middleware if JWT token exists', async function () {
+				global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
+				let middlewareWasExecuted = false;
+
+				server.addMiddleware({
+					type: 'onAuthenticate',
+					onAuthenticate() {
+						middlewareWasExecuted = true;
+					},
+				});
+
+				client = new ClientSocket(clientOptions);
+
+				await client.listen('connect').once(100);
+
+				(async () => {
+					try {
+						await client.invoke('login', {username: 'bob'});
+					} catch (err) {}
+				})();
+
+				await client.listen('authenticate').once(100);
+
+				assert.strictEqual(middlewareWasExecuted, true);
+			});
+		});
+
+		describe('onPublishIn', function () {
+			it('Should run onPublishIn in middleware if client publishes to a channel', async function () {
+				let middlewareWasExecuted = false;
+				let middlewareDetails: { channel: string, data: string } | null = null;
+
+				server.addMiddleware({
+					type: 'Publish In',
+					async onPublishIn({ socket, transport, ...etc }) {
+						middlewareWasExecuted = true;
+						middlewareDetails = etc;
+						
+						return etc.data;
+					}
+				});
+
+				client = new ClientSocket(clientOptions);
+
+				await client.listen('connect').once(100);
+
+				await client.channels.invokePublish('hello', 'world');
+
+				assert.strictEqual(middlewareWasExecuted, true);
+				assert.notEqual(middlewareDetails, null);
+				assert.strictEqual(middlewareDetails!.channel, 'hello');
+				assert.strictEqual(middlewareDetails!.data, 'world');
+			});
+
+			it('Should be able to delay and block publish using onPublishIn middleware', async function () {
+				let middlewareWasExecuted = false;
+
+				server.addMiddleware({
+					type: 'Publish In',
+					async onPublishIn({ socket, transport, ...etc }) {
+						middlewareWasExecuted = true;
+						await wait(50);
+						const error = new Error('Blocked by middleware');
+						error.name = 'BlockedError';
+						throw error;
+					}
+				});
+
+				client = new ClientSocket(clientOptions);
+
+				const helloChannel = client.channels.subscribe<string>('hello');
+				await helloChannel.listen('subscribe').once(100);
+
+				let receivedMessages: string[] = [];
+				(async () => {
+					for await (let data of helloChannel) {
+						receivedMessages.push(data);
+					}
+				})();
+
+				let error: Error | null = null;
+				try {
 					await client.channels.invokePublish('hello', 'world');
+				} catch (err) {
+					error = err;
+				}
+				await wait(100);
 
-					assert.strictEqual(middlewareWasExecuted, true);
-					assert.notEqual(middlewareDetails, null);
-					assert.strictEqual(middlewareDetails!.channel, 'hello');
-					assert.strictEqual(middlewareDetails!.data, 'world');
-				});
-
-				it('Should be able to delay and block publish using onPublishIn middleware', async function () {
-					let middlewareWasExecuted = false;
-
-					server.addMiddleware({
-						type: 'Publish In',
-						async onPublishIn({ socket, transport, ...etc }) {
-							middlewareWasExecuted = true;
-							await wait(50);
-							const error = new Error('Blocked by middleware');
-							error.name = 'BlockedError';
-							throw error;
-						}
-					});
-
-					client = new ClientSocket(clientOptions);
-
-					const helloChannel = client.channels.subscribe<string>('hello');
-					await helloChannel.listen('subscribe').once(100);
-
-					let receivedMessages: string[] = [];
-					(async () => {
-						for await (let data of helloChannel) {
-							receivedMessages.push(data);
-						}
-					})();
-
-					let error: Error | null = null;
-					try {
-						await client.channels.invokePublish('hello', 'world');
-					} catch (err) {
-						error = err;
-					}
-					await wait(100);
-
-					assert.strictEqual(middlewareWasExecuted, true);
-					assert.notEqual(error, null);
-					assert.strictEqual(error!.name, 'BlockedError');
-					assert.strictEqual(receivedMessages.length, 0);
-				});
-
-				it('Delaying onPublishIn for one client should not affect other clients', async function () {
-					let done: () => void;
-					const donePromise = new Promise<void>((resolve) => { done = resolve; });
-
-					server.addMiddleware({
-						type: 'Publish In',
-						async onPublishIn({ data, transport }) {
-							if (transport.request.url!.indexOf('?delayMe=true') !== -1) {
-								// Long delay.
-								await donePromise;
-							}
-
-							return data;
-						}
-					});
-
-					server.addMiddleware(new InOrderMiddleware());
-
-					const clientC = new ClientSocket(clientOptions);
-					const receivedMessages: string[] = [];
-
-					(async () => {
-						for await (let data of clientC.channels.subscribe('foo')) {
-							receivedMessages.push(data);
-						}
-					})();
-
-					const clientA = new ClientSocket(clientOptions);
-					const clientB = new ClientSocket(
-						Object.assign<
-							ClientSocketOptions<MyClientMap>,
-							ClientSocketOptions<MyClientMap>,
-							ClientSocketOptions<MyClientMap>
-						>(
-							{},
-							clientOptions,
-							{ address: `ws://127.0.0.1:${PORT_NUMBER}?delayMe=true` }
-						)
-					);
-
-					await Promise.all([
-						clientA.listen('connect').once(100),
-						clientB.listen('connect').once(100)
-					]);
-
-					clientA.channels.transmitPublish('foo', 'a1');
-					clientA.channels.transmitPublish('foo', 'a2');
-					clientB.channels.transmitPublish('foo', 'b1');
-					clientB.channels.transmitPublish('foo', 'b2');
-
-					await wait(100);
-
-					done!();
-
-					assert.strictEqual(receivedMessages.length, 2);
-					assert.strictEqual(receivedMessages[0], 'a1');
-					assert.strictEqual(receivedMessages[1], 'a2');
-
-					clientA.disconnect();
-					clientB.disconnect();
-					clientC.disconnect();
-				});
-
-				it('Should allow to change message in middleware when client invokePublish', async function() {
-					const clientMessage = 'world';
-					const middlewareMessage = 'intercepted';
-
-					server.addMiddleware({
-						type: 'Publish In',
-						async onPublishIn() {
-							return middlewareMessage;
-						}
-					});
-
-					const client = new ClientSocket(clientOptions);
-					const helloChannel = client.channels.subscribe<string>('hello');
-					const receivedMessages: string[] = [];
-
-					await helloChannel.listen('subscribe').once(100);
-
-					(async () => {
-						for await (let data of helloChannel) {
-							receivedMessages.push(data);
-						}
-					})();
-
-					let error: Error | null = null;
-					try {
-						await client.channels.invokePublish('hello', clientMessage);
-					} catch (err) {
-						error = err;
-					}
-
-					await wait(100);
-
-					assert.notEqual(clientMessage, middlewareMessage);
-					assert.strictEqual(receivedMessages[0], middlewareMessage);
-				});
-
-				it('Should allow to change message in middleware when client transmitPublish', async function() {
-					const clientMessage = 'world';
-					const middlewareMessage = 'intercepted';
-
-					server.addMiddleware({
-						type: 'Publish In',
-						async onPublishIn() {
-							return middlewareMessage;
-						}
-					});
-
-					const client = new ClientSocket(clientOptions);
-					const helloChannel = client.channels.subscribe<string>('hello');
-					const receivedMessages: string[] = [];
-
-					await helloChannel.listen('subscribe').once();
-
-					(async () => {
-						for await (let data of helloChannel) {
-							receivedMessages.push(data);
-						}
-					})();
-
-					let error: Error | null = null;
-
-					try {
-						await client.channels.transmitPublish('hello', clientMessage);
-					} catch (err) {
-						error = err;
-					}
-
-					await wait(100);
-
-					assert.notEqual(clientMessage, middlewareMessage);
-					assert.strictEqual(receivedMessages[0], middlewareMessage);
-				})
+				assert.strictEqual(middlewareWasExecuted, true);
+				assert.notEqual(error, null);
+				assert.strictEqual(error!.name, 'BlockedError');
+				assert.strictEqual(receivedMessages.length, 0);
 			});
 
-			describe('onSubscribe', function () {
-				it('Should run onSubscribe in middleware if client subscribes to a channel', async function () {
-					let middlewareWasExecuted = false;
-					let middlewareChannel: string | null = null;
+			it('Delaying onPublishIn for one client should not affect other clients', async function () {
+				let done: () => void;
+				const donePromise = new Promise<void>((resolve) => { done = resolve; });
 
-					server.addMiddleware({
+				server.addMiddleware({
+					type: 'Publish In',
+					async onPublishIn({ data, transport }) {
+						if (transport.request.url!.indexOf('?delayMe=true') !== -1) {
+							// Long delay.
+							await donePromise;
+						}
+
+						return data;
+					}
+				});
+
+				server.addMiddleware(new InOrderMiddleware());
+
+				const clientC = new ClientSocket(clientOptions);
+				const receivedMessages: string[] = [];
+
+				(async () => {
+					for await (let data of clientC.channels.subscribe('foo')) {
+						receivedMessages.push(data);
+					}
+				})();
+
+				const clientA = new ClientSocket(clientOptions);
+				const clientB = new ClientSocket(
+					Object.assign<
+						ClientSocketOptions<MyClientMap>,
+						ClientSocketOptions<MyClientMap>,
+						ClientSocketOptions<MyClientMap>
+					>(
+						{},
+						clientOptions,
+						{ address: `ws://127.0.0.1:${PORT_NUMBER}?delayMe=true` }
+					)
+				);
+
+				await Promise.all([
+					clientA.listen('connect').once(100),
+					clientB.listen('connect').once(100)
+				]);
+
+				clientA.channels.transmitPublish('foo', 'a1');
+				clientA.channels.transmitPublish('foo', 'a2');
+				clientB.channels.transmitPublish('foo', 'b1');
+				clientB.channels.transmitPublish('foo', 'b2');
+
+				await wait(100);
+
+				done!();
+
+				assert.strictEqual(receivedMessages.length, 2);
+				assert.strictEqual(receivedMessages[0], 'a1');
+				assert.strictEqual(receivedMessages[1], 'a2');
+
+				clientA.disconnect();
+				clientB.disconnect();
+				clientC.disconnect();
+			});
+
+			it('Should allow to change message in middleware when client invokePublish', async function() {
+				const clientMessage = 'world';
+				const middlewareMessage = 'intercepted';
+
+				server.addMiddleware({
+					type: 'Publish In',
+					async onPublishIn() {
+						return middlewareMessage;
+					}
+				});
+
+				const client = new ClientSocket(clientOptions);
+				const helloChannel = client.channels.subscribe<string>('hello');
+				const receivedMessages: string[] = [];
+
+				await helloChannel.listen('subscribe').once(100);
+
+				(async () => {
+					for await (let data of helloChannel) {
+						receivedMessages.push(data);
+					}
+				})();
+
+				let error: Error | null = null;
+				try {
+					await client.channels.invokePublish('hello', clientMessage);
+				} catch (err) {
+					error = err;
+				}
+
+				await wait(100);
+
+				assert.notEqual(clientMessage, middlewareMessage);
+				assert.strictEqual(receivedMessages[0], middlewareMessage);
+			});
+
+			it('Should allow to change message in middleware when client transmitPublish', async function() {
+				const clientMessage = 'world';
+				const middlewareMessage = 'intercepted';
+
+				server.addMiddleware({
+					type: 'Publish In',
+					async onPublishIn() {
+						return middlewareMessage;
+					}
+				});
+
+				const client = new ClientSocket(clientOptions);
+				const helloChannel = client.channels.subscribe<string>('hello');
+				const receivedMessages: string[] = [];
+
+				await helloChannel.listen('subscribe').once();
+
+				(async () => {
+					for await (let data of helloChannel) {
+						receivedMessages.push(data);
+					}
+				})();
+
+				let error: Error | null = null;
+
+				try {
+					await client.channels.transmitPublish('hello', clientMessage);
+				} catch (err) {
+					error = err;
+				}
+
+				await wait(100);
+
+				assert.notEqual(clientMessage, middlewareMessage);
+				assert.strictEqual(receivedMessages[0], middlewareMessage);
+			})
+		});
+
+		describe('onSubscribe', function () {
+			it('Should run onSubscribe in middleware if client subscribes to a channel', async function () {
+				let middlewareWasExecuted = false;
+				let middlewareChannel: string | null = null;
+
+				server.addMiddleware({
+					type: 'Subscribe',
+					async onSubscribe({ channel }) {
+						middlewareWasExecuted = true;
+						middlewareChannel = channel;
+					}
+				});
+
+				const client = new ClientSocket(clientOptions);
+
+				await client.channels.subscribe('hello').listen('subscribe').once();
+
+				assert.strictEqual(middlewareWasExecuted, true);
+				assert.strictEqual(middlewareChannel, 'hello');
+			});
+
+			it('Should maintain pub/sub order if onSubscribe is delayed in middleware even if client starts out in disconnected state', async function () {
+				let middlewareActions: { type: string, channel: string }[] = [];
+
+				server.addMiddleware(
+					new InOrderMiddleware(),
+					{
 						type: 'Subscribe',
 						async onSubscribe({ channel }) {
-							middlewareWasExecuted = true;
-							middlewareChannel = channel;
-						}
-					});
-
-					const client = new ClientSocket(clientOptions);
-
-					await client.channels.subscribe('hello').listen('subscribe').once();
-
-					assert.strictEqual(middlewareWasExecuted, true);
-					assert.strictEqual(middlewareChannel, 'hello');
-				});
-
-				it('Should maintain pub/sub order if onSubscribe is delayed in middleware even if client starts out in disconnected state', async function () {
-					let middlewareActions: { type: string, channel: string }[] = [];
-
-					server.addMiddleware(
-						new InOrderMiddleware(),
-						{
-							type: 'Subscribe',
-							async onSubscribe({ channel }) {
-								middlewareActions.push({ type: 'subscribe', channel });
-								await wait(100);
-							},
-							async onPublishIn({ channel, data }) {
-								middlewareActions.push({ type: 'publishIn', channel });
-								return data;
-							},
-						}
-					);
-
-					const client = new ClientSocket(
-						Object.assign<
-							ClientSocketOptions<MyClientMap>,
-							ClientSocketOptions<MyClientMap>>(
-								{ autoConnect: false },
-								clientOptions
-							)
-					);
-
-					let receivedMessage: string;
-
-					const fooChannel = client.channels.subscribe<string>('foo');
-					client.channels.transmitPublish('foo', 'bar');
-
-					for await (let data of fooChannel) {
-						receivedMessage = data;
-						break;
+							middlewareActions.push({ type: 'subscribe', channel });
+							await wait(100);
+						},
+						async onPublishIn({ channel, data }) {
+							middlewareActions.push({ type: 'publishIn', channel });
+							return data;
+						},
 					}
+				);
 
-					assert.strictEqual(receivedMessage!, 'bar');
-					assert.strictEqual(middlewareActions.length, 2);
-					assert.strictEqual(middlewareActions[0].type, 'subscribe');
-					assert.strictEqual(middlewareActions[0].channel, 'foo');
-					assert.strictEqual(middlewareActions[1].type, 'publishIn');
-					assert.strictEqual(middlewareActions[1].channel, 'foo');
-				});
+				const client = new ClientSocket(
+					Object.assign<
+						ClientSocketOptions<MyClientMap>,
+						ClientSocketOptions<MyClientMap>>(
+							{ autoConnect: false },
+							clientOptions
+						)
+				);
+
+				let receivedMessage: string;
+
+				const fooChannel = client.channels.subscribe<string>('foo');
+				client.channels.transmitPublish('foo', 'bar');
+
+				for await (let data of fooChannel) {
+					receivedMessage = data;
+					break;
+				}
+
+				assert.strictEqual(receivedMessage!, 'bar');
+				assert.strictEqual(middlewareActions.length, 2);
+				assert.strictEqual(middlewareActions[0].type, 'subscribe');
+				assert.strictEqual(middlewareActions[0].channel, 'foo');
+				assert.strictEqual(middlewareActions[1].type, 'publishIn');
+				assert.strictEqual(middlewareActions[1].channel, 'foo');
 			});
-		});		
+		});
+
+		describe('onPublishOut', function () {
+			it('Should run onPublishOut in middleware if client publishes to a channel', async function () {
+				let middlewareWasExecuted = false;
+				let middlewareDetails: { channel: string, data: string } | null = null;
+
+				server.addMiddleware({
+					type: 'Publish Out',
+					async onPublishOut({ socket, transport, ...etc }) {
+						middlewareWasExecuted = true;
+						middlewareDetails = etc;
+						
+						return etc.data;
+					}
+				});
+
+				const client = new ClientSocket(clientOptions);
+
+				await client.channels.subscribe('hello').listen('subscribe').once(100);
+				await client.channels.invokePublish('hello', 123);
+
+				assert.strictEqual(middlewareWasExecuted, true);
+				assert.notEqual(middlewareDetails, null);
+				assert.strictEqual(middlewareDetails!.channel, 'hello');
+				assert.strictEqual(middlewareDetails!.data, 123);
+			});
+		});
 	});
 });
