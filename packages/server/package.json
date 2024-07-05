@@ -1,7 +1,7 @@
 {
 	"name": "@socket-mesh/server",
 	"description": "A TCP socket pair for easily transmitting full messages without worrying about request size limits.",
-	"version": "1.0.0",
+	"version": "18.1.0",
   "type": "module",
   "main": "src/index.js",
 	"types": "src/index.d.ts",
@@ -27,14 +27,13 @@
 	},
 	"dependencies": {
 		"@socket-mesh/async-stream-emitter": "^7.1.2",
-		"@socket-mesh/auth": "*",
-		"@socket-mesh/client": "*",
-		"@socket-mesh/errors": "*",
-		"@socket-mesh/formatter": "*",
+		"@socket-mesh/auth": "^2.2.0",
+		"@socket-mesh/client": "^18.1.0",
+		"@socket-mesh/errors": "^3.2.0",
+		"@socket-mesh/formatter": "^4.1.0",
 		"base64id": "^2.0.0",
 		"clone-deep": "^4.0.1",
 		"events": "^3.3.0",
-		"isomorphic-ws": "^5.0.0",
 		"jsonwebtoken": "^9.0.2",
 		"ws": "^8.18.0"
 	},
