@@ -17,7 +17,7 @@
   ],
   "author": "Greg Kimmy",
 	"license": "MIT",
-	"homepage": "https://github.com/socket-mesh/auth#readme",
+	"homepage": "https://github.com/socket-mesh/main/tree/main/packages/auth#README.md",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/socket-mesh/auth.git"

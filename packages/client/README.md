@@ -1,7 +1,7 @@
-SocketCluster JavaScript client
+SocketMesh JavaScript client
 ======
 
-Client module for SocketCluster.
+Client module for SocketMesh.
 
 ## Setting up
 

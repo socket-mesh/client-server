@@ -1,4 +1,4 @@
-# errors
+# @socket-mesh/errors
 Error types for SocketMesh messages
 
 ## Build

@@ -31,7 +31,7 @@
 	"bugs": {
 		"url": "https://github.com/socket-mesh/formatter/issues"
 	},
-	"homepage": "https://github.com/socket-mesh/formatter#readme",
+	"homepage": "https://github.com/socket-mesh/main/tree/main/packages/formatter#README.md",
 	"directories": {
 		"src": "src",
 		"test": "test"

@@ -1,7 +1,7 @@
-# SocketCluster server
-Minimal server module for SocketCluster.
+# SocketMesh server
+Minimal server module for SocketMesh.
 
-This is a stand-alone server module for SocketCluster.
+This is a stand-alone server module for SocketMesh.
 SocketCluster's protocol is backwards compatible with the SocketCluster protocol.
 
 ## Setting up
@@ -88,7 +88,7 @@ let agServer = socketClusterServer.attach(httpServer, {
 
 (The MIT License)
 
-Copyright (c) 2013-2023 SocketCluster.io
+Copyright (c) 2013-2024 SocketMesh.io
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the 'Software'), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 

@@ -8,11 +8,6 @@
 	"author": {
 		"name": "Greg Kimmy"
 	},
-	"contributors": [
-		{
-			"name": "Greg Kimmy"
-		}
-	],
 	"scripts": {
 		"build": "node ../../scripts/build.mjs && tsc",
 		"deploy": "cd dist && npm publish --access public",

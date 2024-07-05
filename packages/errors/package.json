@@ -5,9 +5,7 @@
   "type": "module",
   "main": "src/index.js",
 	"types": "src/index.d.ts",
-	"contributors": [
-		"Greg Kimmy"
-	],
+	"author": "Greg Kimmy",
 	"scripts": {
 		"build": "node ../../scripts/build.mjs && tsc",
 		"deploy": "cd dist && npm publish",
@@ -25,5 +23,5 @@
 	"bugs": {
 		"url": "https://github.com/socket-mesh/errors/issues"
 	},
-	"homepage": "https://github.com/socket-mesh/errors"
+	"homepage": "https://github.com/socket-mesh/main/tree/main/packages/errors#README.md"
 }

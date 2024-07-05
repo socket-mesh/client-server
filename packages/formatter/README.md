@@ -1,4 +1,4 @@
-# formatter
+# @socket-mesh/formatter
 Module for serializing and unserializing SocketMesh messages
 
 ## Build
