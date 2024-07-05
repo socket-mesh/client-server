@@ -1,54 +1,25 @@
 {
-	"name": "@socket-mesh/sandbox",
-	"description": "A TCP socket pair for easily transmitting full messages without worrying about request size limits.",
-	"version": "1.0.0",
-	"type": "module",
-	"author": {
-		"name": "JF Gros-Dubois",
-		"email": "flashthink@gmail.com"
-	},
-	"contributors": [
-		{
-			"name": "Greg Kimmy"
-		}
-	],
+	"name": "@socket-mesh/mono-repo",
+	"workspaces": [
+		"packages/*"
+	],	
 	"scripts": {
-		"build": "node ./scripts/build.mjs && tsc",
-		"deploy": "cd dist && npm publish --access public",
-		"test": "cross-env node --test --import=./run-test.js test/server-test.ts"
+		"build": "npm run build:auth && npm run build:errors && npm run build:formatter && npm run build:channels && npm run build:client && npm run build:server",
+		"build:auth": "cd packages/auth && npm run build",
+		"build:channels": "cd packages/channels && npm run build",
+		"build:client": "cd packages/client && npm run build",
+		"build:formatter": "cd packages/formatter && npm run build",
+		"build:errors": "cd packages/errors && npm run build",
+		"build:server": "cd packages/server && npm run build",
+		"test": "npm run test:formatter && npm run test:client && npm run test:server",
+		"test:client": "cd packages/client && npm run test",
+		"test:formatter": "cd packages/formatter && npm run test",
+		"test:server": "cd packages/server && npm run test"
 	},
 	"devDependencies": {
-		"@socket-mesh/local-storage": "^1.0.2",
-		"@types/base64id": "^2.0.2",
-		"@types/clone-deep": "^4.0.4",
-		"@types/jsonwebtoken": "^9.0.6",
-		"@types/node": "^20.14.8",
-		"@types/ws": "^8.5.10",
+		"@types/node": "^20.14.9",
 		"cross-env": "^7.0.3",
 		"ts-node": "^10.9.2",
-		"typescript": "^5.5.2"
-	},
-	"dependencies": {
-		"@socket-mesh/async-stream-emitter": "^7.1.0",
-		"@socket-mesh/auth": "^2.1.7",
-		"@socket-mesh/errors": "^3.1.4",
-		"@socket-mesh/formatter": "^4.0.5",
-		"base64id": "^2.0.0",
-		"clone-deep": "^4.0.1",
-		"events": "^3.3.0",
-		"isomorphic-ws": "^5.0.0",
-		"jsonwebtoken": "^9.0.2",
-		"ws": "^8.15.1"
-	},
-	"keywords": [
-		"ncom",
-		"tcp",
-		"simple",
-		"socket",
-		"messages"
-	],
-	"main": "index",
-	"engines": {
-		"node": ">= 0.8.0"
-	}
+		"typescript": "^5.5.3"
+	}	
 }

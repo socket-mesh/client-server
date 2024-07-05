@@ -1,0 +1,28 @@
+{
+  "name": "@socket-mesh/auth",
+  "version": "2.2.0",
+  "description": "Auth module for SocketMesh",
+  "type": "module",
+  "main": "src/index.js",
+	"types": "src/index.d.ts",
+  "scripts": {
+    "build": "node ../../scripts/build.mjs && tsc",
+    "deploy": "cd dist && npm publish --access public",
+    "test": "cross-env node --test --loader ts-node/esm test/index.spec.ts"
+  },
+  "keywords": [
+    "auth",
+    "jwt",
+    "socketMesh"
+  ],
+  "author": "Greg Kimmy",
+	"license": "MIT",
+	"homepage": "https://github.com/socket-mesh/auth#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/socket-mesh/auth.git"
+  },
+  "bugs": {
+		"url": "https://github.com/socket-mesh/auth/issues"
+  }
+}

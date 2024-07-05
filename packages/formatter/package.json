@@ -1,0 +1,39 @@
+{
+	"name": "@socket-mesh/formatter",
+	"description": "Module for serializing and unserializing SocketMesh messages.",
+	"version": "4.1.0",
+	"type": "module",
+  "main": "src/index.js",
+	"types": "src/index.d.ts",
+	"contributors": [
+		"Greg Kimmy"
+	],
+	"repository": {
+		"type": "git",
+		"url": "git://github.com/socket-mesh/formatter.git"
+	},
+	"scripts": {
+		"build": "node ../../scripts/build.mjs && tsc",
+		"deploy": "cd dist && npm publish --access public",
+		"test": "cross-env node --test --loader ts-node/esm test/index.spec.ts"
+	},
+	"keywords": [
+		"socketmesh",
+		"serialize",
+		"stringify",
+		"parser",
+		"parse",
+		"encode",
+		"decode",
+		"codec"
+	],
+	"license": "MIT",
+	"bugs": {
+		"url": "https://github.com/socket-mesh/formatter/issues"
+	},
+	"homepage": "https://github.com/socket-mesh/formatter#readme",
+	"directories": {
+		"src": "src",
+		"test": "test"
+	}
+}

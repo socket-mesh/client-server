@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+		"rootDir": "./src",
+    "outDir": "./dist/src/",
+    "noImplicitAny": true,
+    "module": "ES2020",
+    "target": "ES2020",
+		"declaration": true,
+		"allowSyntheticDefaultImports": true,
+    "moduleResolution": "node",
+		"esModuleInterop": true,
+		"lib": ["es2020", "DOM"],
+		"types": ["node"]
+  },
+	"ts-node": {
+		"compilerOptions": {
+			"module": "ES2020"
+		},
+		"esm": true,
+    "experimentalSpecifierResolution": "node"
+	},
+	"exclude": ["test.js", "dist", "**/*.spec.ts", "test"]
+}

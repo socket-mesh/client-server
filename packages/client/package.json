@@ -1,0 +1,55 @@
+{
+	"name": "@socket-mesh/client",
+	"description": "A TCP socket pair for easily transmitting full messages without worrying about request size limits.",
+	"version": "18.1.0",
+  "type": "module",
+  "main": "src/index.js",
+	"exports": {
+		".": "./src/index.js",
+		"./core": "./src/core/index.js"
+	},
+	"types": "src/index.d.ts",
+	"author": {
+		"name": "Greg Kimmy"
+	},
+	"contributors": [
+		{
+			"name": "Greg Kimmy"
+		}
+	],
+	"scripts": {
+		"build": "node ../../scripts/build.mjs && tsc",
+		"deploy": "cd dist && npm publish --access public",
+		"test": "cross-env node --test --import=./run-test.js test/client-test.ts"
+	},
+	"devDependencies": {
+		"@socket-mesh/server": "*",
+		"@socket-mesh/local-storage": "^1.0.2",
+		"@types/base64id": "^2.0.2",
+		"@types/clone-deep": "^4.0.4",
+		"@types/jsonwebtoken": "^9.0.6",
+		"@types/ws": "^8.5.10",
+		"jsonwebtoken": "^9.0.2"
+	},
+	"dependencies": {
+		"@socket-mesh/async-stream-emitter": "^7.1.2",
+		"@socket-mesh/auth": "^2.2.0",
+		"@socket-mesh/channels": "^6.1.0",
+		"@socket-mesh/errors": "^3.2.0",
+		"@socket-mesh/formatter": "^4.1.0",
+		"base64id": "^2.0.0",
+		"events": "^3.3.0",
+		"isomorphic-ws": "^5.0.0",
+		"ws": "^8.18.0"
+	},
+	"keywords": [
+		"ncom",
+		"tcp",
+		"simple",
+		"socket",
+		"messages"
+	],
+	"engines": {
+		"node": ">= 0.8.0"
+	}
+}
