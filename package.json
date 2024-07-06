@@ -17,7 +17,7 @@
 		"test:server": "cd packages/server && npm run test"
 	},
 	"devDependencies": {
-		"@types/node": "^20.14.9",
+		"@types/node": "^20.14.10",
 		"cross-env": "^7.0.3",
 		"ts-node": "^10.9.2",
 		"typescript": "^5.5.3"
