@@ -1,5 +1,5 @@
 {
-	"name": "@socket-mesh/mono-repo",
+	"name": "@socket-mesh/main",
 	"workspaces": [
 		"packages/*"
 	],	
