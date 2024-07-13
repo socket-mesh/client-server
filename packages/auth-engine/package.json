@@ -1,0 +1,36 @@
+{
+  "name": "@socket-mesh/auth-engine",
+  "version": "1.0.0",
+  "description": "Auth Engine module for SocketMesh",
+  "type": "module",
+  "main": "src/index.js",
+	"types": "src/index.d.ts",
+  "scripts": {
+    "build": "node ../../scripts/build.mjs && tsc",
+    "deploy": "cd dist && npm publish --access public",
+    "test": "cross-env node --test --loader ts-node/esm test/index.spec.ts"
+  },
+  "keywords": [
+    "auth",
+    "jwt",
+    "socketMesh"
+  ],
+  "author": "Greg Kimmy",
+	"license": "MIT",
+	"homepage": "https://github.com/socket-mesh/main/tree/main/packages/auth-engine#README.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/socket-mesh/auth.git"
+  },
+  "bugs": {
+		"url": "https://github.com/socket-mesh/auth/issues"
+  },
+	"devDependencies": {
+		"@types/clone-deep": "^4.0.4"
+	},
+	"dependencies": {
+		"clone-deep": "^4.0.1",
+		"jsonwebtoken": "^9.0.2",
+		"@socket-mesh/errors": "^3.2.0"	
+	}
+}

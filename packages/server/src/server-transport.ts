@@ -5,7 +5,7 @@ import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
 import { AuthError, BrokerError, InvalidActionError, socketProtocolErrorStatuses } from "@socket-mesh/errors";
 import { SocketMapFromServer } from "./maps/socket-map.js";
 import jwt from 'jsonwebtoken';
-import { AuthTokenOptions } from "./auth-engine.js";
+import { AuthTokenOptions } from "@socket-mesh/auth-engine";
 import { RawData } from "ws";
 import { AnyResponse, SocketStatus, SocketTransport, abortRequest, InvokeMethodRequest, InvokeServiceRequest, TransmitMethodRequest, TransmitServiceRequest } from "@socket-mesh/client/core";
 import { ClientRequest, IncomingMessage } from "http";
@@ -246,7 +246,7 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		delete options?.rejectOnFailedDelivery;
 
 		try {
-			signedAuthToken = await auth.signToken(authToken, auth, options as jwt.SignOptions);
+			signedAuthToken = await auth.signToken(authToken, options as jwt.SignOptions);
 		} catch (err) {
 			this.onError(err);
 			this.disconnect(4002, err.toString());

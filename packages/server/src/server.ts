@@ -5,7 +5,7 @@ import { IncomingMessage, Server as HttpServer, OutgoingHttpHeaders } from 'http
 import defaultCodec, { CodecEngine } from "@socket-mesh/formatter";
 import { ClientSocket, HandlerMap, removeAuthTokenHandler } from "@socket-mesh/client";
 import { AnyPacket, CallIdGenerator, StreamCleanupMode } from "@socket-mesh/client/core";
-import { AuthEngine, defaultAuthEngine, isAuthEngine } from "./auth-engine.js";
+import { AuthEngine, defaultAuthEngine, isAuthEngine } from "@socket-mesh/auth-engine";
 import { handshakeHandler } from "./handlers/handshake.js";
 import { ServerMiddleware } from "./middleware/server-middleware.js";
 import { authenticateHandler } from "./handlers/authenticate.js";

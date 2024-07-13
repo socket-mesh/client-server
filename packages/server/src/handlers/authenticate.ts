@@ -1,7 +1,7 @@
 import { RequestHandlerArgs, SocketTransport } from "@socket-mesh/client/core";
 import jwt from "jsonwebtoken";
 import { AuthTokenError, AuthTokenExpiredError, AuthTokenInvalidError, AuthTokenNotBeforeError, InvalidActionError } from "@socket-mesh/errors";
-import { AuthEngine } from "../auth-engine.js";
+import { AuthEngine } from "@socket-mesh/auth-engine";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
 import { BasicSocketMapServer } from "../maps/socket-map.js";
 import { ServerSocket } from "../server-socket.js";
@@ -42,7 +42,7 @@ export async function validateAuthToken(
 	try {
 		return {
 			signedAuthToken: authToken,
-			authToken: await auth.verifyToken(authToken, auth, verificationOptions)
+			authToken: await auth.verifyToken(authToken, verificationOptions)
 		};
 	} catch (error) {
 		return {
