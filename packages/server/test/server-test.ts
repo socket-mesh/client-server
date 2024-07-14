@@ -12,9 +12,9 @@ import assert from "node:assert";
 import localStorage from "@socket-mesh/local-storage";
 import { AnyPacket, AuthStateChangeEvent, AuthenticatedChangeEvent, CloseEvent, ConnectEvent, DisconnectEvent, MethodRequestPacket, RequestHandlerArgs, isRequestPacket, wait } from "@socket-mesh/client/core";
 import { ConnectionEvent, SocketAuthStateChangeEvent } from "../src/server-event.js";
-import { MiddlewareBlockedError } from "@socket-mesh/errors";
+import { PluginBlockedError } from "@socket-mesh/errors";
 import { AuthOptions } from "@socket-mesh/auth-engine";
-import { InOrderMiddleware, MiddlewareArgs, OfflineMiddleware, RequestBatchingMiddleware, ResponseBatchingMiddleware, SendRequestMiddlewareArgs, ServerPrivateMap, SocketMapFromClient } from "@socket-mesh/client";
+import { InOrderPlugin, PluginArgs, OfflinePlugin, RequestBatchingPlugin, ResponseBatchingPlugin, SendRequestPluginArgs, ServerPrivateMap, SocketMapFromClient } from "@socket-mesh/client";
 import { WritableConsumableStream } from "@socket-mesh/writable-consumable-stream";
 import { SimpleBroker } from "../src/broker/simple-broker.js";
 import { ExchangeClient } from "../src/broker/exchange-client.js";
@@ -211,10 +211,10 @@ describe('Integration tests', function () {
 				PORT_NUMBER,
 				Object.assign(
 					{
-						middleware: [{
+						plugin: [{
 							onAuthenticate: (authInfo: AuthInfo) => {
 								if (!('authToken' in authInfo) || authInfo.authToken.username === 'alice') {
-									throw new MiddlewareBlockedError('Blocked by onAuthenticate', 'AuthenticateMiddlewareError');
+									throw new PluginBlockedError('Blocked by onAuthenticate', 'AuthenticatePluginError');
 								}
 							}
 						}]
@@ -428,11 +428,11 @@ describe('Integration tests', function () {
 			// The previous test authenticated us as 'alice', so that token will be passed to the server as
 			// part of the handshake.
 			const event = await client.listen('connect').once();
-			// Any token containing the username 'alice' should be blocked by the MIDDLEWARE_INBOUND middleware.
+			// Any token containing the username 'alice' should be blocked by the MIDDLEWARE_INBOUND plugin.
 			// This will only affects token-based authentication, not the credentials-based login event.
 			assert.strictEqual(event.isAuthenticated, false);
 			assert.notEqual(event.authError, null);
-			assert.strictEqual((event.authError as MiddlewareBlockedError).type, 'AuthenticateMiddlewareError');
+			assert.strictEqual((event.authError as PluginBlockedError).type, 'AuthenticatePluginError');
 		});
 */
 	});
@@ -900,11 +900,11 @@ describe('Integration tests', function () {
 					clientOptions,
 					{
 						autoConnect: false,
-						middleware: [
-							new OfflineMiddleware(),
+						plugin: [
+							new OfflinePlugin(),
 							{
 								type: 'Authenticate Interceptor',
-								sendRequest: ({ requests, cont }: SendRequestMiddlewareArgs<SocketMapFromClient<MyClientMap>>) => {
+								sendRequest: ({ requests, cont }: SendRequestPluginArgs<SocketMapFromClient<MyClientMap>>) => {
 									cont(
 										requests.map(
 											req => {
@@ -962,8 +962,8 @@ describe('Integration tests', function () {
 			client = new ClientSocket(
 				Object.assign(
 					{
-						middleware: [{
-							onOpen({ transport }: MiddlewareArgs<SocketMapFromClient<MyClientMap>>) {
+						plugin: [{
+							onOpen({ transport }: PluginArgs<SocketMapFromClient<MyClientMap>>) {
 								transport.send(Buffer.alloc(0));
 							}
 						}]
@@ -991,8 +991,8 @@ describe('Integration tests', function () {
 			client = new ClientSocket(
 				Object.assign(
 					{
-						middleware: [{
-							onOpen({ transport }: MiddlewareArgs<SocketMapFromClient<MyClientMap>>) {
+						plugin: [{
+							onOpen({ transport }: PluginArgs<SocketMapFromClient<MyClientMap>>) {
 								transport.ping();
 							}
 						}]
@@ -1019,8 +1019,8 @@ describe('Integration tests', function () {
 			client = new ClientSocket(
 				Object.assign(
 					{
-						middleware: [{
-							onOpen({ transport }: MiddlewareArgs<SocketMapFromClient<MyClientMap>>) {
+						plugin: [{
+							onOpen({ transport }: PluginArgs<SocketMapFromClient<MyClientMap>>) {
 								transport.send(Buffer.alloc(0));
 							}
 						}]
@@ -1178,7 +1178,7 @@ describe('Integration tests', function () {
 						{},
 						clientOptions,
 						{
-							middleware: [new OfflineMiddleware()]
+							plugin: [new OfflinePlugin()]
 						}
 					)
 				);
@@ -1524,7 +1524,7 @@ describe('Integration tests', function () {
 								return 'bar';
 							}
 						},
-						middleware: [new InOrderMiddleware()]
+						plugin: [new InOrderPlugin()]
 					}
 				)
 			);
@@ -1545,7 +1545,7 @@ describe('Integration tests', function () {
 					{},
 					clientOptions,
 					{
-						middleware: [new OfflineMiddleware()]
+						plugin: [new OfflinePlugin()]
 					}
 				)
 			);
@@ -1617,7 +1617,7 @@ describe('Integration tests', function () {
 								handledPackets.push(data);	
 							}
 						},
-						middleware: [new InOrderMiddleware()]
+						plugin: [new InOrderPlugin()]
 					}
 				)
 			);
@@ -1787,7 +1787,7 @@ describe('Integration tests', function () {
 					{},
 					clientOptions,
 					{
-						middleware: [new OfflineMiddleware()]
+						plugin: [new OfflinePlugin()]
 					}
 				)
 			);
@@ -1835,7 +1835,7 @@ describe('Integration tests', function () {
 						{},
 						clientOptions,
 						{
-							middleware: [new OfflineMiddleware()]
+							plugin: [new OfflinePlugin()]
 						}
 					)
 				);
@@ -1854,7 +1854,7 @@ describe('Integration tests', function () {
 					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
 					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>>(
 					{
-						middleware: [
+						plugin: [
 							{
 								type: 'Message Interceptor',
 								async onMessageRaw({ socket, message }) {
@@ -1870,7 +1870,7 @@ describe('Integration tests', function () {
 									return packet;
 								}
 							},
-							new InOrderMiddleware()
+							new InOrderPlugin()
 						]
 					},
 					serverOptions
@@ -1902,7 +1902,7 @@ describe('Integration tests', function () {
 		it('Should be able to getOutboundBackpressure() on a socket object', async function () {
 			const backpressureHistory: number[] = [];
 			const requestStream = 
-				new WritableConsumableStream<SendRequestMiddlewareArgs<SocketMapFromServer<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>>>();
+				new WritableConsumableStream<SendRequestPluginArgs<SocketMapFromServer<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>>>();
 
 			(async () => {
 				for await (let { requests, cont } of requestStream) {
@@ -1920,7 +1920,7 @@ describe('Integration tests', function () {
 					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
 					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>>(
 					{
-						middleware: [
+						plugin: [
 							{
 								type: 'Send Request Interceptor',
 								sendRequest(options) {
@@ -1954,8 +1954,8 @@ describe('Integration tests', function () {
 			client = new ClientSocket(
 				Object.assign(
 					{
-						middleware: [
-							new OfflineMiddleware()
+						plugin: [
+							new OfflinePlugin()
 						]
 					},
 					clientOptions
@@ -1983,7 +1983,7 @@ describe('Integration tests', function () {
 					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
 					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>>(
 					{
-						middleware: [
+						plugin: [
 							{
 								type: 'Message Interceptor',
 								async onMessageRaw({ socket, message }) {
@@ -1999,7 +1999,7 @@ describe('Integration tests', function () {
 									return packet;
 								}
 							},
-							new InOrderMiddleware()
+							new InOrderPlugin()
 						]
 					},
 					serverOptions
@@ -2124,7 +2124,7 @@ describe('Integration tests', function () {
 					ClientSocketOptions<MyClientMap>
 				>(
 					{
-						middleware: [
+						plugin: [
 							{
 								type: 'Subscribe handshake test',
 								onOpen({ transport }) {
@@ -2178,7 +2178,7 @@ describe('Integration tests', function () {
 					ClientSocketOptions<MyClientMap>
 				>(
 					{
-						middleware: [
+						plugin: [
 							{
 								type: 'Subscribe handshake test',
 								onOpen({ transport }) {
@@ -2614,7 +2614,7 @@ describe('Integration tests', function () {
 	describe('Batching', function () {
 		it('Should batch messages sent through sockets after the handshake when the batchOnHandshake option is true', async function () {
 			const receivedServerMessages: (string | ArrayBuffer | Buffer[])[] = [];
-			let subscribeMiddlewareCounter = 0;
+			let subscribePluginCounter = 0;
 
 			server = listen(
 				PORT_NUMBER,
@@ -2623,7 +2623,7 @@ describe('Integration tests', function () {
 					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
 				>(
 					{
-						middleware: [
+						plugin: [
 							{
 								type: 'Received Server Messages',
 								async onMessageRaw({ message }) {
@@ -2633,11 +2633,11 @@ describe('Integration tests', function () {
 							},
 							{
 								type: 'Inbound Packets',
-								// Each subscription should pass through the middleware individually, even
+								// Each subscription should pass through the plugin individually, even
 								// though they were sent as a batch/array.
 								async onMessage({ packet }) {
 									if (isRequestPacket(packet) && packet.method === '#subscribe') {
-										subscribeMiddlewareCounter++;
+										subscribePluginCounter++;
 										assert.strictEqual(packet.data.channel.indexOf('my-channel-'), 0);
 										if (packet.data.channel === 'my-channel-10') {
 											assert.strictEqual(JSON.stringify(packet.data.data), JSON.stringify({foo: 123}));
@@ -2653,7 +2653,7 @@ describe('Integration tests', function () {
 									return packet;
 								}
 							},
-							new ResponseBatchingMiddleware({
+							new ResponseBatchingPlugin({
 								batchOnHandshakeDuration: 400,
 								batchInterval: 50
 							})
@@ -2675,7 +2675,7 @@ describe('Integration tests', function () {
 					ClientSocketOptions<MyClientMap>
 				>(
 					{
-						middleware: [
+						plugin: [
 							{
 								type: 'Received Client Messages',
 								async onMessageRaw({ message }) {
@@ -2683,7 +2683,7 @@ describe('Integration tests', function () {
 									return message;
 								}
 							},
-							new RequestBatchingMiddleware({
+							new RequestBatchingPlugin({
 								batchOnHandshakeDuration: 100,
 								batchInterval: 50
 							})
@@ -2726,7 +2726,7 @@ describe('Integration tests', function () {
 
 			for await (let data of channelList[19]) {
 				assert.strictEqual(data, 'Hello!');
-				assert.strictEqual(subscribeMiddlewareCounter, 20);
+				assert.strictEqual(subscribePluginCounter, 20);
 				break;
 			}
 
@@ -2746,8 +2746,8 @@ describe('Integration tests', function () {
 					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
 				>(
 					{
-						middleware: [
-							new ResponseBatchingMiddleware({
+						plugin: [
+							new ResponseBatchingPlugin({
 								batchOnHandshakeDuration: 400,
 								batchInterval: 50
 							})
@@ -2768,8 +2768,8 @@ describe('Integration tests', function () {
 				>(
 					{
 						autoConnect: false,
-						middleware: [
-							new RequestBatchingMiddleware({
+						plugin: [
+							new RequestBatchingPlugin({
 								batchOnHandshakeDuration: 100,
 								batchInterval: 50
 							})
@@ -3000,7 +3000,7 @@ describe('Integration tests', function () {
 		});
 	});
 
-	describe('Middleware', function () {
+	describe('Plugin', function () {
 		beforeEach(async function () {
 			server = listen(PORT_NUMBER, serverOptions);
 
@@ -3011,7 +3011,7 @@ describe('Integration tests', function () {
 
 		describe('onConnection', function () {
 			it('Delaying handshake for one client should not affect other clients', async function () {
-				server.addMiddleware({
+				server.addPlugin({
 					type: 'onConnection Delay',
 					async onConnection(req) {
 						if (req.url && req.url.indexOf('?delayMe=true') !== -1) {
@@ -3058,17 +3058,17 @@ describe('Integration tests', function () {
 		});
 
 		describe('onHandshake', function () {
-			it('Should trigger correct events if handshake middleware blocks with an error', async function () {
-				let middlewareWasExecuted = false;
+			it('Should trigger correct events if handshake plugin blocks with an error', async function () {
+				let pluginWasExecuted = false;
 				const serverWarnings: Error[] = [];
 				const clientErrors: Error[] = [];
 				let abortStatus: number | null = null;
 
-				server.addMiddleware({
-					type: 'Handshake Middleware',
+				server.addPlugin({
+					type: 'Handshake Plugin',
 					async onHandshake() {
 						await wait(100);
-						middlewareWasExecuted = true;
+						pluginWasExecuted = true;
 						const err = new Error('Handshake failed because the server was too lazy');
 						err.name = 'TooLazyHandshakeError';
 
@@ -3097,7 +3097,7 @@ describe('Integration tests', function () {
 
 				await wait(200);
 
-				assert.strictEqual(middlewareWasExecuted, true);
+				assert.strictEqual(pluginWasExecuted, true);
 				assert.notEqual(clientErrors[0], null);
 				assert.strictEqual(clientErrors[0].name, 'TooLazyHandshakeError');
 				assert.notEqual(clientErrors[1], null);
@@ -3107,16 +3107,16 @@ describe('Integration tests', function () {
 				assert.notEqual(abortStatus, null);
 			});
 
-			it('Should send back default 4008 status code if handshake middleware blocks without providing a status code', async function () {
-				let middlewareWasExecuted = false;
+			it('Should send back default 4008 status code if handshake plugin blocks without providing a status code', async function () {
+				let pluginWasExecuted = false;
 				let abortStatus = 0;
 				let abortReason: string | undefined = '';
 
-				server.addMiddleware({
-					type: 'Handshake Middleware',
+				server.addPlugin({
+					type: 'Handshake Plugin',
 					async onHandshake() {
 						await wait(100);
-						middlewareWasExecuted = true;
+						pluginWasExecuted = true;
 						const err = new Error('Handshake failed because the server was too lazy');
 						err.name = 'TooLazyHandshakeError';
 
@@ -3133,21 +3133,21 @@ describe('Integration tests', function () {
 				})();
 
 				await wait(200);
-				assert.strictEqual(middlewareWasExecuted, true);
+				assert.strictEqual(pluginWasExecuted, true);
 				assert.strictEqual(abortStatus, 4008);
 				assert.strictEqual(abortReason, 'TooLazyHandshakeError: Handshake failed because the server was too lazy');
 			});
 
-			it('Should send back custom status code if handshake middleware blocks by providing a status code', async function () {
-				let middlewareWasExecuted = false;
+			it('Should send back custom status code if handshake plugin blocks by providing a status code', async function () {
+				let pluginWasExecuted = false;
 				let abortStatus: number;
 				let abortReason: string | undefined;
 
-				server.addMiddleware({
-					type: 'Handshake Middleware',
+				server.addPlugin({
+					type: 'Handshake Plugin',
 					async onHandshake() {
 						await wait(100);
-						middlewareWasExecuted = true;
+						pluginWasExecuted = true;
 						const err = new Error('Handshake failed because of invalid query auth parameters');
 						err.name = 'InvalidAuthQueryHandshakeError';
 						// Set custom 4501 status code as a property of the error.
@@ -3168,19 +3168,19 @@ describe('Integration tests', function () {
 				})();
 
 				await wait(200);
-				assert.strictEqual(middlewareWasExecuted, true);
+				assert.strictEqual(pluginWasExecuted, true);
 				assert.strictEqual(abortStatus!, 4501);
 				assert.strictEqual(abortReason!, 'InvalidAuthQueryHandshakeError: Handshake failed because of invalid query auth parameters');
 			});
 
-			it('Should connect with a delay if allow() is called after a timeout inside the middleware function', async function () {
+			it('Should connect with a delay if allow() is called after a timeout inside the plugin function', async function () {
 				let createConnectionTime: number | null = null;
 				let connectEventTime: number | null = null;
 				let abortStatus: number;
 				let abortReason: string | undefined;
 
-				server.addMiddleware({
-					type: 'Handshake Middleware',
+				server.addPlugin({
+					type: 'Handshake Plugin',
 					async onHandshake() {
 						await wait(500);
 					}
@@ -3200,12 +3200,12 @@ describe('Integration tests', function () {
 				assert.strictEqual(connectEventTime - createConnectionTime > 400, true);
 			});
 
-			it('Should not be allowed to call setAuthorization from inside middleware', async function () {
+			it('Should not be allowed to call setAuthorization from inside plugin', async function () {
 				let didAuthenticationEventTrigger = false;
 				let setAuthTokenError: Error | null = null;
 
-				server.addMiddleware({
-					type: 'Handshake Middleware',
+				server.addPlugin({
+					type: 'Handshake Plugin',
 					async onHandshake({ transport }) {
 						try {
 							await transport.setAuthorization({username: 'alice'});
@@ -3234,8 +3234,8 @@ describe('Integration tests', function () {
 			});
 
 			it('Delaying handshake for one client should not affect other clients', async function () {
-				server.addMiddleware({
-					type: 'Handshake Middleware',
+				server.addPlugin({
+					type: 'Handshake Plugin',
 					async onHandshake({ transport }) {
 						if (transport.request.url && transport.request.url.indexOf('?delayMe=true') !== -1) {
 							// Long delay.
@@ -3281,16 +3281,16 @@ describe('Integration tests', function () {
 		});
 
 		describe('onMessage', function () {
-			it('Should run INVOKE action in middleware if client invokes an RPC', async function () {
-				let middlewareWasExecuted = false;
-				let middlewarePacket: MethodRequestPacket<ServerIncomingMap & ServerPrivateMap, "proc"> | null = null;
+			it('Should run INVOKE action in plugin if client invokes an RPC', async function () {
+				let pluginWasExecuted = false;
+				let pluginPacket: MethodRequestPacket<ServerIncomingMap & ServerPrivateMap, "proc"> | null = null;
 
-				server.addMiddleware({
+				server.addPlugin({
 					type: 'onMessage',
 					async onMessage({ packet }) {
 						if (isRequestPacket(packet) && packet.method === 'proc') {
-							middlewarePacket = packet;
-							middlewareWasExecuted = true;
+							pluginPacket = packet;
+							pluginWasExecuted = true;
 						}
 
 						return packet;
@@ -3303,21 +3303,21 @@ describe('Integration tests', function () {
 
 				const result = await client.invoke('proc', 123);
 
-				assert.strictEqual(middlewareWasExecuted, true);
-				assert.notEqual(middlewarePacket, null);
+				assert.strictEqual(pluginWasExecuted, true);
+				assert.notEqual(pluginPacket, null);
 				assert.strictEqual(result, 'success 123');
 			});
 
-			it('Should send back custom Error if INVOKE action in middleware blocks the client RPC', async function () {
-				let middlewareWasExecuted = false;
-				let middlewarePacket: AnyPacket<SocketMapFromServer<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>> | null = null;
+			it('Should send back custom Error if INVOKE action in plugin blocks the client RPC', async function () {
+				let pluginWasExecuted = false;
+				let pluginPacket: AnyPacket<SocketMapFromServer<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>> | null = null;
 
-				server.addMiddleware({
+				server.addPlugin({
 					type: 'onMessage',
 					async onMessage({ packet }) {
 						if (isRequestPacket(packet) && packet.method === 'proc') {
-							middlewarePacket = packet;
-							middlewareWasExecuted = true;
+							pluginPacket = packet;
+							pluginWasExecuted = true;
 
 							const customError = new Error('Invoke action was blocked');
 							customError.name = 'BlockedInvokeError';
@@ -3348,30 +3348,30 @@ describe('Integration tests', function () {
 		});
 
 		describe('onAuthenticate', function () {
-			it('Should not run onAuthenticate in middleware if JWT token does not exist', async function () {
-				let middlewareWasExecuted = false;
+			it('Should not run onAuthenticate in plugin if JWT token does not exist', async function () {
+				let pluginWasExecuted = false;
 
-				server.addMiddleware({
+				server.addPlugin({
 					type: 'onAuthenticate',
 					onAuthenticate() {
-						middlewareWasExecuted = true;
+						pluginWasExecuted = true;
 					},
 				});
 
 				client = new ClientSocket(clientOptions);
 
 				await client.listen('connect').once(100);
-				assert.notEqual(middlewareWasExecuted, true);
+				assert.notEqual(pluginWasExecuted, true);
 			});
 
-			it('Should run onAuthenticate in middleware if JWT token exists', async function () {
+			it('Should run onAuthenticate in plugin if JWT token exists', async function () {
 				global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
-				let middlewareWasExecuted = false;
+				let pluginWasExecuted = false;
 
-				server.addMiddleware({
+				server.addPlugin({
 					type: 'onAuthenticate',
 					onAuthenticate() {
-						middlewareWasExecuted = true;
+						pluginWasExecuted = true;
 					},
 				});
 
@@ -3387,20 +3387,20 @@ describe('Integration tests', function () {
 
 				await client.listen('authenticate').once(100);
 
-				assert.strictEqual(middlewareWasExecuted, true);
+				assert.strictEqual(pluginWasExecuted, true);
 			});
 		});
 
 		describe('onPublishIn', function () {
-			it('Should run onPublishIn in middleware if client publishes to a channel', async function () {
-				let middlewareWasExecuted = false;
-				let middlewareDetails: { channel: string, data: string } | null = null;
+			it('Should run onPublishIn in plugin if client publishes to a channel', async function () {
+				let pluginWasExecuted = false;
+				let pluginDetails: { channel: string, data: string } | null = null;
 
-				server.addMiddleware({
+				server.addPlugin({
 					type: 'Publish In',
 					async onPublishIn({ socket, transport, ...etc }) {
-						middlewareWasExecuted = true;
-						middlewareDetails = etc;
+						pluginWasExecuted = true;
+						pluginDetails = etc;
 						
 						return etc.data;
 					}
@@ -3412,21 +3412,21 @@ describe('Integration tests', function () {
 
 				await client.channels.invokePublish('hello', 'world');
 
-				assert.strictEqual(middlewareWasExecuted, true);
-				assert.notEqual(middlewareDetails, null);
-				assert.strictEqual(middlewareDetails!.channel, 'hello');
-				assert.strictEqual(middlewareDetails!.data, 'world');
+				assert.strictEqual(pluginWasExecuted, true);
+				assert.notEqual(pluginDetails, null);
+				assert.strictEqual(pluginDetails!.channel, 'hello');
+				assert.strictEqual(pluginDetails!.data, 'world');
 			});
 
-			it('Should be able to delay and block publish using onPublishIn middleware', async function () {
-				let middlewareWasExecuted = false;
+			it('Should be able to delay and block publish using onPublishIn plugin', async function () {
+				let pluginWasExecuted = false;
 
-				server.addMiddleware({
+				server.addPlugin({
 					type: 'Publish In',
 					async onPublishIn({ socket, transport, ...etc }) {
-						middlewareWasExecuted = true;
+						pluginWasExecuted = true;
 						await wait(50);
-						const error = new Error('Blocked by middleware');
+						const error = new Error('Blocked by plugin');
 						error.name = 'BlockedError';
 						throw error;
 					}
@@ -3452,7 +3452,7 @@ describe('Integration tests', function () {
 				}
 				await wait(100);
 
-				assert.strictEqual(middlewareWasExecuted, true);
+				assert.strictEqual(pluginWasExecuted, true);
 				assert.notEqual(error, null);
 				assert.strictEqual(error!.name, 'BlockedError');
 				assert.strictEqual(receivedMessages.length, 0);
@@ -3462,7 +3462,7 @@ describe('Integration tests', function () {
 				let done: () => void;
 				const donePromise = new Promise<void>((resolve) => { done = resolve; });
 
-				server.addMiddleware({
+				server.addPlugin({
 					type: 'Publish In',
 					async onPublishIn({ data, transport }) {
 						if (transport.request.url!.indexOf('?delayMe=true') !== -1) {
@@ -3474,7 +3474,7 @@ describe('Integration tests', function () {
 					}
 				});
 
-				server.addMiddleware(new InOrderMiddleware());
+				server.addPlugin(new InOrderPlugin());
 
 				const clientC = new ClientSocket(clientOptions);
 				const receivedMessages: string[] = [];
@@ -3521,14 +3521,14 @@ describe('Integration tests', function () {
 				clientC.disconnect();
 			});
 
-			it('Should allow to change message in middleware when client invokePublish', async function() {
+			it('Should allow to change message in plugin when client invokePublish', async function() {
 				const clientMessage = 'world';
-				const middlewareMessage = 'intercepted';
+				const pluginMessage = 'intercepted';
 
-				server.addMiddleware({
+				server.addPlugin({
 					type: 'Publish In',
 					async onPublishIn() {
-						return middlewareMessage;
+						return pluginMessage;
 					}
 				});
 
@@ -3553,18 +3553,18 @@ describe('Integration tests', function () {
 
 				await wait(100);
 
-				assert.notEqual(clientMessage, middlewareMessage);
-				assert.strictEqual(receivedMessages[0], middlewareMessage);
+				assert.notEqual(clientMessage, pluginMessage);
+				assert.strictEqual(receivedMessages[0], pluginMessage);
 			});
 
-			it('Should allow to change message in middleware when client transmitPublish', async function() {
+			it('Should allow to change message in plugin when client transmitPublish', async function() {
 				const clientMessage = 'world';
-				const middlewareMessage = 'intercepted';
+				const pluginMessage = 'intercepted';
 
-				server.addMiddleware({
+				server.addPlugin({
 					type: 'Publish In',
 					async onPublishIn() {
-						return middlewareMessage;
+						return pluginMessage;
 					}
 				});
 
@@ -3590,21 +3590,21 @@ describe('Integration tests', function () {
 
 				await wait(100);
 
-				assert.notEqual(clientMessage, middlewareMessage);
-				assert.strictEqual(receivedMessages[0], middlewareMessage);
+				assert.notEqual(clientMessage, pluginMessage);
+				assert.strictEqual(receivedMessages[0], pluginMessage);
 			})
 		});
 
 		describe('onSubscribe', function () {
-			it('Should run onSubscribe in middleware if client subscribes to a channel', async function () {
-				let middlewareWasExecuted = false;
-				let middlewareChannel: string | null = null;
+			it('Should run onSubscribe in plugin if client subscribes to a channel', async function () {
+				let pluginWasExecuted = false;
+				let pluginChannel: string | null = null;
 
-				server.addMiddleware({
+				server.addPlugin({
 					type: 'Subscribe',
 					async onSubscribe({ channel }) {
-						middlewareWasExecuted = true;
-						middlewareChannel = channel;
+						pluginWasExecuted = true;
+						pluginChannel = channel;
 					}
 				});
 
@@ -3612,23 +3612,23 @@ describe('Integration tests', function () {
 
 				await client.channels.subscribe('hello').listen('subscribe').once();
 
-				assert.strictEqual(middlewareWasExecuted, true);
-				assert.strictEqual(middlewareChannel, 'hello');
+				assert.strictEqual(pluginWasExecuted, true);
+				assert.strictEqual(pluginChannel, 'hello');
 			});
 
-			it('Should maintain pub/sub order if onSubscribe is delayed in middleware even if client starts out in disconnected state', async function () {
-				let middlewareActions: { type: string, channel: string }[] = [];
+			it('Should maintain pub/sub order if onSubscribe is delayed in plugin even if client starts out in disconnected state', async function () {
+				let pluginActions: { type: string, channel: string }[] = [];
 
-				server.addMiddleware(
-					new InOrderMiddleware(),
+				server.addPlugin(
+					new InOrderPlugin(),
 					{
 						type: 'Subscribe',
 						async onSubscribe({ channel }) {
-							middlewareActions.push({ type: 'subscribe', channel });
+							pluginActions.push({ type: 'subscribe', channel });
 							await wait(100);
 						},
 						async onPublishIn({ channel, data }) {
-							middlewareActions.push({ type: 'publishIn', channel });
+							pluginActions.push({ type: 'publishIn', channel });
 							return data;
 						},
 					}
@@ -3654,24 +3654,24 @@ describe('Integration tests', function () {
 				}
 
 				assert.strictEqual(receivedMessage!, 'bar');
-				assert.strictEqual(middlewareActions.length, 2);
-				assert.strictEqual(middlewareActions[0].type, 'subscribe');
-				assert.strictEqual(middlewareActions[0].channel, 'foo');
-				assert.strictEqual(middlewareActions[1].type, 'publishIn');
-				assert.strictEqual(middlewareActions[1].channel, 'foo');
+				assert.strictEqual(pluginActions.length, 2);
+				assert.strictEqual(pluginActions[0].type, 'subscribe');
+				assert.strictEqual(pluginActions[0].channel, 'foo');
+				assert.strictEqual(pluginActions[1].type, 'publishIn');
+				assert.strictEqual(pluginActions[1].channel, 'foo');
 			});
 		});
 
 		describe('onPublishOut', function () {
-			it('Should run onPublishOut in middleware if client publishes to a channel', async function () {
-				let middlewareWasExecuted = false;
-				let middlewareDetails: { channel: string, data: string } | null = null;
+			it('Should run onPublishOut in plugin if client publishes to a channel', async function () {
+				let pluginWasExecuted = false;
+				let pluginDetails: { channel: string, data: string } | null = null;
 
-				server.addMiddleware({
+				server.addPlugin({
 					type: 'Publish Out',
 					async onPublishOut({ socket, transport, ...etc }) {
-						middlewareWasExecuted = true;
-						middlewareDetails = etc;
+						pluginWasExecuted = true;
+						pluginDetails = etc;
 						
 						return etc.data;
 					}
@@ -3682,10 +3682,10 @@ describe('Integration tests', function () {
 				await client.channels.subscribe('hello').listen('subscribe').once(100);
 				await client.channels.invokePublish('hello', 123);
 
-				assert.strictEqual(middlewareWasExecuted, true);
-				assert.notEqual(middlewareDetails, null);
-				assert.strictEqual(middlewareDetails!.channel, 'hello');
-				assert.strictEqual(middlewareDetails!.data, 123);
+				assert.strictEqual(pluginWasExecuted, true);
+				assert.notEqual(pluginDetails, null);
+				assert.strictEqual(pluginDetails!.channel, 'hello');
+				assert.strictEqual(pluginDetails!.data, 123);
 			});
 		});
 	});

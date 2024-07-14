@@ -19,9 +19,9 @@ export async function publishHandler(
 
 	let data = options.data;
 
-	for (const middleware of socket.server.middleware) {
-		if (middleware.onPublishIn) {
-			data = await middleware.onPublishIn({
+	for (const plugin of socket.server.plugins) {
+		if (plugin.onPublishIn) {
+			data = await plugin.onPublishIn({
 				channel: options.channel,
 				data,
 				socket,

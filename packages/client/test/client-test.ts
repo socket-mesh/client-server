@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { beforeEach, afterEach, describe, it, mock } from "node:test";
-import { ClientSocket, ClientSocketOptions, LocalStorageAuthEngine, OfflineMiddleware } from '../src/index.js';
+import { ClientSocket, ClientSocketOptions, LocalStorageAuthEngine, OfflinePlugin } from '../src/index.js';
 import { SocketStatus, RequestHandlerArgs, wait } from '../src/core/index.js';
 import { AuthStateChangeEvent, CloseEvent, DisconnectEvent } from '../src/core/socket-event.js';
 import { BasicServerMap, BasicSocketMapServer, Server, ServerSocket, listen } from '@socket-mesh/server';
@@ -625,7 +625,7 @@ describe('Integration tests', function () {
 					{},
 					clientOptions,
 					{
-						middleware: [new OfflineMiddleware()]
+						plugin: [new OfflinePlugin()]
 					}
 				)
 			);
@@ -810,9 +810,9 @@ describe('Integration tests', function () {
 		beforeEach(async function () {
 			publisherClient = new ClientSocket(clientOptions);
 
-//			server.removeMiddleware(MiddlewareType.MIDDLEWARE_INBOUND);
-//			server.setMiddleware(MiddlewareType.MIDDLEWARE_INBOUND, async (middlewareStream) => {
-//				for await (let action of middlewareStream) {
+//			server.removePlugin(PluginType.MIDDLEWARE_INBOUND);
+//			server.setPlugin(PluginType.MIDDLEWARE_INBOUND, async (pluginStream) => {
+//				for await (let action of pluginStream) {
 //					if (action.type === 'publishIn') {
 //						lastServerMessage = (action as ActionPublishIn).data;
 //					}
@@ -1049,7 +1049,7 @@ describe('Integration tests', function () {
 					{},
 					clientOptions,
 					{
-						middleware: [new OfflineMiddleware()],
+						plugin: [new OfflinePlugin()],
 						ackTimeoutMs: 2000
 					}
 				)

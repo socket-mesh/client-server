@@ -1,22 +1,22 @@
 import { RawData } from "ws";
 import { EmptySocketMap, SocketMap } from "../maps/socket-map.js";
-import { MessageRawMiddlewareArgs, Middleware, MiddlewareArgs } from "./middleware.js";
+import { MessageRawPluginArgs, Plugin, PluginArgs } from "./plugin.js";
 import { WritableConsumableStream } from "@socket-mesh/writable-consumable-stream";
 import ws from "isomorphic-ws";
 
-interface InboundMessage<T extends SocketMap> extends MessageRawMiddlewareArgs<T> {
+interface InboundMessage<T extends SocketMap> extends MessageRawPluginArgs<T> {
 	callback: (err: Error | null, data: string | ws.RawData) => void
 }
 
-export class InOrderMiddleware<T extends SocketMap = EmptySocketMap> implements Middleware<T> {
+export class InOrderPlugin<T extends SocketMap = EmptySocketMap> implements Plugin<T> {
 	type: 'inOrder'
 
 	private readonly _inboundMessageStream: WritableConsumableStream<InboundMessage<T>>;
-	//private readonly _outboundMessageStream: WritableConsumableStream<SendRequestMiddlewareArgs<T>>;
+	//private readonly _outboundMessageStream: WritableConsumableStream<SendRequestPluginArgs<T>>;
 
 	constructor() {
 		this._inboundMessageStream = new WritableConsumableStream<InboundMessage<T>>();
-		//this._outboundMessageStream = new WritableConsumableStream<SendRequestMiddlewareArgs<T>>;
+		//this._outboundMessageStream = new WritableConsumableStream<SendRequestPluginArgs<T>>;
 		this.handleInboundMessageStream();
 		//this.handleOutboundMessageStream();
 	}
@@ -58,7 +58,7 @@ export class InOrderMiddleware<T extends SocketMap = EmptySocketMap> implements 
 	}
 */
 
-	onEnd({ transport }: MiddlewareArgs<T>): void {
+	onEnd({ transport }: PluginArgs<T>): void {
 		if (transport.streamCleanupMode === 'close') {
 			this._inboundMessageStream.close();
 			//this._outboundMessageStream.close();
@@ -68,7 +68,7 @@ export class InOrderMiddleware<T extends SocketMap = EmptySocketMap> implements 
 		}
 	}
 
-	onMessageRaw(options: MessageRawMiddlewareArgs<T>): Promise<string | RawData> {
+	onMessageRaw(options: MessageRawPluginArgs<T>): Promise<string | RawData> {
 		let callback: (err: Error | null, data: string | ws.RawData) => void;
 
 		const promise = new Promise<string | RawData>((resolve, reject) => {
@@ -87,7 +87,7 @@ export class InOrderMiddleware<T extends SocketMap = EmptySocketMap> implements 
 		return promise;
 	}
 
-	//sendRequest(options: SendRequestMiddlewareArgs<T>): void {
+	//sendRequest(options: SendRequestPluginArgs<T>): void {
 	//	this._outboundMessageStream.write(options);
 	//}
 }

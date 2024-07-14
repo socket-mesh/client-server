@@ -69,42 +69,42 @@ export class AuthError extends Error {
 	}
 }
 
-export class MiddlewareError extends Error {
+export class PluginError extends Error {
 	type: string;
 
 	constructor(message: string, type: string) {
 		super(message);
 
-		this.name = 'MiddlewareError';
+		this.name = 'PluginError';
 		this.type = type;
 
-		Object.setPrototypeOf(this, MiddlewareError.prototype);
+		Object.setPrototypeOf(this, PluginError.prototype);
 	}
 }
 
-export class MiddlewareBlockedError extends Error {
+export class PluginBlockedError extends Error {
 	type: string;
 
 	constructor(message: string, type: string) {
 		super(message);
 
-		this.name = 'MiddlewareBlockedError';
+		this.name = 'PluginBlockedError';
 		this.type = type;
 
-		Object.setPrototypeOf(this, MiddlewareBlockedError.prototype);
+		Object.setPrototypeOf(this, PluginBlockedError.prototype);
 	}
 }
 
-export class SilentMiddlewareBlockedError extends Error {
+export class SilentPluginBlockedError extends Error {
 	type: string;
 
 	constructor(message: string, type: string) {
 		super(message);
 
-		this.name = 'SilentMiddlewareBlockedError';
+		this.name = 'SilentPluginBlockedError';
 		this.type = type;
 
-		Object.setPrototypeOf(this, SilentMiddlewareBlockedError.prototype);
+		Object.setPrototypeOf(this, SilentPluginBlockedError.prototype);
 	}
 }
 

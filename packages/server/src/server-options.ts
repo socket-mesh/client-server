@@ -3,7 +3,7 @@ import { AuthEngine, AuthOptions } from "@socket-mesh/auth-engine";
 import { CallIdGenerator, StreamCleanupMode } from "@socket-mesh/client/core";
 import { CodecEngine } from "@socket-mesh/formatter";
 import { HandlerMap, EmptySocketMap } from "@socket-mesh/client";
-import { ServerMiddleware } from "./middleware/server-middleware.js";
+import { ServerPlugin } from "./plugin/server-plugin.js";
 import { ServerMap } from "./maps/server-map.js";
 import { Broker } from "./broker/broker.js";
 
@@ -31,7 +31,7 @@ export interface ServerOptions<T extends ServerMap> extends ws.ServerOptions {
 
 	isPingTimeoutDisabled?: boolean,
 
-	middleware?: ServerMiddleware<T>[],
+	plugin?: ServerPlugin<T>[],
 
 	// Origins which are allowed to connect to the server.
 	origins?: string;

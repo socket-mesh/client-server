@@ -1,9 +1,9 @@
 import defaultCodec, { CodecEngine } from "@socket-mesh/formatter";
 import ws from "isomorphic-ws";
-import { Middleware } from "../middleware/middleware.js";
+import { Plugin } from "../plugins/plugin.js";
 import { AnyRequest, InvokeMethodRequest, InvokeServiceRequest, TransmitMethodRequest, TransmitServiceRequest, abortRequest, isRequestDone } from "./request.js";
 import { AnyPacket, MethodPacket, isRequestPacket } from "./packet.js";
-import { AbortError, BadConnectionError, InvalidActionError, InvalidArgumentsError, MiddlewareBlockedError, SocketProtocolError, TimeoutError, dehydrateError, hydrateError, socketProtocolErrorStatuses, socketProtocolIgnoreStatuses } from "@socket-mesh/errors";
+import { AbortError, BadConnectionError, InvalidActionError, InvalidArgumentsError, PluginBlockedError, SocketProtocolError, TimeoutError, dehydrateError, hydrateError, socketProtocolErrorStatuses, socketProtocolIgnoreStatuses } from "@socket-mesh/errors";
 import { ClientRequest, IncomingMessage } from "http";
 import { FunctionReturnType, MethodMap, ServiceMap } from "../maps/method-map.js";
 import { AnyResponse, MethodDataResponse, isResponsePacket } from "./response.js";
@@ -58,7 +58,7 @@ export class SocketTransport<T extends SocketMap> {
 	private readonly _handlers: HandlerMap<T>;
 	private _onUnhandledRequest: (socket: SocketTransport<T>, packet: AnyPacket<T>) => boolean;
 	public readonly codecEngine: CodecEngine;
-	public readonly middleware: Middleware<T>[];
+	public readonly plugins: Plugin<T>[];
 	public streamCleanupMode: StreamCleanupMode;
 	public id: string;
 	public ackTimeoutMs: number;
@@ -83,7 +83,7 @@ export class SocketTransport<T extends SocketMap> {
 		this._outboundPreparedMessageCount = 0;
 		this._outboundSentMessageCount = 0;
 		this._pingTimeoutRef = null;
-		this.middleware = options?.middleware || [];
+		this.plugins = options?.plugins || [];
 		this.streamCleanupMode = options?.streamCleanupMode || 'kill';
 	}
 
@@ -117,9 +117,9 @@ export class SocketTransport<T extends SocketMap> {
 
 			this._socket.emit('deauthenticate', { signedAuthToken, authToken });
 
-			for (const middleware of this.middleware) {
-				if (middleware.onDeauthenticate) {
-					middleware.onDeauthenticate({ socket: this.socket, transport: this });
+			for (const plugin of this.plugins) {
+				if (plugin.onDeauthenticate) {
+					plugin.onDeauthenticate({ socket: this.socket, transport: this });
 				}	
 			}
 
@@ -174,23 +174,23 @@ export class SocketTransport<T extends SocketMap> {
 		packet = toArray<AnyPacket<T> | AnyResponse<T>>(packet);
 
 		for (let curPacket of packet) {
-			let middlewareError: Error;
+			let pluginError: Error;
 
 			try {
-				for (const middleware of this.middleware) {
-					if (middleware.onMessage) {
-						curPacket = await middleware.onMessage({ socket: this.socket, transport: this, packet: curPacket, timestamp: timestamp })
+				for (const plugin of this.plugins) {
+					if (plugin.onMessage) {
+						curPacket = await plugin.onMessage({ socket: this.socket, transport: this, packet: curPacket, timestamp: timestamp })
 					}
 				}					
 			} catch (err) {
-				middlewareError = err;
+				pluginError = err;
 			}
 
 			// Check to see if it is a request or response packet. 
 			if (isResponsePacket(curPacket)) {
-				this.onResponse(curPacket, middlewareError);
+				this.onResponse(curPacket, pluginError);
 			} else if (isRequestPacket(curPacket)) {
-				await this.onRequest(curPacket, timestamp, middlewareError);
+				await this.onRequest(curPacket, timestamp, pluginError);
 			} else {
 				// TODO: Handle non packets here (binary data)
 			}
@@ -208,9 +208,9 @@ export class SocketTransport<T extends SocketMap> {
 
 		this.abortAllPendingCallbacksDueToBadConnection(prevStatus);
 
-		for (const middleware of this.middleware) {
-			if (middleware.onClose) {
-				middleware.onClose({ socket: this.socket, transport: this });
+		for (const plugin of this.plugins) {
+			if (plugin.onClose) {
+				plugin.onClose({ socket: this.socket, transport: this });
 			}
 		}
 
@@ -238,9 +238,9 @@ export class SocketTransport<T extends SocketMap> {
 			this._socket.emit('connectAbort', { code, reason });
 		}
 
-		for (const middleware of this.middleware) {
-			if (middleware.onDisconnected) {
-				middleware.onDisconnected({ socket: this.socket, transport: this, status, code, reason });
+		for (const plugin of this.plugins) {
+			if (plugin.onDisconnected) {
+				plugin.onDisconnected({ socket: this.socket, transport: this, status, code, reason });
 			}
 		}
 	}
@@ -273,12 +273,12 @@ export class SocketTransport<T extends SocketMap> {
 
 		this._inboundReceivedMessageCount++;
 
-		for (let i = 0; i < this.middleware.length; i++) {
-			const middleware = this.middleware[i];
+		for (let i = 0; i < this.plugins.length; i++) {
+			const plugin = this.plugins[i];
 
-			if (middleware.onMessageRaw) {
+			if (plugin.onMessageRaw) {
 				p = p.then(message => {
-					return middleware.onMessageRaw({ socket: this.socket, transport: this, message, timestamp, promise })
+					return plugin.onMessageRaw({ socket: this.socket, transport: this, message, timestamp, promise })
 				});	
 			}
 		}
@@ -290,7 +290,7 @@ export class SocketTransport<T extends SocketMap> {
 		.then(resolve)
 		.catch(err => {
 			reject(err);
-			if (!(err instanceof MiddlewareBlockedError)) {
+			if (!(err instanceof PluginBlockedError)) {
 				this.onError(err);
 			}
 		}).finally(() => {
@@ -300,9 +300,9 @@ export class SocketTransport<T extends SocketMap> {
 
 	protected onOpen(): void {
 		// Placeholder for inherited classes
-		for (const middleware of this.middleware) {
-			if (middleware.onOpen) {
-				middleware.onOpen({ socket: this.socket, transport: this });
+		for (const plugin of this.plugins) {
+			if (plugin.onOpen) {
+				plugin.onOpen({ socket: this.socket, transport: this });
 			}
 		}
 	}
@@ -315,7 +315,7 @@ export class SocketTransport<T extends SocketMap> {
 		this._socket.emit('pong', { data });
 	}
 
-	protected async onRequest(packet: AnyPacket<T>, timestamp: Date, middlewareError?: Error): Promise<boolean> {
+	protected async onRequest(packet: AnyPacket<T>, timestamp: Date, pluginError?: Error): Promise<boolean> {
 		this._socket.emit('request', { request: packet });
 		
 		const timeoutAt = typeof packet.ackTimeoutMs === 'number' ? new Date(timestamp.valueOf() + packet.ackTimeoutMs) : null;
@@ -324,10 +324,10 @@ export class SocketTransport<T extends SocketMap> {
 		let response: AnyResponse<T>;
 		let error: Error;
 
-		if (middlewareError) {
+		if (pluginError) {
 			wasHandled = true;
-			error = middlewareError;
-			response = { rid: packet.cid, timeoutAt, error: middlewareError };
+			error = pluginError;
+			response = { rid: packet.cid, timeoutAt, error: pluginError };
 		} else {
 			const handler = this._handlers[(packet as MethodPacket<T['Incoming']>).method];
 
@@ -374,7 +374,7 @@ export class SocketTransport<T extends SocketMap> {
 		return wasHandled;
 	}
 
-	protected onResponse(response: AnyResponse<T>, middlewareError?: Error) {
+	protected onResponse(response: AnyResponse<T>, pluginError?: Error) {
 		const map = this._callbackMap[response.rid];
 
 		if (map) {
@@ -383,8 +383,8 @@ export class SocketTransport<T extends SocketMap> {
 				delete map.timeoutId;
 			}
 
-			if (middlewareError) {
-				map.callback(middlewareError);
+			if (pluginError) {
+				map.callback(pluginError);
 			} else if ('error' in response) {
 				map.callback(hydrateError(response.error));
 			} else {
@@ -392,8 +392,8 @@ export class SocketTransport<T extends SocketMap> {
 			}
 		}
 
-		if (middlewareError) {
-			this._socket.emit('response', { response: { rid: response.rid, error: middlewareError } });
+		if (pluginError) {
+			this._socket.emit('response', { response: { rid: response.rid, error: pluginError } });
 		} else {
 			this._socket.emit('response', { response });
 		}
@@ -491,14 +491,14 @@ export class SocketTransport<T extends SocketMap> {
 			}
 		}
 
-		for (; index < this.middleware.length; index++) {
-			const middleware = this.middleware[index];
+		for (; index < this.plugins.length; index++) {
+			const plugin = this.plugins[index];
 
-			if ('sendRequest' in middleware) {
+			if ('sendRequest' in plugin) {
 				index++;
 
 				try {
-					middleware.sendRequest({
+					plugin.sendRequest({
 						socket: this.socket,
 						transport: this,
 						requests,
@@ -583,14 +583,14 @@ export class SocketTransport<T extends SocketMap> {
 			return;
 		}
 
-		for (; index < this.middleware.length; index++) {
-			const middleware = this.middleware[index];
+		for (; index < this.plugins.length; index++) {
+			const plugin = this.plugins[index];
 
-			if ('sendResponse' in middleware) {
+			if ('sendResponse' in plugin) {
 				index++;
 
 				try {
-					middleware.sendResponse({
+					plugin.sendResponse({
 						socket: this.socket,
 						transport: this,
 						responses,
@@ -668,9 +668,9 @@ export class SocketTransport<T extends SocketMap> {
 
 		this._isReady = true;
 
-		for (const middleware of this.middleware) {
-			if (middleware.onReady) {
-				middleware.onReady({ socket: this.socket, transport: this });
+		for (const plugin of this.plugins) {
+			if (plugin.onReady) {
+				plugin.onReady({ socket: this.socket, transport: this });
 			}
 		}
 
@@ -721,9 +721,9 @@ export class SocketTransport<T extends SocketMap> {
 			{ wasSigned, signedAuthToken: this._signedAuthToken, authToken:this._authToken }
 		);
 
-		for (const middleware of this.middleware) {
-			if (middleware.onAuthenticated) {
-				middleware.onAuthenticated({ socket: this.socket, transport: this });
+		for (const plugin of this.plugins) {
+			if (plugin.onAuthenticated) {
+				plugin.onAuthenticated({ socket: this.socket, transport: this });
 			}
 		}
 	}

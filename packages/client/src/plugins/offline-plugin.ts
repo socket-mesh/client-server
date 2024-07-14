@@ -1,10 +1,10 @@
 import { EmptySocketMap, SocketMap } from "../maps/socket-map.js";
 import { AnyRequest } from "../core/request.js";
-import { Middleware, SendRequestMiddlewareArgs } from "./middleware.js";
+import { Plugin, SendRequestPluginArgs } from "./plugin.js";
 
 const SYSTEM_METHODS = ['#handshake', '#removeAuthToken'];
 
-export class OfflineMiddleware<T extends SocketMap = EmptySocketMap> implements Middleware<T> {
+export class OfflinePlugin<T extends SocketMap = EmptySocketMap> implements Plugin<T> {
 	private _isReady: boolean;
 	private _requests: AnyRequest<T>[][];
 	private _continue: (requests: AnyRequest<T>[], cb?: (error?: Error) => void) => void| null;
@@ -18,7 +18,7 @@ export class OfflineMiddleware<T extends SocketMap = EmptySocketMap> implements 
 
 	type: "offline";
 
-	public sendRequest({ requests, cont }: SendRequestMiddlewareArgs<T>): void {
+	public sendRequest({ requests, cont }: SendRequestPluginArgs<T>): void {
 		if (this._isReady) {
 			cont(requests);
 			return;

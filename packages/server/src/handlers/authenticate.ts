@@ -88,10 +88,10 @@ export async function processAuthentication(
 		throw authInfo.authError;
 	}
 
-	for (const middleware of socket.server.middleware) {
-		if (middleware.onAuthenticate) {
+	for (const plugin of socket.server.plugins) {
+		if (plugin.onAuthenticate) {
 			try {
-				middleware.onAuthenticate(authInfo);
+				plugin.onAuthenticate(authInfo);
 			} catch (err) {
 				await transport.changeToUnauthenticatedState();
 

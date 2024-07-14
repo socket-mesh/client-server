@@ -1,9 +1,9 @@
 import { EmptySocketMap, SocketMap } from "../maps/socket-map.js";
 import { AnyRequest, MethodRequest, ServiceRequest } from "../core/request.js";
 import { AnyResponse } from "../core/response.js";
-import { Middleware, SendRequestMiddlewareArgs, SendResponseMiddlewareArgs } from "./middleware.js";
+import { Plugin, SendRequestPluginArgs, SendResponsePluginArgs } from "./plugin.js";
 
-export interface BatchingMiddlewareOptions {
+export interface BatchingPluginOptions {
 	// Whether or not to start batching messages immediately after the connection handshake completes. This is useful for handling
 	// connection recovery when the client tries to resubscribe to a large number of channels in a very short amount of time. Defaults to false.
 	// This lets you specify how long to enable batching (in milliseconds) following a successful socket handshake.
@@ -13,7 +13,7 @@ export interface BatchingMiddlewareOptions {
 	batchInterval?: number
 }
 
-export abstract class BatchingMiddleware<T extends SocketMap = EmptySocketMap> implements Middleware<T> {
+export abstract class BatchingPlugin<T extends SocketMap = EmptySocketMap> implements Plugin<T> {
 	public batchOnHandshakeDuration: number | boolean;
 	public batchInterval: number;
 	
@@ -21,7 +21,7 @@ export abstract class BatchingMiddleware<T extends SocketMap = EmptySocketMap> i
 	private _handshakeTimeoutId: NodeJS.Timeout | null;
 	private _isBatching: boolean;
 
-	constructor(options?: BatchingMiddlewareOptions) {
+	constructor(options?: BatchingPluginOptions) {
 		this._isBatching = false;
 		this.batchInterval = options?.batchInterval || 50;
 		this.batchOnHandshakeDuration = options?.batchOnHandshakeDuration ?? false;
@@ -97,11 +97,11 @@ export abstract class BatchingMiddleware<T extends SocketMap = EmptySocketMap> i
 	}
 }
 
-export class RequestBatchingMiddleware<T extends SocketMap = EmptySocketMap> extends BatchingMiddleware<T> {
+export class RequestBatchingPlugin<T extends SocketMap = EmptySocketMap> extends BatchingPlugin<T> {
 	private _requests: (MethodRequest<T['Outgoing']> | ServiceRequest<T['Service']>)[];
 	private _continue: (requests: AnyRequest<T>[], cb?: (error?: Error) => void) => void | null;
 
-	constructor(options?: BatchingMiddlewareOptions) {
+	constructor(options?: BatchingPluginOptions) {
 		super(options);
 
 		this.type = 'requestBatching';
@@ -124,7 +124,7 @@ export class RequestBatchingMiddleware<T extends SocketMap = EmptySocketMap> ext
 		}
 	}
 
-	public sendRequest({ requests, cont }: SendRequestMiddlewareArgs<T>): void {
+	public sendRequest({ requests, cont }: SendRequestPluginArgs<T>): void {
 		if (!this.isBatching) {
 			cont(requests);
 			return;
@@ -137,11 +137,11 @@ export class RequestBatchingMiddleware<T extends SocketMap = EmptySocketMap> ext
 	type: 'requestBatching'
 }
 
-export class ResponseBatchingMiddleware<T extends SocketMap = EmptySocketMap> extends BatchingMiddleware<T> {
+export class ResponseBatchingPlugin<T extends SocketMap = EmptySocketMap> extends BatchingPlugin<T> {
 	private _responses: AnyResponse<T>[];
 	private _continue: (requests: AnyResponse<T>[], cb?: (error?: Error) => void) => void | null;
 
-	constructor(options?: BatchingMiddlewareOptions) {
+	constructor(options?: BatchingPluginOptions) {
 		super(options);
 
 		this.type = 'responseBatching';
@@ -157,7 +157,7 @@ export class ResponseBatchingMiddleware<T extends SocketMap = EmptySocketMap> ex
 		}
 	}
 
-	public sendResponse({ responses, cont }: SendResponseMiddlewareArgs<T>): void {
+	public sendResponse({ responses, cont }: SendResponsePluginArgs<T>): void {
 		if (!this.isBatching) {
 			cont(responses);
 			return;

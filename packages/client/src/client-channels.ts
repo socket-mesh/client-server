@@ -23,7 +23,7 @@ export class ClientChannels<T extends ClientMap> extends Channels<T['Channel']> 
 		this._transport = transport;
 		this._preparingPendingSubscriptions = false;
 
-		this._transport.middleware.push({
+		this._transport.plugins.push({
 			type: 'channels',
 			onAuthenticated: () => {
 				if (!this._preparingPendingSubscriptions) {

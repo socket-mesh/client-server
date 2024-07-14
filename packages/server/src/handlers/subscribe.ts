@@ -26,9 +26,9 @@ export async function subscribeHandler(
 
 	const { channel, ...channelOptions } = options;
 
-	for (const middleware of socket.server.middleware) {
-		if (middleware.onSubscribe) {
-			await middleware.onSubscribe({ channel, options, socket, transport });
+	for (const plugin of socket.server.plugins) {
+		if (plugin.onSubscribe) {
+			await plugin.onSubscribe({ channel, options, socket, transport });
 		}
 	}
 

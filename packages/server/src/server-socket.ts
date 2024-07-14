@@ -7,11 +7,11 @@ import { ServerMap } from "./maps/server-map.js";
 import { Exchange } from "./broker/exchange.js";
 import { Server } from "./server.js";
 import { IncomingMessage } from "http";
-import { ServerMiddleware } from "./middleware/server-middleware.js";
+import { ServerPlugin } from "./plugin/server-plugin.js";
 
 export interface ServerSocketOptions<T extends ServerMap> extends SocketOptions<SocketMapFromServer<T>> {
 	handlers: HandlerMap<SocketMapFromServer<T>>,
-	middleware?: ServerMiddleware<T>[],
+	plugins?: ServerPlugin<T>[],
 	service?: string,
 	server: Server<T>,
 	request: IncomingMessage,

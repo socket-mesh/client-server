@@ -9,11 +9,11 @@ import { AuthTokenOptions } from "@socket-mesh/auth-engine";
 import { RawData } from "ws";
 import { AnyResponse, SocketStatus, SocketTransport, abortRequest, InvokeMethodRequest, InvokeServiceRequest, TransmitMethodRequest, TransmitServiceRequest } from "@socket-mesh/client/core";
 import { ClientRequest, IncomingMessage } from "http";
-import { ServerMiddleware } from "./middleware/server-middleware.js";
+import { ServerPlugin } from "./plugin/server-plugin.js";
 import { PublishOptions } from "@socket-mesh/channels";
 
 export class ServerTransport<T extends ServerMap> extends SocketTransport<SocketMapFromServer<T>> {
-	public readonly middleware: ServerMiddleware<T>[];
+	public readonly plugins: ServerPlugin<T>[];
 	public readonly service?: string;
 	public readonly request: IncomingMessage;
 
@@ -22,7 +22,7 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 
 		this.type = 'server';
 		this.request = options.request;
-		this.middleware = options.middleware;
+		this.plugins = options.plugins;
 		this.service = options.service;
 		this.webSocket = options.socket;
 
@@ -97,11 +97,11 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 					this.socket.closeListeners();
 				}
 			
-				for (let i = 0; i < this.middleware.length; i++) {
-					const middleware = this.middleware[i];
+				for (let i = 0; i < this.plugins.length; i++) {
+					const plugin = this.plugins[i];
 		
-					if (middleware.onEnd) {
-						middleware.onEnd({ socket: this.socket, transport: this });
+					if (plugin.onEnd) {
+						plugin.onEnd({ socket: this.socket, transport: this });
 					}
 				}
 			})();
@@ -158,16 +158,16 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 	protected async onPublish(options: PublishOptions): Promise<void> {
 		let data = options.data;
 
-		for (const middleware of this.middleware) {
-			if ('onPublishOut' in middleware) {
-				data = await middleware.onPublishOut({ socket: this.socket, transport: this, channel: options.channel, data });
+		for (const plugin of this.plugins) {
+			if ('onPublishOut' in plugin) {
+				data = await plugin.onPublishOut({ socket: this.socket, transport: this, channel: options.channel, data });
 			}
 		}
 
 		options.data = data;
 	}
 
-	protected override async onRequest(packet: AnyPacket<SocketMapFromServer<T>>, timestamp: Date, middlewareError?: Error): Promise<boolean> {
+	protected override async onRequest(packet: AnyPacket<SocketMapFromServer<T>>, timestamp: Date, pluginError?: Error): Promise<boolean> {
 		let wasHandled = false;
 
 		if (!this.service || !('service' in packet) || packet.service === this.service) {
@@ -176,7 +176,7 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 				return true;
 			}
 
-			wasHandled = await super.onRequest(packet, timestamp, middlewareError);
+			wasHandled = await super.onRequest(packet, timestamp, pluginError);
 		} else {
 			wasHandled = this.onUnhandledRequest(packet);
 		}

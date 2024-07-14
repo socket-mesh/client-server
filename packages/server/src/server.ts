@@ -7,7 +7,7 @@ import { ClientSocket, HandlerMap, removeAuthTokenHandler } from "@socket-mesh/c
 import { AnyPacket, CallIdGenerator, StreamCleanupMode } from "@socket-mesh/client/core";
 import { AuthEngine, defaultAuthEngine, isAuthEngine } from "@socket-mesh/auth-engine";
 import { handshakeHandler } from "./handlers/handshake.js";
-import { ServerMiddleware } from "./middleware/server-middleware.js";
+import { ServerPlugin } from "./plugin/server-plugin.js";
 import { authenticateHandler } from "./handlers/authenticate.js";
 import { CloseEvent, ConnectionEvent, ErrorEvent, HandshakeEvent, HeadersEvent, ListeningEvent, ServerEvent, ServerSocketEvent, SocketAuthenticateEvent, SocketAuthStateChangeEvent, SocketBadAuthTokenEvent, SocketCloseEvent, SocketConnectEvent, SocketConnectingEvent, SocketDeauthenticateEvent, SocketDisconnectEvent, SocketErrorEvent, SocketMessageEvent, SocketPingEvent, SocketPongEvent, SocketRemoveAuthTokenEvent, SocketRequestEvent, SocketResponseEvent, SocketSubscribeEvent, SocketSubscribeFailEvent, SocketSubscribeStateChangeEvent, SocketUnexpectedResponseEvent, SocketUnsubscribeEvent, SocketUpgradeEvent, WarningEvent } from "./server-event.js";
 import { AsyncStreamEmitter } from "@socket-mesh/async-stream-emitter";
@@ -51,7 +51,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 	public readonly socketStreamCleanupMode: StreamCleanupMode;
 	public readonly httpServer: HttpServer;
 
-	public readonly middleware: ServerMiddleware<T>[];
+	public readonly plugins: ServerPlugin<T>[];
 
 	constructor(options?: ServerOptions<T>) {
 		super();
@@ -89,7 +89,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 		);
 		this.httpServer = options.server;
 
-		this.middleware = options.middleware || [];
+		this.plugins = options.plugin || [];
 		this.origins = options.origins || '*:*';
 		this.pendingClients = {};
 		this.pendingClientCount = 0;
@@ -132,8 +132,8 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 		}
 	}
 
-	public addMiddleware(...middleware: ServerMiddleware<T>[]): void {
-		this.middleware.push(...middleware);
+	public addPlugin(...plugin: ServerPlugin<T>[]): void {
+		this.plugins.push(...plugin);
 	}
 
 	private bind(socket: ClientSocket<ClientMapFromServer<T>> | ServerSocket<T>) {
@@ -237,7 +237,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 			callIdGenerator: this._callIdGenerator,
 			codecEngine: this.codecEngine,
 			handlers: this._handlers,
-			middleware: this.middleware,
+			plugins: this.plugins,
 			onUnhandledRequest: this.onUnhandledRequest.bind(this),
 			request: upgradeReq,
 			socket: wsSocket,
@@ -352,9 +352,9 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 			}
 
 			try {
-				for (const middleware of this.middleware) {
-					if (middleware.onConnection) {
-						await middleware.onConnection(info.req);
+				for (const plugin of this.plugins) {
+					if (plugin.onConnection) {
+						await plugin.onConnection(info.req);
 					}
 				}
 			} catch (err) {

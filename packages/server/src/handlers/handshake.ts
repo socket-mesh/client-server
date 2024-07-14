@@ -17,10 +17,10 @@ export async function handshakeHandler(
 	const wasAuthenticated = !!transport.signedAuthToken;
 	const authInfo = await validateAuthToken(server.auth, options.authToken);
 
-	for (const middleware of server.middleware) {
-		if (middleware.onHandshake) {
+	for (const plugin of server.plugins) {
+		if (plugin.onHandshake) {
 			try {
-				await middleware.onHandshake({
+				await plugin.onHandshake({
 					socket,
 					transport,
 					authInfo : 'authError' in authInfo ?

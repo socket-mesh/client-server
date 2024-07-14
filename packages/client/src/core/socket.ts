@@ -2,13 +2,13 @@ import { CodecEngine } from "@socket-mesh/formatter";
 import { AnyPacket } from "./packet.js";
 import { AsyncStreamEmitter } from "@socket-mesh/async-stream-emitter";
 import { SocketEvent, AuthenticateEvent, BadAuthTokenEvent, CloseEvent, ConnectEvent, DisconnectEvent, ErrorEvent, MessageEvent, PingEvent, PongEvent, RequestEvent, UnexpectedResponseEvent, UpgradeEvent, ResponseEvent, AuthStateChangeEvent, RemoveAuthTokenEvent, ConnectingEvent, DeauthenticateEvent } from "./socket-event.js";
-import { FunctionReturnType, MethodMap, ServiceMap } from "../maps/method-map.js";
+import { FunctionReturnType } from "../maps/method-map.js";
 import { HandlerMap } from "../maps/handler-map.js";
 import { CallIdGenerator, InvokeMethodOptions, InvokeServiceOptions, SocketTransport } from "./socket-transport.js";
 import { DemuxedConsumableStream, StreamEvent } from "@socket-mesh/stream-demux";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
 import { SocketMap } from "../maps/socket-map.js";
-import { Middleware } from "../middleware/middleware.js";
+import { Plugin } from "../plugins/plugin.js";
 
 export type StreamCleanupMode = 'kill' | 'close' | 'none';
 
@@ -19,7 +19,7 @@ export interface SocketOptions<T extends SocketMap, TSocket extends Socket<T> = 
 	handlers?: HandlerMap<T>;
 	id?: string,
 	isPingTimeoutDisabled?: boolean;
-	middleware?: Middleware<T>[],
+	plugins?: Plugin<T>[],
 	onUnhandledRequest?: (socket: TSocket, packet: AnyPacket<T>) => boolean,
 	state?: T['State'],
 
