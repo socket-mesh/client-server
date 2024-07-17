@@ -10,11 +10,10 @@ import { ServerTransport } from "../src/server-transport.js";
 import { AuthInfo } from "../src/handlers/authenticate.js";
 import assert from "node:assert";
 import localStorage from "@socket-mesh/local-storage";
-import { AnyPacket, AuthStateChangeEvent, AuthenticatedChangeEvent, CloseEvent, ConnectEvent, DisconnectEvent, MethodRequestPacket, RequestHandlerArgs, isRequestPacket, wait } from "@socket-mesh/client/core";
+import { AnyPacket, AuthStateChangeEvent, AuthenticatedChangeEvent, CloseEvent, ConnectEvent, DisconnectEvent, PluginArgs, MethodRequestPacket, RequestHandlerArgs, SendRequestPluginArgs, isRequestPacket, wait } from "@socket-mesh/core";
 import { ConnectionEvent, SocketAuthStateChangeEvent } from "../src/server-event.js";
 import { PluginBlockedError } from "@socket-mesh/errors";
-import { AuthOptions } from "@socket-mesh/auth-engine";
-import { InOrderPlugin, PluginArgs, OfflinePlugin, RequestBatchingPlugin, ResponseBatchingPlugin, SendRequestPluginArgs, ServerPrivateMap, SocketMapFromClient } from "@socket-mesh/client";
+import { InOrderPlugin, OfflinePlugin, RequestBatchingPlugin, ResponseBatchingPlugin, ServerPrivateMap, SocketMapFromClient } from "@socket-mesh/client";
 import { WritableConsumableStream } from "@socket-mesh/writable-consumable-stream";
 import { SimpleBroker } from "../src/broker/simple-broker.js";
 import { ExchangeClient } from "../src/broker/exchange-client.js";
@@ -209,9 +208,13 @@ describe('Integration tests', function () {
 		beforeEach(async function () {
 			server = listen(
 				PORT_NUMBER,
-				Object.assign(
+				Object.assign<
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
+				>(
 					{
-						plugin: [{
+						plugins: [{
+							type: 'Authenticate Plugin',
 							onAuthenticate: (authInfo: AuthInfo) => {
 								if (!('authToken' in authInfo) || authInfo.authToken.username === 'alice') {
 									throw new PluginBlockedError('Blocked by onAuthenticate', 'AuthenticatePluginError');
@@ -226,7 +229,7 @@ describe('Integration tests', function () {
 
 			await server.listen('ready').once(100);
 		});
-/*
+
 		it('Should not send back error if JWT is not provided in handshake', async function () {
 			client = new ClientSocket(clientOptions);
 			const event = await client.listen('connect').once(100);
@@ -245,7 +248,7 @@ describe('Integration tests', function () {
 			const event = await client.listen('connect').once(100);
 			assert.strictEqual(event.isAuthenticated, true);
 		});
-*/
+
 		it('Should send back error if JWT is invalid during handshake', async function () {
 			global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
 
@@ -263,7 +266,7 @@ describe('Integration tests', function () {
 			assert.notEqual(event.authError, null);
 			assert.strictEqual(event.authError!.name, 'AuthTokenInvalidError');
 		});
-/*
+
 		it('Should allow switching between users', async function () {
 			global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
 
@@ -434,9 +437,8 @@ describe('Integration tests', function () {
 			assert.notEqual(event.authError, null);
 			assert.strictEqual((event.authError as PluginBlockedError).type, 'AuthenticatePluginError');
 		});
-*/
 	});
-/*
+
 	describe('Server authentication', function () {
 		it('Token should be available after the authenticate listener resolves', async function () {
 			server = listen(PORT_NUMBER, serverOptions);
@@ -662,7 +664,11 @@ describe('Integration tests', function () {
 
 			server = listen(
 				PORT_NUMBER,
-				Object.assign(
+				Object.assign<
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
+				>(
 					{},
 					serverOptions,
 					{
@@ -734,7 +740,11 @@ describe('Integration tests', function () {
 
 			server = listen(
 				PORT_NUMBER,
-				Object.assign(
+				Object.assign<
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
+				>(
 					{},
 					serverOptions,
 					{
@@ -803,7 +813,11 @@ describe('Integration tests', function () {
 			global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
 
 			server = listen(PORT_NUMBER,
-				Object.assign(
+				Object.assign<
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
+				>(
 					{},
 					serverOptions,
 					{
@@ -843,7 +857,11 @@ describe('Integration tests', function () {
 
 		it('Should remove client data from the server when client disconnects before authentication process finished', async function () {
 			server = listen(PORT_NUMBER,
-				Object.assign(
+				Object.assign<
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
+				>(
 					{},
 					serverOptions,
 					{
@@ -895,12 +913,16 @@ describe('Integration tests', function () {
 			await server.listen('ready').once();
 
 			client = new ClientSocket(
-				Object.assign(
+				Object.assign<
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>
+				>(
 					{},
 					clientOptions,
 					{
 						autoConnect: false,
-						plugin: [
+						plugins: [
 							new OfflinePlugin(),
 							{
 								type: 'Authenticate Interceptor',
@@ -960,9 +982,13 @@ describe('Integration tests', function () {
 			await server.listen('ready').once(100);
 
 			client = new ClientSocket(
-				Object.assign(
+				Object.assign<
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>
+				>(
 					{
-						plugin: [{
+						plugins: [{
+							type: 'onOpen',
 							onOpen({ transport }: PluginArgs<SocketMapFromClient<MyClientMap>>) {
 								transport.send(Buffer.alloc(0));
 							}
@@ -989,9 +1015,13 @@ describe('Integration tests', function () {
 			await server.listen('ready').once(100);
 
 			client = new ClientSocket(
-				Object.assign(
+				Object.assign<
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>
+				>(
 					{
-						plugin: [{
+						plugins: [{
+							type: 'onOpen',
 							onOpen({ transport }: PluginArgs<SocketMapFromClient<MyClientMap>>) {
 								transport.ping();
 							}
@@ -1008,7 +1038,10 @@ describe('Integration tests', function () {
 
 		it('Should not close the connection if the client tries to send a message before the handshake and strictHandshake is false', async function () {
 			server = listen(PORT_NUMBER,
-				Object.assign(
+				Object.assign<
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
+				>(
 					{ strictHandshake: false },
 					serverOptions
 				)
@@ -1017,9 +1050,13 @@ describe('Integration tests', function () {
 			await server.listen('ready').once(100);
 
 			client = new ClientSocket(
-				Object.assign(
+				Object.assign<
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>
+				>(
 					{
-						plugin: [{
+						plugins: [{
+							type: 'onOpen',
 							onOpen({ transport }: PluginArgs<SocketMapFromClient<MyClientMap>>) {
 								transport.send(Buffer.alloc(0));
 							}
@@ -1145,7 +1182,11 @@ describe('Integration tests', function () {
 
 			server = listen(
 				PORT_NUMBER,
-				Object.assign(
+				Object.assign<
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
+				>(
 					{},
 					serverOptions,
 					{
@@ -1174,11 +1215,15 @@ describe('Integration tests', function () {
 
 			for (let i = 0; i < 100; i++) {
 				client = new ClientSocket(
-					Object.assign(
+					Object.assign<
+						ClientSocketOptions<MyClientMap>,
+						ClientSocketOptions<MyClientMap>,
+						ClientSocketOptions<MyClientMap>
+					>(
 						{},
 						clientOptions,
 						{
-							plugin: [new OfflinePlugin()]
+							plugins: [new OfflinePlugin()]
 						}
 					)
 				);
@@ -1201,7 +1246,11 @@ describe('Integration tests', function () {
 	describe('Socket disconnection', function () {
 		it('Server-side socket disconnect event should not trigger if the socket did not complete the handshake; instead, it should trigger connectAbort', async function () {
 			server = listen(PORT_NUMBER,
-				Object.assign(
+				Object.assign<
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
+				>(
 					{},
 					serverOptions,
 					{
@@ -1286,7 +1335,11 @@ describe('Integration tests', function () {
 
 		it('Server-side socket disconnect event should trigger if the socket completed the handshake (not connectAbort)', async function () {
 			server = listen(PORT_NUMBER,
-				Object.assign(
+				Object.assign<
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
+				>(
 					{},
 					serverOptions,
 					{
@@ -1370,7 +1423,11 @@ describe('Integration tests', function () {
 
 		it('The close event should trigger when the socket loses the connection before the handshake', async function () {
 			server = listen(PORT_NUMBER,
-				Object.assign(
+				Object.assign<
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
+				>(
 					{},
 					serverOptions,
 					{
@@ -1431,7 +1488,11 @@ describe('Integration tests', function () {
 
 		it('The close event should trigger when the socket loses the connection after the handshake', async function () {
 			server = listen(PORT_NUMBER,
-				Object.assign(
+				Object.assign<
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
+				>(
 					{},
 					serverOptions,
 					{
@@ -1524,7 +1585,7 @@ describe('Integration tests', function () {
 								return 'bar';
 							}
 						},
-						plugin: [new InOrderPlugin()]
+						plugins: [new InOrderPlugin()]
 					}
 				)
 			);
@@ -1541,11 +1602,15 @@ describe('Integration tests', function () {
 			await server.listen('ready').once(100);
 
 			client = new ClientSocket(
-				Object.assign(
-					{},
+				Object.assign<
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>
+				>(
+				{},
 					clientOptions,
 					{
-						plugin: [new OfflinePlugin()]
+						plugins: [new OfflinePlugin()]
 					}
 				)
 			);
@@ -1607,7 +1672,11 @@ describe('Integration tests', function () {
 
 			server = listen(
 				PORT_NUMBER,
-				Object.assign(
+				Object.assign<
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
+				>(
 					{},
 					serverOptions,
 					{
@@ -1617,7 +1686,7 @@ describe('Integration tests', function () {
 								handledPackets.push(data);	
 							}
 						},
-						plugin: [new InOrderPlugin()]
+						plugins: [new InOrderPlugin()]
 					}
 				)
 			);
@@ -1659,7 +1728,11 @@ describe('Integration tests', function () {
 
 			server = listen(
 				PORT_NUMBER,
-				Object.assign(
+				Object.assign<
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
+				>(
 					{},
 					serverOptions,
 					{
@@ -1711,7 +1784,11 @@ describe('Integration tests', function () {
 
 			server = listen(
 				PORT_NUMBER,
-				Object.assign(
+				Object.assign<
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
+				>(
 					{},
 					serverOptions,
 					{
@@ -1761,7 +1838,11 @@ describe('Integration tests', function () {
 		it ('Should support invoking a remote procedure on the server', async function () {
 			server = listen(
 				PORT_NUMBER,
-				Object.assign(
+				Object.assign<
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
+				>(
 					{},
 					serverOptions,
 					{
@@ -1783,11 +1864,15 @@ describe('Integration tests', function () {
 			bindFailureHandlers(server);
 
 			client = new ClientSocket(
-				Object.assign(
+				Object.assign<
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>
+				>(
 					{},
 					clientOptions,
 					{
-						plugin: [new OfflinePlugin()]
+						plugins: [new OfflinePlugin()]
 					}
 				)
 			);
@@ -1811,7 +1896,11 @@ describe('Integration tests', function () {
 		it ('Should support receiving remote transmitted data on the server', function (context, done) {
 			server = listen(
 				PORT_NUMBER,
-				Object.assign(
+				Object.assign<
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
+				>(
 					{},
 					serverOptions,
 					{
@@ -1831,11 +1920,15 @@ describe('Integration tests', function () {
 				await wait(10);
 
 				client = new ClientSocket(
-					Object.assign(
+					Object.assign<
+						ClientSocketOptions<MyClientMap>,
+						ClientSocketOptions<MyClientMap>,
+						ClientSocketOptions<MyClientMap>
+					>(
 						{},
 						clientOptions,
 						{
-							plugin: [new OfflinePlugin()]
+							plugins: [new OfflinePlugin()]
 						}
 					)
 				);
@@ -1854,7 +1947,7 @@ describe('Integration tests', function () {
 					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
 					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>>(
 					{
-						plugin: [
+						plugins: [
 							{
 								type: 'Message Interceptor',
 								async onMessageRaw({ socket, message }) {
@@ -1920,7 +2013,7 @@ describe('Integration tests', function () {
 					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
 					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>>(
 					{
-						plugin: [
+						plugins: [
 							{
 								type: 'Send Request Interceptor',
 								sendRequest(options) {
@@ -1952,9 +2045,12 @@ describe('Integration tests', function () {
 			await server.listen('ready').once(100);
 
 			client = new ClientSocket(
-				Object.assign(
+				Object.assign<
+					ClientSocketOptions<MyClientMap>,
+					ClientSocketOptions<MyClientMap>
+				>(
 					{
-						plugin: [
+						plugins: [
 							new OfflinePlugin()
 						]
 					},
@@ -1981,9 +2077,10 @@ describe('Integration tests', function () {
 				PORT_NUMBER,
 				Object.assign<
 					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>,
-					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>>(
+					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
+				>(
 					{
-						plugin: [
+						plugins: [
 							{
 								type: 'Message Interceptor',
 								async onMessageRaw({ socket, message }) {
@@ -2124,7 +2221,7 @@ describe('Integration tests', function () {
 					ClientSocketOptions<MyClientMap>
 				>(
 					{
-						plugin: [
+						plugins: [
 							{
 								type: 'Subscribe handshake test',
 								onOpen({ transport }) {
@@ -2178,7 +2275,7 @@ describe('Integration tests', function () {
 					ClientSocketOptions<MyClientMap>
 				>(
 					{
-						plugin: [
+						plugins: [
 							{
 								type: 'Subscribe handshake test',
 								onOpen({ transport }) {
@@ -2623,7 +2720,7 @@ describe('Integration tests', function () {
 					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
 				>(
 					{
-						plugin: [
+						plugins: [
 							{
 								type: 'Received Server Messages',
 								async onMessageRaw({ message }) {
@@ -2675,7 +2772,7 @@ describe('Integration tests', function () {
 					ClientSocketOptions<MyClientMap>
 				>(
 					{
-						plugin: [
+						plugins: [
 							{
 								type: 'Received Client Messages',
 								async onMessageRaw({ message }) {
@@ -2746,7 +2843,7 @@ describe('Integration tests', function () {
 					ServerOptions<BasicServerMap<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>
 				>(
 					{
-						plugin: [
+						plugins: [
 							new ResponseBatchingPlugin({
 								batchOnHandshakeDuration: 400,
 								batchInterval: 50
@@ -2768,7 +2865,7 @@ describe('Integration tests', function () {
 				>(
 					{
 						autoConnect: false,
-						plugin: [
+						plugins: [
 							new RequestBatchingPlugin({
 								batchOnHandshakeDuration: 100,
 								batchInterval: 50
@@ -3689,5 +3786,4 @@ describe('Integration tests', function () {
 			});
 		});
 	});
-*/
 });

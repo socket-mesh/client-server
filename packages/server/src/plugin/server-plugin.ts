@@ -1,7 +1,7 @@
 import { IncomingMessage } from "http";
 import { ServerMap } from "../maps/server-map.js";
 import { SocketMapFromServer } from "../maps/socket-map.js";
-import { Plugin } from "@socket-mesh/client";
+import { Plugin } from "@socket-mesh/core";
 import { AuthInfo } from "../handlers/authenticate.js";
 import { ServerSocket } from "../server-socket.js";
 import { ServerTransport } from "../server-transport.js";

@@ -1,5 +1,5 @@
 import { HandshakeOptions, HandshakeStatus } from "@socket-mesh/client";
-import { RequestHandlerArgs, wait } from "@socket-mesh/client/core";
+import { RequestHandlerArgs, wait } from "@socket-mesh/core";
 import { BasicServerMap } from "../maps/server-map.js";
 import { BasicSocketMapServer } from "../maps/socket-map.js";
 import { processAuthentication, validateAuthToken } from "./authenticate.js";

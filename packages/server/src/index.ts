@@ -4,7 +4,7 @@ import { ServerOptions } from "./server-options.js";
 import { ServerMap } from "./maps/server-map.js";
 export { Server } from "./server.js";
 export { ServerSocket } from "./server-socket.js";
-export { PluginType } from "@socket-mesh/client";
+export { PluginType } from "@socket-mesh/core";
 export { BasicServerMap } from "./maps/server-map.js";
 export { BasicSocketMapServer } from "./maps/socket-map.js";
 

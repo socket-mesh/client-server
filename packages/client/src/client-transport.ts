@@ -1,16 +1,12 @@
-import { SocketStatus } from "./core/socket.js";
+import { AnyPacket, AnyResponse, FunctionReturnType, InvokeMethodOptions, InvokeServiceOptions, SocketTransport, SocketStatus } from "@socket-mesh/core";
 import ws from "isomorphic-ws";
 import { ClientAuthEngine, LocalStorageAuthEngine, isAuthEngine } from "./client-auth-engine.js";
-import { FunctionReturnType } from "./maps/method-map.js";
 import { hydrateError, socketProtocolErrorStatuses } from "@socket-mesh/errors";
 import { ServerPrivateMap, HandshakeStatus } from "./maps/server-map.js";
-import { InvokeMethodOptions, InvokeServiceOptions, SocketTransport } from "./core/socket-transport.js";
 import { AutoReconnectOptions, ClientSocketOptions, ConnectOptions } from "./client-socket-options.js";
 import { AuthToken } from "@socket-mesh/auth";
 import { SocketMapFromClient } from "./maps/socket-map.js";
 import { ClientMap } from "./maps/client-map.js";
-import { AnyPacket } from "./core/packet.js";
-import { AnyResponse } from "./core/response.js";
 
 export class ClientTransport<T extends ClientMap> extends SocketTransport<SocketMapFromClient<T>> {
 	public readonly authEngine: ClientAuthEngine;

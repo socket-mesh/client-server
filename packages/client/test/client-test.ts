@@ -1,8 +1,7 @@
 import assert from 'node:assert';
 import { beforeEach, afterEach, describe, it, mock } from "node:test";
 import { ClientSocket, ClientSocketOptions, LocalStorageAuthEngine, OfflinePlugin } from '../src/index.js';
-import { SocketStatus, RequestHandlerArgs, wait } from '../src/core/index.js';
-import { AuthStateChangeEvent, CloseEvent, DisconnectEvent } from '../src/core/socket-event.js';
+import { AuthStateChangeEvent, CloseEvent, DisconnectEvent, SocketStatus, RequestHandlerArgs, wait } from '@socket-mesh/core';
 import { BasicServerMap, BasicSocketMapServer, Server, ServerSocket, listen } from '@socket-mesh/server';
 import localStorage from '@socket-mesh/local-storage';
 import jwt from "jsonwebtoken";
@@ -625,7 +624,7 @@ describe('Integration tests', function () {
 					{},
 					clientOptions,
 					{
-						plugin: [new OfflinePlugin()]
+						plugins: [new OfflinePlugin()]
 					}
 				)
 			);
@@ -1049,7 +1048,7 @@ describe('Integration tests', function () {
 					{},
 					clientOptions,
 					{
-						plugin: [new OfflinePlugin()],
+						plugins: [new OfflinePlugin()],
 						ackTimeoutMs: 2000
 					}
 				)

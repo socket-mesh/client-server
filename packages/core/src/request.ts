@@ -1,5 +1,5 @@
-import { MethodMap, ServiceMap } from "../maps/method-map.js";
-import { SocketMap } from "../maps/socket-map.js";
+import { MethodMap, ServiceMap } from "./maps/method-map.js";
+import { SocketMap } from "./maps/socket-map.js";
 import { toArray } from "./utils.js";
 
 export type AnyRequest<T extends SocketMap> =

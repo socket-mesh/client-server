@@ -2,7 +2,7 @@ import { BrokerError, InvalidActionError } from "@socket-mesh/errors";
 import { BasicServerMap } from "../maps/server-map.js";
 import { BasicSocketMapServer } from "../maps/socket-map.js";
 import { SubscribeOptions } from "@socket-mesh/client";
-import { RequestHandlerArgs } from "@socket-mesh/client/core";
+import { RequestHandlerArgs } from "@socket-mesh/core";
 import { ServerSocket } from "../server-socket.js";
 import { ServerTransport } from "../server-transport.js";
 

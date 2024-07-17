@@ -1,4 +1,4 @@
-import { RequestHandlerArgs } from "../core/request-handler.js";
+import { RequestHandlerArgs } from "@socket-mesh/core";
 import { ClientSocket } from "../client-socket.js";
 import { ClientTransport } from "../client-transport.js";
 import { ClientMap, KickOutOptions } from "../maps/client-map.js";

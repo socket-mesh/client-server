@@ -1,18 +1,18 @@
 import defaultCodec, { CodecEngine } from "@socket-mesh/formatter";
 import ws from "isomorphic-ws";
-import { Plugin } from "../plugins/plugin.js";
+import { Plugin } from "./plugins/plugin.js";
 import { AnyRequest, InvokeMethodRequest, InvokeServiceRequest, TransmitMethodRequest, TransmitServiceRequest, abortRequest, isRequestDone } from "./request.js";
 import { AnyPacket, MethodPacket, isRequestPacket } from "./packet.js";
 import { AbortError, BadConnectionError, InvalidActionError, InvalidArgumentsError, PluginBlockedError, SocketProtocolError, TimeoutError, dehydrateError, hydrateError, socketProtocolErrorStatuses, socketProtocolIgnoreStatuses } from "@socket-mesh/errors";
 import { ClientRequest, IncomingMessage } from "http";
-import { FunctionReturnType, MethodMap, ServiceMap } from "../maps/method-map.js";
+import { FunctionReturnType, MethodMap, ServiceMap } from "./maps/method-map.js";
 import { AnyResponse, MethodDataResponse, isResponsePacket } from "./response.js";
-import { HandlerMap } from "../maps/handler-map.js";
+import { HandlerMap } from "./maps/handler-map.js";
 import { AuthToken, extractAuthTokenData, SignedAuthToken } from "@socket-mesh/auth";
 import { Socket, SocketOptions, SocketStatus, StreamCleanupMode } from "./socket.js";
 import base64id from "base64id";
 import { RequestHandlerArgs } from "./request-handler.js";
-import { SocketMap } from "../maps/socket-map.js";
+import { SocketMap } from "./maps/socket-map.js";
 import { toArray, wait } from "./utils.js";
 
 export type CallIdGenerator = () => number;

@@ -45,8 +45,7 @@ function generateAuthKey(): string {
 }
 
 export function defaultAuthEngine(options?: AuthOptions): AuthEngine {
-	return Object.assign<AuthOptions, AuthEngine>(
-		options,
+	return Object.assign<AuthEngine, AuthOptions>(
 		{
 			signToken(token: object, signOptions?: jwt.SignOptions): Promise<string> {
 				signOptions = Object.assign({}, signOptions || {});
@@ -111,14 +110,14 @@ export function defaultAuthEngine(options?: AuthOptions): AuthEngine {
 				if (typeof signedToken === 'string' || signedToken == null) {
 					let publicKey: jwt.Secret;
 
-					if (typeof options.authKey === 'object' && 'public' in options.authKey) {
-						publicKey = options.authKey.public;
+					if (typeof this.authKey === 'object' && 'public' in this.authKey) {
+						publicKey = this.authKey.public;
 					} else {
-						if (!options.authKey == null) {
-							options.authKey = generateAuthKey();
+						if (!this.authKey == null) {
+							this.authKey = generateAuthKey();
 						}
 			
-						publicKey = options.authKey;
+						publicKey = this.authKey;
 					}
 							
 					return new Promise((resolve, reject) => {
@@ -138,6 +137,7 @@ export function defaultAuthEngine(options?: AuthOptions): AuthEngine {
 					new InvalidArgumentsError('Invalid token format - Token must be a string')
 				);
 			}
-		}
+		},
+		options
 	);
 }

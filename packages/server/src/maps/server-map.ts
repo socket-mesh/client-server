@@ -1,5 +1,6 @@
 import { ChannelMap } from "@socket-mesh/channels";
-import { ClientPrivateMap, PrivateMethodMap, PublicMethodMap, ServerPrivateMap, ServiceMap } from "@socket-mesh/client";
+import { ClientPrivateMap, ServerPrivateMap } from "@socket-mesh/client";
+import { PrivateMethodMap, PublicMethodMap, ServiceMap } from "@socket-mesh/core";
 import { ServerSocketState } from "../server-socket-state.js";
 
 export interface ServerMap {

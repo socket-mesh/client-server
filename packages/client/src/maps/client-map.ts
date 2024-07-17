@@ -1,6 +1,6 @@
 import { SignedAuthToken } from "@socket-mesh/auth";
 import { ChannelMap, PublishOptions } from "@socket-mesh/channels";
-import { MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap } from "./method-map.js"
+import { MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap } from "@socket-mesh/core";
 
 export interface ClientMap {
 	Channel: ChannelMap,

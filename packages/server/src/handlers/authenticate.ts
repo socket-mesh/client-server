@@ -1,4 +1,4 @@
-import { RequestHandlerArgs, SocketTransport } from "@socket-mesh/client/core";
+import { RequestHandlerArgs, SocketTransport } from "@socket-mesh/core";
 import jwt from "jsonwebtoken";
 import { AuthTokenError, AuthTokenExpiredError, AuthTokenInvalidError, AuthTokenNotBeforeError, InvalidActionError } from "@socket-mesh/errors";
 import { AuthEngine } from "@socket-mesh/auth-engine";

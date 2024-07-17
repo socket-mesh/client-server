@@ -1,6 +1,5 @@
 import { SignedAuthToken } from "@socket-mesh/auth";
-import { ChannelMap, ChannelOptions, PublishOptions } from "@socket-mesh/channels";
-import { PrivateMethodMap, PublicMethodMap, ServiceMap } from "./method-map.js";
+import { ChannelOptions, PublishOptions } from "@socket-mesh/channels";
 
 export interface HandshakeOptions {
 	authToken: SignedAuthToken

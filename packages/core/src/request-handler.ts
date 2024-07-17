@@ -1,7 +1,7 @@
 import { TimeoutError } from "@socket-mesh/errors";
 import { Socket } from "./socket.js";
 import { SocketTransport } from "./socket-transport.js";
-import { EmptySocketMap, SocketMap } from "../maps/socket-map.js";
+import { EmptySocketMap, SocketMap } from "./maps/socket-map.js";
 
 export interface RequestHandlerArgsOptions<
 	TOptions,

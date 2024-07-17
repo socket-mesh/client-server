@@ -8,7 +8,7 @@ import {
 	RemoveAuthTokenEvent,
 	DeauthenticateEvent,
 	AuthStateChangeEvent
-} from "@socket-mesh/client/core";
+} from "@socket-mesh/core";
 import { ServerMap } from "./maps/server-map.js";
 import { ClientMapFromServer } from "./maps/client-map.js";
 import { SubscribeEvent, SubscribeFailEvent, SubscribeStateChangeEvent, UnsubscribeEvent } from "@socket-mesh/channels";

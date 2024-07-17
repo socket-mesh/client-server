@@ -1,5 +1,4 @@
-import { HandlerMap } from "@socket-mesh/client";
-import { Socket, SocketOptions } from "@socket-mesh/client/core";
+import { HandlerMap, Socket, SocketOptions } from "@socket-mesh/core";
 import ws from "ws";
 import { ServerTransport } from "./server-transport.js";
 import { SocketMapFromServer } from "./maps/socket-map.js";

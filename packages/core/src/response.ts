@@ -1,5 +1,5 @@
-import { MethodMap, ServiceMap } from "../maps/method-map.js";
-import { SocketMap } from "../maps/socket-map.js";
+import { MethodMap, ServiceMap } from "./maps/method-map.js";
+import { SocketMap } from "./maps/socket-map.js";
 
 export type AnyResponse<T extends SocketMap> =
 	Response | ErrorResponse | ServiceDataResponse<T['Service']> | MethodDataResponse<T['PrivateOutgoing']> | MethodDataResponse<T['Outgoing']>;

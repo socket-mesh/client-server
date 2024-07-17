@@ -1,4 +1,6 @@
+export * from "./maps/index.js";
 export * from "./packet.js";
+export * from "./plugins/index.js";
 export * from "./request.js";
 export * from "./request-handler.js";
 export * from "./response.js";

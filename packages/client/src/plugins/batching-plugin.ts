@@ -1,7 +1,5 @@
-import { EmptySocketMap, SocketMap } from "../maps/socket-map.js";
-import { AnyRequest, MethodRequest, ServiceRequest } from "../core/request.js";
-import { AnyResponse } from "../core/response.js";
-import { Plugin, SendRequestPluginArgs, SendResponsePluginArgs } from "./plugin.js";
+import { EmptySocketMap, SocketMap } from "@socket-mesh/core";
+import { AnyResponse, AnyRequest, MethodRequest, Plugin, SendRequestPluginArgs, SendResponsePluginArgs, ServiceRequest } from "@socket-mesh/core";
 
 export interface BatchingPluginOptions {
 	// Whether or not to start batching messages immediately after the connection handshake completes. This is useful for handling

@@ -1,4 +1,4 @@
-import { RequestHandlerArgs } from "@socket-mesh/client/core";
+import { RequestHandlerArgs } from "@socket-mesh/core";
 import { BasicSocketMapServer } from "../maps/socket-map.js";
 import { InvalidActionError } from "@socket-mesh/errors";
 import { PublishOptions } from "@socket-mesh/channels";

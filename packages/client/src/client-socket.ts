@@ -1,11 +1,10 @@
-import { Socket } from "./core/socket.js";
 import { ClientTransport } from "./client-transport.js";
 import { AutoReconnectOptions, ClientSocketOptions, ConnectOptions, parseClientOptions } from "./client-socket-options.js";
 import { setAuthTokenHandler } from "./handlers/set-auth-token.js";
 import { removeAuthTokenHandler } from "./handlers/remove-auth-token.js";
 import { SignedAuthToken } from "@socket-mesh/auth";
 import { hydrateError } from "@socket-mesh/errors";
-import { wait } from "./core/utils.js";
+import { Socket, wait } from "@socket-mesh/core";
 import { ClientChannels } from "./client-channels.js";
 import { SocketMapFromClient } from "./maps/socket-map.js";
 import { ClientMap } from "./maps/client-map.js";

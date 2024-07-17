@@ -3,7 +3,7 @@ import { ClientRequest, IncomingMessage } from "http";
 import { MethodPacket, ServicePacket } from "./packet.js";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
 import { AnyResponse } from "./response.js";
-import { SocketMap } from "../maps/socket-map.js";
+import { SocketMap } from "./maps/socket-map.js";
 
 export type SocketEvent<T extends SocketMap> =
 	AuthStateChangeEvent |

@@ -1,5 +1,5 @@
 import ws from "isomorphic-ws";
-import { SocketOptions } from "./core/socket.js";
+import { SocketOptions } from "@socket-mesh/core";
 import { ClientAuthEngine, LocalStorageAuthEngineOptions } from "./client-auth-engine.js";
 import { SocketMapFromClient } from "./maps/socket-map.js";
 import { ClientMap } from "./maps/client-map.js";

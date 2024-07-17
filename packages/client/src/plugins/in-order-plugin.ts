@@ -1,6 +1,5 @@
 import { RawData } from "ws";
-import { EmptySocketMap, SocketMap } from "../maps/socket-map.js";
-import { MessageRawPluginArgs, Plugin, PluginArgs } from "./plugin.js";
+import { EmptySocketMap, MessageRawPluginArgs, Plugin, PluginArgs, SocketMap } from "@socket-mesh/core";
 import { WritableConsumableStream } from "@socket-mesh/writable-consumable-stream";
 import ws from "isomorphic-ws";
 

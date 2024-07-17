@@ -1,4 +1,4 @@
-import { RequestHandlerArgs } from "@socket-mesh/client/core";
+import { RequestHandlerArgs } from "@socket-mesh/core";
 import { BasicSocketMapServer } from "../maps/socket-map.js";
 import { BrokerError } from "@socket-mesh/errors";
 import { ServerSocket } from "../server-socket.js";

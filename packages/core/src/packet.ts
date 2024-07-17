@@ -1,5 +1,5 @@
-import { MethodMap, ServiceMap } from "../maps/method-map.js";
-import { SocketMap } from "../maps/socket-map.js";
+import { MethodMap, ServiceMap } from "./maps/method-map.js";
+import { SocketMap } from "./maps/socket-map.js";
 
 export type AnyPacket<T extends SocketMap> = ServicePacket<T['Service']> | MethodPacket<T['Incoming']>;
 

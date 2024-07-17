@@ -25,7 +25,18 @@
   "bugs": {
 		"url": "https://github.com/socket-mesh/auth/issues"
   },
+	"devDependencies": {
+		"@types/base64id": "^2.0.2",
+		"@types/ws": "^8.5.11"
+	},
 	"dependencies": {
-		"@socket-mesh/errors": "^3.2.0"	
+		"@socket-mesh/async-stream-emitter": "^7.1.2",
+		"@socket-mesh/auth": "^2.2.0",
+		"@socket-mesh/errors": "^3.2.0",
+		"@socket-mesh/formatter": "^4.1.0",
+		"@socket-mesh/stream-demux": "^10.1.5",
+		"base64id": "^2.0.0",
+		"isomorphic-ws": "^5.0.0",
+		"ws": "^8.18.0"
 	}
 }

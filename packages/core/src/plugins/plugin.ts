@@ -1,9 +1,9 @@
 import { EmptySocketMap, SocketMap } from "../maps/socket-map.js";
-import { AnyPacket } from "../core/packet.js";
-import { AnyRequest } from "../core/request.js";
-import { AnyResponse } from "../core/response.js";
-import { SocketTransport } from "../core/socket-transport.js";
-import { Socket, SocketStatus } from "../core/socket.js";
+import { AnyPacket } from "../packet.js";
+import { AnyRequest } from "../request.js";
+import { AnyResponse } from "../response.js";
+import { SocketTransport } from "../socket-transport.js";
+import { Socket, SocketStatus } from "../socket.js";
 import ws from "isomorphic-ws";
 import { HandlerMap } from "../maps/handler-map.js";
 

@@ -1,6 +1,4 @@
-import { EmptySocketMap, SocketMap } from "../maps/socket-map.js";
-import { AnyRequest } from "../core/request.js";
-import { Plugin, SendRequestPluginArgs } from "./plugin.js";
+import { AnyRequest, EmptySocketMap, Plugin, SendRequestPluginArgs, SocketMap } from "@socket-mesh/core";
 
 const SYSTEM_METHODS = ['#handshake', '#removeAuthToken'];
 

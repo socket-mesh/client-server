@@ -4,11 +4,12 @@
 		"packages/*"
 	],	
 	"scripts": {
-		"build": "npm run build:auth && npm run build:errors && npm run build:auth-engine && npm run build:formatter && npm run build:channels && npm run build:client && npm run build:server",
+		"build": "npm run build:auth && npm run build:errors && npm run build:formatter && npm run build:core && npm run build:channels && npm run build:client && npm run build:auth-engine && npm run build:server",
 		"build:auth": "cd packages/auth && npm run build",
 		"build:auth-engine": "cd packages/auth-engine && npm run build",
 		"build:channels": "cd packages/channels && npm run build",
 		"build:client": "cd packages/client && npm run build",
+		"build:core": "cd packages/core && npm run build",
 		"build:formatter": "cd packages/formatter && npm run build",
 		"build:errors": "cd packages/errors && npm run build",
 		"build:server": "cd packages/server && npm run build",

@@ -3,8 +3,8 @@ import { ServerProtocolError } from "@socket-mesh/errors";
 import { ServerSocket } from "./server-socket.js";
 import { IncomingMessage, Server as HttpServer, OutgoingHttpHeaders } from 'http';
 import defaultCodec, { CodecEngine } from "@socket-mesh/formatter";
-import { ClientSocket, HandlerMap, removeAuthTokenHandler } from "@socket-mesh/client";
-import { AnyPacket, CallIdGenerator, StreamCleanupMode } from "@socket-mesh/client/core";
+import { ClientSocket, removeAuthTokenHandler } from "@socket-mesh/client";
+import { AnyPacket, CallIdGenerator, HandlerMap, StreamCleanupMode } from "@socket-mesh/core";
 import { AuthEngine, defaultAuthEngine, isAuthEngine } from "@socket-mesh/auth-engine";
 import { handshakeHandler } from "./handlers/handshake.js";
 import { ServerPlugin } from "./plugin/server-plugin.js";
@@ -89,7 +89,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 		);
 		this.httpServer = options.server;
 
-		this.plugins = options.plugin || [];
+		this.plugins = options.plugins || [];
 		this.origins = options.origins || '*:*';
 		this.pendingClients = {};
 		this.pendingClientCount = 0;

@@ -1,4 +1,4 @@
-import { RequestHandlerArgs } from "../core/request-handler.js";
+import { RequestHandlerArgs } from "@socket-mesh/core";
 
 export async function removeAuthTokenHandler(
 	{ transport }: RequestHandlerArgs<void>

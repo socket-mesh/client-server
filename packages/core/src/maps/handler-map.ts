@@ -1,4 +1,4 @@
-import { RequestHandler } from "../core/request-handler.js";
+import { RequestHandler } from "../request-handler.js";
 import { SocketMap } from "./socket-map.js";
 
 export type HandlerMap<T extends SocketMap> = Partial<

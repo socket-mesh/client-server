@@ -1,4 +1,3 @@
-import { AnyPacket } from "@socket-mesh/client/core";
 import { ServerMap } from "./maps/server-map.js";
 import { ServerSocket, ServerSocketOptions } from "./server-socket.js";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
@@ -7,7 +6,7 @@ import { SocketMapFromServer } from "./maps/socket-map.js";
 import jwt from 'jsonwebtoken';
 import { AuthTokenOptions } from "@socket-mesh/auth-engine";
 import { RawData } from "ws";
-import { AnyResponse, SocketStatus, SocketTransport, abortRequest, InvokeMethodRequest, InvokeServiceRequest, TransmitMethodRequest, TransmitServiceRequest } from "@socket-mesh/client/core";
+import { AnyPacket, AnyResponse, SocketStatus, SocketTransport, abortRequest, InvokeMethodRequest, InvokeServiceRequest, TransmitMethodRequest, TransmitServiceRequest } from "@socket-mesh/core";
 import { ClientRequest, IncomingMessage } from "http";
 import { ServerPlugin } from "./plugin/server-plugin.js";
 import { PublishOptions } from "@socket-mesh/channels";
