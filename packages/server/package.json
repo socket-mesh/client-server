@@ -3,14 +3,15 @@
 	"description": "A TCP socket pair for easily transmitting full messages without worrying about request size limits.",
 	"version": "18.1.0",
   "type": "module",
-  "main": "src/index.js",
-	"types": "src/index.d.ts",
+  "main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"files": ["./dist"],
 	"author": {
 		"name": "Greg Kimmy"
 	},
 	"scripts": {
-		"build": "node ../../scripts/build.mjs && tsc",
-		"deploy": "cd dist && npm publish --access public",
+    "build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
+		"deploy": "npm publish --access public",
 		"test": "cross-env node --test --import=./run-test.js test/server-test.ts"
 	},
 	"devDependencies": {

@@ -3,11 +3,12 @@
   "version": "2.2.0",
   "description": "Auth module for SocketMesh",
   "type": "module",
-  "main": "src/index.js",
-	"types": "src/index.d.ts",
+  "main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"files": ["./dist"],
   "scripts": {
-    "build": "node ../../scripts/build.mjs && tsc",
-    "deploy": "cd dist && npm publish --access public",
+    "build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
+    "deploy": "npm publish --access public",
     "test": "cross-env node --test --loader ts-node/esm test/index.spec.ts"
   },
   "keywords": [

@@ -10,7 +10,6 @@ import { AnyResponse, MethodDataResponse, isResponsePacket } from "./response.js
 import { HandlerMap } from "./maps/handler-map.js";
 import { AuthToken, extractAuthTokenData, SignedAuthToken } from "@socket-mesh/auth";
 import { Socket, SocketOptions, SocketStatus, StreamCleanupMode } from "./socket.js";
-import base64id from "base64id";
 import { RequestHandlerArgs } from "./request-handler.js";
 import { SocketMap } from "./maps/socket-map.js";
 import { toArray, wait } from "./utils.js";
@@ -60,7 +59,7 @@ export class SocketTransport<T extends SocketMap> {
 	public readonly codecEngine: CodecEngine;
 	public readonly plugins: Plugin<T>[];
 	public streamCleanupMode: StreamCleanupMode;
-	public id: string;
+	public id: string | null;
 	public ackTimeoutMs: number;
 
 	private _pingTimeoutRef: NodeJS.Timeout | null;
@@ -77,7 +76,7 @@ export class SocketTransport<T extends SocketMap> {
 		this._callbackMap = {};
 		this.codecEngine = options?.codecEngine || defaultCodec;
 		this._handlers = options?.handlers || {};
-		this.id = (options?.id || base64id.generateId());
+		this.id = null;
 		this._inboundProcessedMessageCount = 0;
 		this._inboundReceivedMessageCount = 0;
 		this._outboundPreparedMessageCount = 0;

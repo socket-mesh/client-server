@@ -2,8 +2,9 @@
 	"name": "@socket-mesh/main",
 	"workspaces": [
 		"packages/*"
-	],	
+	],
 	"scripts": {
+		"bundle": "cd packages/client && npm run bundle",
 		"build": "npm run build:auth && npm run build:errors && npm run build:formatter && npm run build:core && npm run build:channels && npm run build:client && npm run build:auth-engine && npm run build:server",
 		"build:auth": "cd packages/auth && npm run build",
 		"build:auth-engine": "cd packages/auth-engine && npm run build",
@@ -20,9 +21,9 @@
 		"test:server": "cd packages/server && npm run test"
 	},
 	"devDependencies": {
-		"@types/node": "^20.14.10",
+		"@types/node": "^20.14.11",
 		"cross-env": "^7.0.3",
 		"ts-node": "^10.9.2",
 		"typescript": "^5.5.3"
-	}	
+	}
 }

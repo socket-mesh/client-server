@@ -11,6 +11,7 @@ import { ServerPlugin } from "./plugin/server-plugin.js";
 export interface ServerSocketOptions<T extends ServerMap> extends SocketOptions<SocketMapFromServer<T>> {
 	handlers: HandlerMap<SocketMapFromServer<T>>,
 	plugins?: ServerPlugin<T>[],
+	id?: string,
 	service?: string,
 	server: Server<T>,
 	request: IncomingMessage,

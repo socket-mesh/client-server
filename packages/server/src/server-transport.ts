@@ -10,6 +10,7 @@ import { AnyPacket, AnyResponse, SocketStatus, SocketTransport, abortRequest, In
 import { ClientRequest, IncomingMessage } from "http";
 import { ServerPlugin } from "./plugin/server-plugin.js";
 import { PublishOptions } from "@socket-mesh/channels";
+import base64id from "base64id";
 
 export class ServerTransport<T extends ServerMap> extends SocketTransport<SocketMapFromServer<T>> {
 	public readonly plugins: ServerPlugin<T>[];
@@ -24,6 +25,7 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		this.plugins = options.plugins;
 		this.service = options.service;
 		this.webSocket = options.socket;
+		this.id = (options.id || base64id.generateId());		
 
 		// Server is not set on socket until the socket constructor is completed so pull it from the options.
 		this.resetPingTimeout(

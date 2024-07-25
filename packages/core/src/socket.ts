@@ -17,7 +17,6 @@ export interface SocketOptions<T extends SocketMap, TSocket extends Socket<T> = 
 	callIdGenerator?: CallIdGenerator,
 	codecEngine?: CodecEngine,
 	handlers?: HandlerMap<T>;
-	id?: string,
 	isPingTimeoutDisabled?: boolean;
 	plugins?: Plugin<T>[],
 	onUnhandledRequest?: (socket: TSocket, packet: AnyPacket<T>) => boolean,

@@ -3,8 +3,9 @@
 	"description": "Module for serializing and unserializing SocketMesh messages.",
 	"version": "4.1.0",
 	"type": "module",
-  "main": "src/index.js",
-	"types": "src/index.d.ts",
+  "main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"files": ["./dist"],
 	"contributors": [
 		"Greg Kimmy"
 	],
@@ -13,8 +14,8 @@
 		"url": "git://github.com/socket-mesh/formatter.git"
 	},
 	"scripts": {
-		"build": "node ../../scripts/build.mjs && tsc",
-		"deploy": "cd dist && npm publish --access public",
+    "build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
+		"deploy": "npm publish --access public",
 		"test": "cross-env node --test --loader ts-node/esm test/index.spec.ts"
 	},
 	"keywords": [

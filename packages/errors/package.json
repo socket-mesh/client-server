@@ -3,12 +3,13 @@
 	"version": "3.2.0",
 	"description": "Error types for use throughout SocketMesh",
   "type": "module",
-  "main": "src/index.js",
-	"types": "src/index.d.ts",
+  "main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"files": ["./dist"],
 	"author": "Greg Kimmy",
 	"scripts": {
-		"build": "node ../../scripts/build.mjs && tsc",
-		"deploy": "cd dist && npm publish",
+    "build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
+		"deploy": "npm publish",
 		"test": "echo \"Error: no test specified\" && exit 1"
 	},
 	"repository": {
