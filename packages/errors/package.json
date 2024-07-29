@@ -14,7 +14,7 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "git://github.com/socket-mesh/errors.git"
+		"url": "git+https://github.com/socket-mesh/client-server.git"
 	},
 	"keywords": [
 		"errors",
@@ -22,7 +22,7 @@
 	],
 	"license": "MIT",
 	"bugs": {
-		"url": "https://github.com/socket-mesh/errors/issues"
+		"url": "https://github.com/socket-mesh/client-server/labels/errors"
 	},
 	"homepage": "https://github.com/socket-mesh/main/tree/main/packages/errors#README.md"
 }

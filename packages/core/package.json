@@ -21,10 +21,10 @@
 	"homepage": "https://github.com/socket-mesh/main/tree/main/packages/core#README.md",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/socket-mesh/auth.git"
+    "url": "git+https://github.com/socket-mesh/client-server.git"
   },
   "bugs": {
-		"url": "https://github.com/socket-mesh/auth/issues"
+		"url": "https://github.com/socket-mesh/client-server/labels/core"
   },
 	"devDependencies": {
 		"@types/base64id": "^2.0.2",

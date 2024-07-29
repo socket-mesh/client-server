@@ -21,10 +21,10 @@
 	"homepage": "https://github.com/socket-mesh/main/tree/main/packages/auth-engine#README.md",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/socket-mesh/auth.git"
+    "url": "git+https://github.com/socket-mesh/client-server.git"
   },
   "bugs": {
-		"url": "https://github.com/socket-mesh/auth/issues"
+		"url": "https://github.com/socket-mesh/client-server/labels/auth-engine"
   },
 	"devDependencies": {
 		"@types/clone-deep": "^4.0.4"

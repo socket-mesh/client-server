@@ -18,6 +18,13 @@
     "deploy": "npm run build && node ../../scripts/publish.mjs",
 		"test": "cross-env node --test --import=./run-test.js test/client-test.ts"
 	},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/socket-mesh/client-server.git"
+  },
+  "bugs": {
+		"url": "https://github.com/socket-mesh/client-server/labels/client"
+  },
 	"devDependencies": {
 		"@rollup/plugin-alias": "^5.1.0",
 		"@rollup/plugin-commonjs": "^26.0.1",

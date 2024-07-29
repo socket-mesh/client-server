@@ -11,7 +11,7 @@
 	],
 	"repository": {
 		"type": "git",
-		"url": "git://github.com/socket-mesh/formatter.git"
+		"url": "git+https://github.com/socket-mesh/client-server.git"
 	},
 	"scripts": {
     "build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
@@ -30,7 +30,7 @@
 	],
 	"license": "MIT",
 	"bugs": {
-		"url": "https://github.com/socket-mesh/formatter/issues"
+		"url": "https://github.com/socket-mesh/client-server/labels/formatter"
 	},
 	"homepage": "https://github.com/socket-mesh/main/tree/main/packages/formatter#README.md",
 	"directories": {

@@ -14,6 +14,13 @@
     "deploy": "npm run build && node ../../scripts/publish.mjs",
 		"test": "cross-env node --test --import=./run-test.js test/server-test.ts"
 	},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/socket-mesh/client-server.git"
+  },
+  "bugs": {
+		"url": "https://github.com/socket-mesh/client-server/labels/channels"
+  },	
 	"dependencies": {
 		"@socket-mesh/async-stream-emitter": "^7.1.2",
 		"@socket-mesh/consumable-stream": "^3.2.1",
