@@ -9,7 +9,7 @@
 	"author": "Greg Kimmy",
 	"scripts": {
     "build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
-		"deploy": "npm publish",
+    "deploy": "npm run build && node ../../scripts/publish.mjs",
 		"test": "echo \"Error: no test specified\" && exit 1"
 	},
 	"repository": {

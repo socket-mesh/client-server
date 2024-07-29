@@ -11,7 +11,7 @@
 	},
 	"scripts": {
     "build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
-		"deploy": "npm publish --access public",
+    "deploy": "npm run build && node ../../scripts/publish.mjs",
 		"test": "cross-env node --test --import=./run-test.js test/server-test.ts"
 	},
 	"dependencies": {
