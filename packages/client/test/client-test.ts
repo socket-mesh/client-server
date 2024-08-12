@@ -40,7 +40,7 @@ interface MyClientMap {
 	Outgoing: ServerIncomingMap,
 	PrivateOutgoing: {},
 	State: {}
-};
+}
 
 const allowedUsers: { [name: string]: true } = {
 	bob: true,

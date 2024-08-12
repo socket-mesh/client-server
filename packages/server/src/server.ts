@@ -9,7 +9,7 @@ import { AuthEngine, defaultAuthEngine, isAuthEngine } from "@socket-mesh/auth-e
 import { handshakeHandler } from "./handlers/handshake.js";
 import { ServerPlugin } from "./plugin/server-plugin.js";
 import { authenticateHandler } from "./handlers/authenticate.js";
-import { CloseEvent, ConnectionEvent, ErrorEvent, HandshakeEvent, HeadersEvent, ListeningEvent, ServerEvent, ServerSocketEvent, SocketAuthenticateEvent, SocketAuthStateChangeEvent, SocketBadAuthTokenEvent, SocketCloseEvent, SocketConnectEvent, SocketConnectingEvent, SocketDeauthenticateEvent, SocketDisconnectEvent, SocketErrorEvent, SocketMessageEvent, SocketPingEvent, SocketPongEvent, SocketRemoveAuthTokenEvent, SocketRequestEvent, SocketResponseEvent, SocketSubscribeEvent, SocketSubscribeFailEvent, SocketSubscribeStateChangeEvent, SocketUnexpectedResponseEvent, SocketUnsubscribeEvent, SocketUpgradeEvent, WarningEvent } from "./server-event.js";
+import { CloseEvent, ConnectionEvent, ErrorEvent, HandshakeEvent, HeadersEvent, ListeningEvent, ServerEvent, SocketAuthenticateEvent, SocketAuthStateChangeEvent, SocketBadAuthTokenEvent, SocketCloseEvent, SocketConnectEvent, SocketConnectingEvent, SocketDeauthenticateEvent, SocketDisconnectEvent, SocketErrorEvent, SocketMessageEvent, SocketPingEvent, SocketPongEvent, SocketRemoveAuthTokenEvent, SocketRequestEvent, SocketResponseEvent, SocketSubscribeEvent, SocketSubscribeFailEvent, SocketSubscribeStateChangeEvent, SocketUnsubscribeEvent, WarningEvent } from "./server-event.js";
 import { AsyncStreamEmitter } from "@socket-mesh/async-stream-emitter";
 import { DemuxedConsumableStream, StreamEvent } from "@socket-mesh/stream-demux";
 import { ServerOptions } from "./server-options.js";
@@ -399,8 +399,6 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 	emit(event: 'socketSubscribeRequest', data: SocketSubscribeEvent<T>): void;
 	emit(event: 'socketSubscribeStateChange', data: SocketSubscribeStateChangeEvent<T>): void;
 	emit(event: 'socketUnsubscribe', data: SocketUnsubscribeEvent<T>): void;
-	emit(event: 'socketUnexpectedResponse', data: SocketUnexpectedResponseEvent<T>): void;
-	emit(event: 'socketUpgrade', data: SocketUpgradeEvent<T>): void;
 	emit(event: "warning", data: WarningEvent): void;
 	emit(event: string, data: any): void {
 		super.emit(event, data);
@@ -435,8 +433,6 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 	listen(event: 'socketSubscribeRequest'): DemuxedConsumableStream<SocketSubscribeEvent<T>>;
 	listen(event: 'socketSubscribeStateChange'): DemuxedConsumableStream<SocketSubscribeStateChangeEvent<T>>;
 	listen(event: 'socketUnsubscribe'): DemuxedConsumableStream<SocketUnsubscribeEvent<T>>;
-	listen(event: 'socketUnexpectedResponse'): DemuxedConsumableStream<SocketUnexpectedResponseEvent<T>>;
-	listen(event: 'socketUpgrade'): DemuxedConsumableStream<SocketUpgradeEvent<T>>;
 	listen(event: "warning"): DemuxedConsumableStream<WarningEvent>;
 	listen(event?: string): DemuxedConsumableStream<StreamEvent<any>> | DemuxedConsumableStream<ServerEvent<T>> {
 		return super.listen(event);

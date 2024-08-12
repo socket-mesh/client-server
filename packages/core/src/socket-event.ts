@@ -20,9 +20,7 @@ export type SocketEvent<T extends SocketMap> =
 	PingEvent |
 	PongEvent |
 	RequestEvent<T> |
-	ResponseEvent<T> |
-	UnexpectedResponseEvent |
-	UpgradeEvent;
+	ResponseEvent<T>;
 
 export type AuthStateChangeEvent = AuthenticatedChangeEvent | DeauthenticatedChangeEvent;
 
@@ -101,13 +99,4 @@ export interface RequestEvent<T extends SocketMap> {
 
 export interface ResponseEvent<T extends SocketMap> {
 	response: AnyResponse<T>
-}
-
-export interface UnexpectedResponseEvent {
-	request: ClientRequest,
-	response: IncomingMessage
-}
-
-export interface UpgradeEvent {
-	request: IncomingMessage
 }

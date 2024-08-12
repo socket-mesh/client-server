@@ -3,10 +3,7 @@ import { ClientSocket } from "@socket-mesh/client";
 import { ServerSocket } from "./server-socket.js";
 import {
 	AuthenticateEvent, BadAuthTokenEvent, ConnectEvent, CloseEvent as SCloseEvent, DisconnectEvent, ErrorEvent as SErrorEvent,
-	MessageEvent, PingEvent, PongEvent, RequestEvent, ResponseEvent, UnexpectedResponseEvent, UpgradeEvent,
-	ConnectingEvent,
-	RemoveAuthTokenEvent,
-	DeauthenticateEvent,
+	MessageEvent, PingEvent, PongEvent, RequestEvent, ResponseEvent, ConnectingEvent, RemoveAuthTokenEvent, DeauthenticateEvent,
 	AuthStateChangeEvent
 } from "@socket-mesh/core";
 import { ServerMap } from "./maps/server-map.js";
@@ -36,8 +33,6 @@ export type ServerEvent<T extends ServerMap> =
 	SocketRemoveAuthTokenEvent<T> |
 	SocketRequestEvent<T> |
 	SocketResponseEvent<T> |
-	SocketUnexpectedResponseEvent<T> |
-	SocketUpgradeEvent<T> |
 	WarningEvent;
 
 export interface ConnectionEvent<T extends ServerMap> {
@@ -108,7 +103,3 @@ export type SocketSubscribeFailEvent<T extends ServerMap> = SubscribeFailEvent &
 export type SocketSubscribeStateChangeEvent<T extends ServerMap> = SubscribeStateChangeEvent & ServerSocketEvent<T>;
 
 export type SocketUnsubscribeEvent<T extends ServerMap> = UnsubscribeEvent & ServerSocketEvent<T>;
-
-export type SocketUnexpectedResponseEvent<T extends ServerMap> = UnexpectedResponseEvent & ServerSocketEvent<T>;
-
-export type SocketUpgradeEvent<T extends ServerMap> = UpgradeEvent & ServerSocketEvent<T>;

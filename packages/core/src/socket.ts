@@ -1,7 +1,7 @@
 import { CodecEngine } from "@socket-mesh/formatter";
 import { AnyPacket } from "./packet.js";
 import { AsyncStreamEmitter } from "@socket-mesh/async-stream-emitter";
-import { SocketEvent, AuthenticateEvent, BadAuthTokenEvent, CloseEvent, ConnectEvent, DisconnectEvent, ErrorEvent, MessageEvent, PingEvent, PongEvent, RequestEvent, UnexpectedResponseEvent, UpgradeEvent, ResponseEvent, AuthStateChangeEvent, RemoveAuthTokenEvent, ConnectingEvent, DeauthenticateEvent } from "./socket-event.js";
+import { SocketEvent, AuthenticateEvent, BadAuthTokenEvent, CloseEvent, ConnectEvent, DisconnectEvent, ErrorEvent, MessageEvent, PingEvent, PongEvent, RequestEvent, ResponseEvent, AuthStateChangeEvent, RemoveAuthTokenEvent, ConnectingEvent, DeauthenticateEvent } from "./socket-event.js";
 import { FunctionReturnType } from "./maps/method-map.js";
 import { HandlerMap } from "./maps/handler-map.js";
 import { CallIdGenerator, InvokeMethodOptions, InvokeServiceOptions, SocketTransport } from "./socket-transport.js";
@@ -101,8 +101,6 @@ export class Socket<T extends SocketMap> extends AsyncStreamEmitter<SocketEvent<
 	emit(event: 'removeAuthToken', data: RemoveAuthTokenEvent): void;
 	emit(event: 'request', data: RequestEvent<T>): void;
 	emit(event: 'response', data: ResponseEvent<T>): void;
-	emit(event: 'unexpectedResponse', data: UnexpectedResponseEvent): void;
-	emit(event: 'upgrade', data: UpgradeEvent): void;
 	emit(event: string, data?: SocketEvent<T>): void {
 		super.emit(event, data);
 	}
@@ -125,8 +123,6 @@ export class Socket<T extends SocketMap> extends AsyncStreamEmitter<SocketEvent<
 	listen(event: 'removeAuthToken'): DemuxedConsumableStream<RemoveAuthTokenEvent>;
 	listen(event: 'request'): DemuxedConsumableStream<RequestEvent<T>>;
 	listen(event: 'response'): DemuxedConsumableStream<ResponseEvent<T>>;
-	listen(event: 'unexpectedResponse'): DemuxedConsumableStream<UnexpectedResponseEvent>;
-	listen(event: 'upgrade'): DemuxedConsumableStream<UpgradeEvent>;
 	listen<U extends SocketEvent<T>, V = U>(event: string): DemuxedConsumableStream<V>;
 	listen<U extends SocketEvent<T>, V = U>(event?: string): DemuxedConsumableStream<V> {
 		return super.listen(event);

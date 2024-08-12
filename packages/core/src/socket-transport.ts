@@ -259,7 +259,7 @@ export class SocketTransport<T extends SocketMap> {
 		this.sendRequest([request as AnyRequest<T>]);
 	}
 
-	protected onMessage(data: ws.RawData, isBinary: boolean): void {
+	protected onMessage(data: ws.Data, isBinary: boolean): void {
 		const timestamp = new Date();
 		let p = Promise.resolve(isBinary ? data : data.toString());
 		let resolve: () => void;
@@ -398,6 +398,18 @@ export class SocketTransport<T extends SocketMap> {
 		}
 	}
 
+	private onSocketClose(event: ws.CloseEvent): void {
+		this.onClose(event.code, event.reason);
+	}
+
+	private onSocketError(event: ws.ErrorEvent): void {
+		this.onError(event.error);
+	}
+
+	private onSocketMessage(event: ws.MessageEvent): void {
+		this.onMessage(event.data, false);
+	}
+
 	protected onTransmit<
 		TService extends keyof T['Service'],
 		TServiceMethod extends keyof T['Service'][TService],
@@ -408,20 +420,12 @@ export class SocketTransport<T extends SocketMap> {
 		this.sendRequest([request as TransmitMethodRequest<T["Outgoing"], TMethod>]);
 	}
 
-	protected onUnexpectedResponse(request: ClientRequest, response: IncomingMessage): void {
-		this._socket.emit('unexpectedResponse', { request, response });
-	}
-
 	protected onUnhandledRequest(packet: AnyPacket<T>): boolean {
 		if (this._onUnhandledRequest) {
 			return this._onUnhandledRequest(this, packet);
 		}
 
 		return false;
-	}
-
-	protected onUpgrade(request: IncomingMessage): void {
-		this._socket.emit('upgrade', { request });
 	}
 
 	public ping(): Promise<void> {
@@ -921,36 +925,32 @@ export class SocketTransport<T extends SocketMap> {
 	
 	protected set webSocket(value: ws.WebSocket | null) {
 		if (this._webSocket) {
-			this._webSocket.off('open', this.onOpen);
-			this._webSocket.off('close', this.onClose);
-			this._webSocket.off('error', this.onError);
-			this._webSocket.off('upgrade', this.onUpgrade);
-			this._webSocket.off('message', this.onMessage);
+			this._webSocket.onclose = null;
+			this._webSocket.onerror = null;
+			this._webSocket.onmessage = null;
+			this._webSocket.onopen = null;
+
 			this._webSocket.off('ping', this.onPing);
 			this._webSocket.off('pong', this.onPong);
-			this._webSocket.off('unexpectedResponse', this.onUnexpectedResponse);
 
+			delete this.onSocketClose;
+			delete this.onSocketError;
+			delete this.onSocketMessage;
 			delete this.onOpen;
-			delete this.onClose;
-			delete this.onError;
-			delete this.onUpgrade;
-			delete this.onMessage;
 			delete this.onPing;
 			delete this.onPong;
-			delete this.onUnexpectedResponse;
 		}
 
 		this._webSocket = value;
 
 		if (value) {
-			this._webSocket.on('open', this.onOpen = this.onOpen.bind(this));
-			this._webSocket.on('close', this.onClose = this.onClose.bind(this));
-			this._webSocket.on('error', this.onError = this.onError.bind(this));
-			this._webSocket.on('upgrade', this.onUpgrade = this.onUpgrade.bind(this));
-			this._webSocket.on('message', this.onMessage = this.onMessage.bind(this));
+			this._webSocket.onclose = this.onSocketClose = this.onSocketClose.bind(this);
+			this._webSocket.onopen = this.onOpen = this.onOpen.bind(this);
+			this._webSocket.onerror = this.onSocketError = this.onSocketError.bind(this);
+			this._webSocket.onmessage = this.onSocketMessage = this.onSocketMessage.bind(this);
+
 			this._webSocket.on('ping', this.onPing = this.onPing.bind(this));
 			this._webSocket.on('pong', this.onPong = this.onPong.bind(this));
-			this._webSocket.on('unexpectedResponse', this.onUnexpectedResponse = this.onUnexpectedResponse.bind(this));
 		}
 	}	
 }

@@ -5,9 +5,9 @@ import { AuthError, BrokerError, InvalidActionError, socketProtocolErrorStatuses
 import { SocketMapFromServer } from "./maps/socket-map.js";
 import jwt from 'jsonwebtoken';
 import { AuthTokenOptions } from "@socket-mesh/auth-engine";
-import { RawData } from "ws";
+import { Data } from "ws";
 import { AnyPacket, AnyResponse, SocketStatus, SocketTransport, abortRequest, InvokeMethodRequest, InvokeServiceRequest, TransmitMethodRequest, TransmitServiceRequest } from "@socket-mesh/core";
-import { ClientRequest, IncomingMessage } from "http";
+import { IncomingMessage } from "http";
 import { ServerPlugin } from "./plugin/server-plugin.js";
 import { PublishOptions } from "@socket-mesh/channels";
 import base64id from "base64id";
@@ -51,7 +51,7 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		return false;
 	}
 	
-	protected override decode(data: string | RawData): AnyPacket<SocketMapFromServer<T>> | AnyPacket<SocketMapFromServer<T>>[] | AnyResponse<SocketMapFromServer<T>> | AnyResponse<SocketMapFromServer<T>>[] | null {
+	protected override decode(data: Data): AnyPacket<SocketMapFromServer<T>> | AnyPacket<SocketMapFromServer<T>>[] | AnyResponse<SocketMapFromServer<T>> | AnyResponse<SocketMapFromServer<T>>[] | null {
 		const packet = super.decode(data);
 
 		if ((packet === null || typeof packet !== 'object') && this.socket.server.strictHandshake && this.status === 'connecting') {
@@ -135,7 +135,7 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 			});
 	}
 
-	protected override onMessage(data: RawData, isBinary: boolean): void {
+	protected override onMessage(data: Data, isBinary: boolean): void {
 		this.socket.server.emit('socketMessage', { socket: this.socket, data, isBinary });
 		super.onMessage(data, isBinary);
 	}
@@ -206,16 +206,6 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 			.catch(err => {
 				abortRequest(request as TransmitMethodRequest<T["Outgoing"], TMethod>, err);
 			});
-	}
-
-	protected override onUpgrade(request: IncomingMessage): void {
-		super.onUpgrade(request);
-		this.socket.server.emit('socketUpgrade', { socket: this.socket, request });
-	}
-	
-	protected override onUnexpectedResponse(request: ClientRequest, response: IncomingMessage): void {
-		super.onUnexpectedResponse(request, response);
-		this.socket.server.emit('socketUnexpectedResponse', { socket: this.socket, request, response });
 	}
 
 	public override async setAuthorization(authToken: AuthToken, options?: AuthTokenOptions): Promise<boolean>;

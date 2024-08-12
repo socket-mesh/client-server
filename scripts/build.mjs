@@ -1,5 +1,5 @@
-import fs from 'fs';
-import Path from 'path';
+import fs from 'node:fs';
+import Path from 'node:path';
 
 function rmDirSync(path) {
 	if (fs.existsSync(path)) {

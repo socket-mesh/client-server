@@ -100,7 +100,7 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 		}
 
 		if (this.status === 'closed') {
-			this.webSocket = new ws.WebSocket(this._uri, this._wsOptions);
+			this.webSocket = new ws(this._uri, this._wsOptions);
 
 			this.socket.emit('connecting', {});
 
