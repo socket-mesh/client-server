@@ -114,13 +114,6 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 		return this._connectAttempts;
 	}
 
-	protected override decode(data: string | ws.RawData):
-		AnyPacket<SocketMapFromClient<T>> | AnyPacket<SocketMapFromClient<T>>[] |
-		AnyResponse<SocketMapFromClient<T>> | AnyResponse<SocketMapFromClient<T>>[] {
-		
-		return super.decode(data);
-	}
-
 	public override disconnect(code=1000, reason?: string) {
 		if (code !== 4007) {
 			this.resetReconnect();
@@ -183,9 +176,10 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 			});
 	}
 
-	protected override onPing(data: Buffer) {
+	protected override onPingPong() {
+		this.send('');
 		this.resetPingTimeout(this.isPingTimeoutDisabled ? false : this.pingTimeoutMs, 4000);
-		super.onPing(data);
+		this.socket.emit('ping', {});
 	}
 
 	protected override onClose(code: number, reason?: Buffer) {

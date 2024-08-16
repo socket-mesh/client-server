@@ -6,7 +6,7 @@ import { SocketMapFromServer } from "./maps/socket-map.js";
 import jwt from 'jsonwebtoken';
 import { AuthTokenOptions } from "@socket-mesh/auth-engine";
 import { Data } from "ws";
-import { AnyPacket, AnyResponse, SocketStatus, SocketTransport, abortRequest, InvokeMethodRequest, InvokeServiceRequest, TransmitMethodRequest, TransmitServiceRequest } from "@socket-mesh/core";
+import { AnyPacket, AnyResponse, SocketStatus, SocketTransport, abortRequest, InvokeMethodRequest, InvokeServiceRequest, TransmitMethodRequest, TransmitServiceRequest, InboundMessage } from "@socket-mesh/core";
 import { IncomingMessage } from "http";
 import { ServerPlugin } from "./plugin/server-plugin.js";
 import { PublishOptions } from "@socket-mesh/channels";
@@ -51,15 +51,13 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		return false;
 	}
 	
-	protected override decode(data: Data): AnyPacket<SocketMapFromServer<T>> | AnyPacket<SocketMapFromServer<T>>[] | AnyResponse<SocketMapFromServer<T>> | AnyResponse<SocketMapFromServer<T>>[] | null {
-		const packet = super.decode(data);
-
+	protected handleInboudMessage({ packet, timestamp }: InboundMessage<SocketMapFromServer<T>>): Promise<void> {
 		if ((packet === null || typeof packet !== 'object') && this.socket.server.strictHandshake && this.status === 'connecting') {
 			this.disconnect(4009);
-			return null;
+			return;
 		}
 
-		return packet;
+		return super.handleInboudMessage({ packet, timestamp });
 	}
 
 	protected override onClose(code: number, reason?: string | Buffer): void {
@@ -140,6 +138,7 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		super.onMessage(data, isBinary);
 	}
 
+/*
 	protected override onPing(data: Buffer): void {
 		if (this.socket.server.strictHandshake && this.status === 'connecting') {
 			this.disconnect(4009);
@@ -149,11 +148,17 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		super.onPing(data);
 		this.socket.server.emit('socketPing', { socket: this.socket, data });	
 	}
+*/
 
-	protected override onPong(data: Buffer): void {
+	protected override onPingPong(): void {
+		if (this.socket.server.strictHandshake && this.status === 'connecting') {
+			this.disconnect(4009);
+			return;
+		}
+
 		this.resetPingTimeout(this.socket.server.isPingTimeoutDisabled ? false : this.socket.server.pingTimeoutMs, 4001);
-		super.onPong(data);
-		this.socket.server.emit('socketPong', { socket: this.socket, data });
+		this.socket.emit('pong', {});
+		this.socket.server.emit('socketPong', { socket: this.socket });
 	}
 
 	protected async onPublish(options: PublishOptions): Promise<void> {
@@ -206,6 +211,10 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 			.catch(err => {
 				abortRequest(request as TransmitMethodRequest<T["Outgoing"], TMethod>, err);
 			});
+	}
+
+	public ping(): Promise<void> {
+		return this.send('');
 	}
 
 	public override async setAuthorization(authToken: AuthToken, options?: AuthTokenOptions): Promise<boolean>;

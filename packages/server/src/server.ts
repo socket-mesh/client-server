@@ -43,10 +43,10 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 
 	public readonly auth: AuthEngine;
 	public readonly brokerEngine: Broker<T['Channel']>;
-	public readonly clients: { [ id: string ]: ClientSocket<ClientMapFromServer<T>> | ServerSocket<T> };
+	public readonly clients: { [ id: string ]: ServerSocket<T> };
 	public clientCount: number;
 	public readonly codecEngine: CodecEngine;
-	public readonly pendingClients: { [ id: string ]: ClientSocket<ClientMapFromServer<T>> | ServerSocket<T> };	
+	public readonly pendingClients: { [ id: string ]: ServerSocket<T> };	
 	public pendingClientCount: number;
 	public readonly socketStreamCleanupMode: StreamCleanupMode;
 	public readonly httpServer: HttpServer;
@@ -136,7 +136,8 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 		this.plugins.push(...plugin);
 	}
 
-	private bind(socket: ClientSocket<ClientMapFromServer<T>> | ServerSocket<T>) {
+	private bind(socket: ServerSocket<T>) {
+/*
 		if (socket.type === 'client') {
 			(async () => {
 				for await (let event of socket.listen()) {
@@ -162,6 +163,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 				}
 			})();	
 		}
+*/
 
 		(async () => {
 			for await (let {} of socket.listen('connect')) {

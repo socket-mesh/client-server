@@ -128,10 +128,6 @@ export class Socket<T extends SocketMap> extends AsyncStreamEmitter<SocketEvent<
 		return super.listen(event);
 	}
 
-	public ping(): Promise<void> {
-		return this._transport.ping();
-	}
-
 	public get status(): SocketStatus {
 		return this._transport.status;
 	}

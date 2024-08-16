@@ -1009,7 +1009,7 @@ describe('Integration tests', function () {
 			assert.strictEqual(results[1].reason, 'Server received a message before the client handshake');
 		});
 
-		it('Should close the connection if the client tries to send a ping before the handshake', async function () {
+		it('Should close the connection if the client tries to send a pong before the handshake', async function () {
 			server = listen(PORT_NUMBER, serverOptions);
 
 			await server.listen('ready').once(100);
@@ -1023,7 +1023,7 @@ describe('Integration tests', function () {
 						plugins: [{
 							type: 'onOpen',
 							onOpen({ transport }: PluginArgs<SocketMapFromClient<MyClientMap>>) {
-								transport.ping();
+								transport.send('');
 							}
 						}]
 					},

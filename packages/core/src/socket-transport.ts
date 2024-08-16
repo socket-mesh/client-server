@@ -33,9 +33,9 @@ interface InvokeCallback<T> {
 	callback: (err: Error, result?: T) => void
 }
 
-interface InboundMessage {
+export interface InboundMessage<T extends SocketMap> {
 	timestamp: Date,
-	data: string | ws.RawData
+	packet: (AnyPacket<T> | AnyResponse<T>) | (AnyPacket<T> | AnyResponse<T>)[]
 }
 
 interface WebSocketError extends Error {
@@ -163,9 +163,7 @@ export class SocketTransport<T extends SocketMap> {
 		return this._outboundPreparedMessageCount - this._outboundSentMessageCount;
 	}
 
-	private async handleInboudMessage({ data, timestamp }: InboundMessage): Promise<void> {
-		let packet: (AnyPacket<T> | AnyResponse<T>) | (AnyPacket<T> | AnyResponse<T>)[] | null = this.decode(data);
-
+	protected async handleInboudMessage({ packet, timestamp }: InboundMessage<T>): Promise<void> {
 		if (packet === null) {
 			return;
 		}
@@ -260,8 +258,15 @@ export class SocketTransport<T extends SocketMap> {
 	}
 
 	protected onMessage(data: ws.Data, isBinary: boolean): void {
+		data = isBinary ? data : data.toString();
+
+		if (data === '') {
+			this.onPingPong();
+			return;
+		}
+
 		const timestamp = new Date();
-		let p = Promise.resolve(isBinary ? data : data.toString());
+		let p = Promise.resolve(data);
 		let resolve: () => void;
 		let reject: (err: Error) => void;
 
@@ -283,8 +288,10 @@ export class SocketTransport<T extends SocketMap> {
 		}
 
 		p.then(data => {
+			const packet: (AnyPacket<T> | AnyResponse<T>) | (AnyPacket<T> | AnyResponse<T>)[] | null = this.decode(data);
+
 			this._socket.emit('message', { data, isBinary });	
-			return this.handleInboudMessage({ data, timestamp });
+			return this.handleInboudMessage({ packet, timestamp });
 		})
 		.then(resolve)
 		.catch(err => {
@@ -305,14 +312,8 @@ export class SocketTransport<T extends SocketMap> {
 			}
 		}
 	}
-	
-	protected onPing(data: Buffer): void {
-		this._socket.emit('ping', { data });
-	}
 
-	protected onPong(data: Buffer): void {
-		this._socket.emit('pong', { data });
-	}
+	protected onPingPong(): void {}
 
 	protected async onRequest(packet: AnyPacket<T>, timestamp: Date, pluginError?: Error): Promise<boolean> {
 		this._socket.emit('request', { request: packet });
@@ -426,18 +427,6 @@ export class SocketTransport<T extends SocketMap> {
 		}
 
 		return false;
-	}
-
-	public ping(): Promise<void> {
-		return new Promise<void>((resolve, reject) => {
-			this.webSocket.ping(undefined, undefined, (err) => {
-				if (err) {
-					reject(err);
-				} else {
-					resolve();
-				}
-			});
-		});
 	}
 
 	protected resetPingTimeout(timeoutMs: number | false, code: number) {
@@ -930,15 +919,10 @@ export class SocketTransport<T extends SocketMap> {
 			this._webSocket.onmessage = null;
 			this._webSocket.onopen = null;
 
-			this._webSocket.off('ping', this.onPing);
-			this._webSocket.off('pong', this.onPong);
-
 			delete this.onSocketClose;
 			delete this.onSocketError;
 			delete this.onSocketMessage;
 			delete this.onOpen;
-			delete this.onPing;
-			delete this.onPong;
 		}
 
 		this._webSocket = value;
@@ -948,9 +932,6 @@ export class SocketTransport<T extends SocketMap> {
 			this._webSocket.onopen = this.onOpen = this.onOpen.bind(this);
 			this._webSocket.onerror = this.onSocketError = this.onSocketError.bind(this);
 			this._webSocket.onmessage = this.onSocketMessage = this.onSocketMessage.bind(this);
-
-			this._webSocket.on('ping', this.onPing = this.onPing.bind(this));
-			this._webSocket.on('pong', this.onPong = this.onPong.bind(this));
 		}
 	}	
 }

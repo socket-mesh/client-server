@@ -53,6 +53,10 @@ export class ServerSocket<T extends ServerMap> extends Socket<SocketMapFromServe
 		}
 	}
 
+	public get exchange(): Exchange<T['Channel']> {
+		return this.server.exchange;
+	}
+
 	kickOut(channel: string, message: string): Promise<void[]> {
 		const channels = channel ? [channel] : Object.keys(this.state.channelSubscriptions);
 
@@ -62,8 +66,8 @@ export class ServerSocket<T extends ServerMap> extends Socket<SocketMapFromServe
 		}));
 	}
 
-	public get exchange(): Exchange<T['Channel']> {
-		return this.server.exchange;
+	public ping(): Promise<void> {
+		return this._serverTransport.ping();
 	}
 
 	get service(): string {

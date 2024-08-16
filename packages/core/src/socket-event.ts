@@ -81,13 +81,9 @@ export interface MessageEvent {
 	isBinary: boolean
 }
 
-export interface PingEvent {
-	data: Buffer
-}
+export interface PingEvent {}
 
-export interface PongEvent {
-	data: Buffer
-}
+export interface PongEvent {}
 
 export interface RemoveAuthTokenEvent {
 	oldAuthToken: SignedAuthToken
