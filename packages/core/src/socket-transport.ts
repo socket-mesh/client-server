@@ -539,27 +539,34 @@ export class SocketTransport<T extends SocketMap> {
 			return rest;
 		});
 
-		this._webSocket.send(
-			this.codecEngine.encode(encode.length === 1 ? encode[0] : encode),
-			(err?: WebSocketError) => {
-				for (const req of requests) {
-					if (err?.code === 'ECONNRESET') {
-						err = new BadConnectionError(
-							`Socket ${'callback' in req ? 'invoke' : 'transmit' } ${String(req.method)} event was aborted due to a bad connection`,
-							'connectAbort'
-						);
-					}
+		let sendErr: WebSocketError;
 
-					if (req.sentCallback) {
-						req.sentCallback(err);
-					}
+		this.send(
+			this.codecEngine.encode(encode.length === 1 ? encode[0] : encode)
+		).catch(err => {
+			sendErr = err;
+		}).then(() => {
+			const errCode = sendErr?.code;
 
-					if (err && 'callback' in req) {
-						req.callback(err);
-					}
+			for (const req of requests) {
+				if (errCode === 'ECONNRESET') {
+					sendErr = new BadConnectionError(
+						`Socket ${'callback' in req ? 'invoke' : 'transmit' } ${String(req.method)} event was aborted due to a bad connection`,
+						'connectAbort'
+					);
+				}
+
+				if (req.sentCallback) {
+					req.sentCallback(sendErr);
+				}
+
+				if (sendErr && 'callback' in req) {
+					req.callback(sendErr);
 				}
 			}
-		);
+		}).catch(err => {
+			this.onError(err);
+		});
 	}
 
 	protected sendResponse(responses: (AnyResponse<T>)[]): void;
@@ -616,14 +623,11 @@ export class SocketTransport<T extends SocketMap> {
 
 		//timeoutId?: NodeJS.Timeout;
 		//callback: (err: Error, result?: U) => void | null
-		this._webSocket.send(
-			this.codecEngine.encode(responses.length === 1 ? responses[0] : responses),
-			(err) => {
-				if (err) {
-					this.onError(err);
-				}
-			}
-		);
+		this.send(
+			this.codecEngine.encode(responses.length === 1 ? responses[0] : responses)
+		).catch(err => {
+			this.onError(err);
+		});
 	}
 
 	public async setAuthorization(authToken: AuthToken): Promise<boolean>;

@@ -139,6 +139,42 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 		return status;
 	}
 
+	protected override onClose(code: number, reason?: Buffer) {
+		const status = this.status;
+		let reconnecting = false;
+
+		super.onClose(code, reason);
+
+		// Try to reconnect
+		// on server ping timeout (4000)
+		// or on client pong timeout (4001)
+		// or on close without status (1005)
+		// or on handshake failure (4003)
+		// or on handshake rejection (4008)
+		// or on socket hung up (1006)
+		if (this.autoReconnect) {
+			if (code === 4000 || code === 4001 || code === 1005) {
+				// If there is a ping or pong timeout or socket closes without
+				// status, don't wait before trying to reconnect - These could happen
+				// if the client wakes up after a period of inactivity and in this case we
+				// want to re-establish the connection as soon as possible.
+				reconnecting = !!this.autoReconnect;
+				this.tryReconnect(0);
+
+				// Codes 4500 and above will be treated as permanent disconnects.
+				// Socket will not try to auto-reconnect.
+			} else if (code !== 1000 && code < 4500) {
+				reconnecting = !!this.autoReconnect;
+				this.tryReconnect();
+			}
+		}
+		if (!reconnecting) {
+			const strReason = reason?.toString() || socketProtocolErrorStatuses[code];
+
+			this.onDisconnect(status, code, strReason);
+		}
+	}
+
 	protected override onOpen() {
 		super.onOpen();
 
@@ -182,42 +218,6 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 		this.socket.emit('ping', {});
 	}
 
-	protected override onClose(code: number, reason?: Buffer) {
-		const status = this.status;
-		let reconnecting = false;
-
-		super.onClose(code, reason);
-
-		// Try to reconnect
-		// on server ping timeout (4000)
-		// or on client pong timeout (4001)
-		// or on close without status (1005)
-		// or on handshake failure (4003)
-		// or on handshake rejection (4008)
-		// or on socket hung up (1006)
-		if (this.autoReconnect) {
-			if (code === 4000 || code === 4001 || code === 1005) {
-				// If there is a ping or pong timeout or socket closes without
-				// status, don't wait before trying to reconnect - These could happen
-				// if the client wakes up after a period of inactivity and in this case we
-				// want to re-establish the connection as soon as possible.
-				reconnecting = !!this.autoReconnect;
-				this.tryReconnect(0);
-
-				// Codes 4500 and above will be treated as permanent disconnects.
-				// Socket will not try to auto-reconnect.
-			} else if (code !== 1000 && code < 4500) {
-				reconnecting = !!this.autoReconnect;
-				this.tryReconnect();
-			}
-		}
-		if (!reconnecting) {
-			const strReason = reason?.toString() || socketProtocolErrorStatuses[code];
-
-			this.onDisconnect(status, code, strReason);
-		}
-	}
-
 	public get pendingReconnect(): boolean {
 		return (this._pendingReconnectTimeout !== null);
 	}
@@ -234,6 +234,10 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 	private resetReconnect() {
 		this._pendingReconnectTimeout = null;
 		this._connectAttempts = 0;
+	}
+
+	public async send(data: Buffer | string): Promise<void> {
+		this.webSocket.send(data);
 	}
 
 	override async setAuthorization(authToken: AuthToken): Promise<boolean>;
