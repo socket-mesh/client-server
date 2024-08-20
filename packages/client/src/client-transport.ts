@@ -312,7 +312,7 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 
 		super.webSocket = value;
 
-		if (this.webSocket) {
+		if (this.webSocket && this.webSocket.on) {
 			// WebSockets will throw an error if they are closed before they are completely open.
 			// We hook into these events to supress those errors and clean them up after a connection is established.
 			function onOpenCloseError(this: ws.WebSocket) {

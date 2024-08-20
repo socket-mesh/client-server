@@ -5,20 +5,20 @@ import terser from '@rollup/plugin-terser';
 
 /** @type {import('rollup').RollupOptions} */
 export default {
-  input: 'src/index.ts',
-  output: {
+	input: 'src/index.ts',
+	output: {
 		file: 'socket-mesh-client.js',
-    format: 'es'
-  },
-  plugins: [
+		format: 'es'
+	},
+	plugins: [
 		typescript({
 			tsconfig: './tsconfig.build.json'
 		}),
 		commonjs(),
 		nodeResolve({
 			preferBuiltins: false,
-      browser: true
+			browser: true
 		}),
-    terser()
+		terser()
 	]
 };
