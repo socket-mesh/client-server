@@ -31,7 +31,7 @@
 		"@socket-mesh/async-stream-emitter": "^7.1.2",
 		"@socket-mesh/auth": "^2.2.0",
 		"@socket-mesh/auth-engine": "^1.0.0",
-		"@socket-mesh/client": "^18.1.0",
+		"@socket-mesh/client": "^18.1.2",
 		"@socket-mesh/errors": "^3.2.0",
 		"@socket-mesh/formatter": "^4.1.0",
 		"base64id": "^2.0.0",
