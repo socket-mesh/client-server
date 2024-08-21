@@ -19,6 +19,6 @@ export default {
 			preferBuiltins: false,
 			browser: true
 		}),
-		terser()
+		//terser()
 	]
 };
