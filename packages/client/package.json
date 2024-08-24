@@ -26,6 +26,7 @@
 		"url": "https://github.com/socket-mesh/client-server/labels/client"
   },
 	"devDependencies": {
+		"@kineticcafe/rollup-plugin-delete": "^3.0.0",
 		"@rollup/plugin-alias": "^5.1.0",
 		"@rollup/plugin-commonjs": "^26.0.1",
 		"@rollup/plugin-node-resolve": "^15.2.3",
@@ -38,6 +39,7 @@
 		"@types/ws": "^8.5.10",
 		"jsonwebtoken": "^9.0.2",
 		"rollup": "^4.18.1",
+		"rollup-plugin-dts": "^6.1.1",
 		"tslib": "^2.6.3"
 	},
 	"dependencies": {
