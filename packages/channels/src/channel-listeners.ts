@@ -3,10 +3,10 @@ import { ChannelsListeners } from "./channels-listeners.js";
 import { ChannelMap } from "./channel-map.js";
 
 export class ChannelListeners<TChannelMap extends ChannelMap> {
-	private readonly _name: string;
+	private readonly _name: keyof TChannelMap & string;
 	private readonly _listeners: ChannelsListeners<TChannelMap>;
 
-	constructor(name: string, listeners: ChannelsListeners<TChannelMap>) {
+	constructor(name: keyof TChannelMap & string, listeners: ChannelsListeners<TChannelMap>) {
 		this._name = name;
 		this._listeners = listeners;
 	}

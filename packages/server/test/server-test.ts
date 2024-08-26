@@ -36,8 +36,10 @@ const invalidSignedAuthToken = 'fakebGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.fakec2VybmF
 const SERVER_AUTH_KEY = 'testkey';
 
 type MyChannels = {
-	foo: string,
-	bar: string
+	foo: string | number,
+	bar: string,
+	hello: string | number,
+	[channel: string]: string | number
 }
 
 type CustomProcArgs = { good: true } | { bad: true };
@@ -2137,7 +2139,7 @@ describe('Integration tests', function () {
 
 			await client.listen('connect').once(100);
 
-			const receivedMessages: string[] = [];
+			const receivedMessages: (string | number)[] = [];
 
 			(async () => {
 				for await (let data of client.channels.subscribe('foo')) {
@@ -2172,10 +2174,10 @@ describe('Integration tests', function () {
 
 			assert.strictEqual(client.status, 'closed');
 
-			let receivedMessages: number[] = [];
+			let receivedMessages: (string | number)[] = [];
 
 			(async () => {
-				for await (let data of client.channels.subscribe<number>('foo')) {
+				for await (let data of client.channels.subscribe('foo')) {
 					receivedMessages.push(data);
 				}
 			})();
@@ -2417,8 +2419,8 @@ describe('Integration tests', function () {
 				client.channels.transmitPublish('foo', 'hi2');
 			})();
 
-			const receivedSubscribedData: string[] = [];
-			const receivedChannelData: string[] = [];
+			const receivedSubscribedData: (string | number)[] = [];
+			const receivedChannelData: (string | number)[] = [];
 
 			(async () => {
 				const subscription = server.exchange.subscribe<string>('foo');
@@ -2465,13 +2467,13 @@ describe('Integration tests', function () {
 			const receivedChannelData: string[] = [];
 
 			(async () => {
-				const subscription = client.channels.subscribe<string>('bar');
+				const subscription = client.channels.subscribe('bar');
 				for await (let data of subscription) {
 					receivedSubscribedData.push(data);
 				}
 			})();
 
-			const channel = client.channels.channel<string>('bar');
+			const channel = client.channels.channel('bar');
 
 			for await (let data of channel) {
 				receivedChannelData.push(data);
@@ -2644,9 +2646,9 @@ describe('Integration tests', function () {
 			// it receives a #publish event.
 			client.channels.isSubscribed = function () { return true; };
 
-			let messageList: string[] = [];
+			let messageList: (string | number)[] = [];
 
-			let fooChannel = client.channels.subscribe<string>('foo');
+			let fooChannel = client.channels.subscribe('foo');
 
 			(async () => {
 				for await (let data of fooChannel) {
@@ -2790,12 +2792,12 @@ describe('Integration tests', function () {
 				)
 			);
 
-			const channelList:Channel<MyChannels, unknown>[] = [];
+			const channelList: Channel<MyChannels, string>[] = [];
 
 			for (let i = 0; i < 20; i++) {
 				const subscriptionOptions: ChannelOptions = {};
 				if (i === 10) {
-					subscriptionOptions.data = {foo: 123};
+					subscriptionOptions.data = { foo: 123 };
 				}
 				channelList.push(
 					client.channels.subscribe('my-channel-' + i, subscriptionOptions)
@@ -2876,9 +2878,10 @@ describe('Integration tests', function () {
 				)
 			);
 
-			let receivedMessage: string;
+			let receivedMessage: string | number;
 
-			let fooChannel = client.channels.subscribe('foo');
+			const fooChannel = client.channels.subscribe('foo');
+
 			client.channels.transmitPublish('foo', 'bar');
 
 			for await (let data of fooChannel) {
@@ -3531,10 +3534,11 @@ describe('Integration tests', function () {
 
 				client = new ClientSocket(clientOptions);
 
-				const helloChannel = client.channels.subscribe<string>('hello');
+				const helloChannel = client.channels.subscribe('hello');
 				await helloChannel.listen('subscribe').once(100);
 
-				let receivedMessages: string[] = [];
+				let receivedMessages: (string | number)[] = [];
+
 				(async () => {
 					for await (let data of helloChannel) {
 						receivedMessages.push(data);
@@ -3574,7 +3578,7 @@ describe('Integration tests', function () {
 				server.addPlugin(new InOrderPlugin());
 
 				const clientC = new ClientSocket(clientOptions);
-				const receivedMessages: string[] = [];
+				const receivedMessages: (string | number)[] = [];
 
 				(async () => {
 					for await (let data of clientC.channels.subscribe('foo')) {
@@ -3630,8 +3634,8 @@ describe('Integration tests', function () {
 				});
 
 				const client = new ClientSocket(clientOptions);
-				const helloChannel = client.channels.subscribe<string>('hello');
-				const receivedMessages: string[] = [];
+				const helloChannel = client.channels.subscribe('hello');
+				const receivedMessages: (string | number)[] = [];
 
 				await helloChannel.listen('subscribe').once(100);
 
@@ -3666,8 +3670,8 @@ describe('Integration tests', function () {
 				});
 
 				const client = new ClientSocket(clientOptions);
-				const helloChannel = client.channels.subscribe<string>('hello');
-				const receivedMessages: string[] = [];
+				const helloChannel = client.channels.subscribe('hello');
+				const receivedMessages: (string | number)[] = [];
 
 				await helloChannel.listen('subscribe').once();
 
@@ -3740,9 +3744,9 @@ describe('Integration tests', function () {
 						)
 				);
 
-				let receivedMessage: string;
+				let receivedMessage: string | number;
 
-				const fooChannel = client.channels.subscribe<string>('foo');
+				const fooChannel = client.channels.subscribe('foo');
 				client.channels.transmitPublish('foo', 'bar');
 
 				for await (let data of fooChannel) {

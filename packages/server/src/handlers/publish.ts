@@ -7,7 +7,7 @@ import { BasicServerMap } from "../maps/server-map.js";
 import { ServerTransport } from "../server-transport.js";
 
 export async function publishHandler(
-	{ socket, transport, options }: RequestHandlerArgs<PublishOptions, BasicSocketMapServer<{}, { [channel: string]: any }>, ServerSocket<BasicServerMap>, ServerTransport<BasicServerMap>>
+	{ socket, transport, options }: RequestHandlerArgs<PublishOptions, BasicSocketMapServer<{}, { [channel: string]: any }>, ServerSocket<BasicServerMap<{}, { [channel: string]: any }>>, ServerTransport<BasicServerMap>>
 ): Promise<void> {
 	if (!socket.server.allowClientPublish) {
 		throw new InvalidActionError('Client publish feature is disabled');

@@ -59,9 +59,7 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 		}
 	}
 
-	channel<U extends keyof T & string>(channelName: U): Channel<T, T[U]>;
-	channel<U>(channelName: string): Channel<T, U>;
-	channel<U>(channelName: string): Channel<T, U> {
+	channel<U extends keyof T & string>(channelName: U): Channel<T, U> {
 		const currentChannel = this._channelMap[channelName];
 
 		return new Channel<T, U>(
@@ -73,12 +71,12 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 	}
 
 
-	close(channelName?: keyof T & string | string): void {
+	close(channelName?: keyof T & string): void {
 		this.output.close(channelName);
 		this.listeners.close(channelName);
 	}
 
-	protected decorateChannelName(channelName: keyof T & string | string): string {
+	protected decorateChannelName(channelName: keyof T & string): string {
 		return `${this.channelPrefix || ''}${channelName}`;
 	}
 
@@ -87,14 +85,14 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 		this.listeners.kill(channelName);
 	}
 
-	getBackpressure(channelName?: keyof T & string | string): number {
+	getBackpressure(channelName?: keyof T & string): number {
 		return Math.max(
 			this.output.getBackpressure(channelName),
 			this.listeners.getBackpressure(channelName)
 		);
 	}
 
-	getState(channelName: keyof T & string | string): ChannelState {
+	getState(channelName: keyof T & string): ChannelState {
 		const channel = this._channelMap[channelName];
 
 		if (channel) {
@@ -104,7 +102,7 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 		return 'unsubscribed';
 	}
 
-	getOptions(channelName: keyof T & string | string): ChannelOptions {
+	getOptions(channelName: keyof T & string): ChannelOptions {
 		const channel = this._channelMap[channelName];
 
 		if (channel) {
@@ -113,7 +111,7 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 		return {};
 	}
 
-	kickOut(channelName: keyof T & string | string, message: string): void {
+	kickOut(channelName: keyof T & string, message: string): void {
 		const undecoratedChannelName = this.undecorateChannelName(channelName);		
 		const channel = this._channelMap[undecoratedChannelName];
 
@@ -127,9 +125,7 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 		}
 	}
 
-	subscribe<U extends keyof T & string>(channelName: U, options?: ChannelOptions): Channel<T, T[U]>;
-	subscribe<U>(channelName: string, options?: ChannelOptions): Channel<T, U>;
-	subscribe<U>(channelName: string, options?: ChannelOptions): Channel<T, U> {
+	subscribe<U extends keyof T & string>(channelName: U, options?: ChannelOptions): Channel<T, U> {
 		options = options || {};
 		let channel = this._channelMap[channelName];
 
@@ -215,7 +211,7 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 
 	protected abstract tryUnsubscribe(channel: ChannelDetails): void;
 
-	protected undecorateChannelName(channelName: keyof T & string | string): string {
+	protected undecorateChannelName(channelName: keyof T & string): string {
 		if (this.channelPrefix && channelName.indexOf(this.channelPrefix) === 0) {
 			return channelName.replace(this.channelPrefix, '');
 		}
@@ -223,7 +219,7 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 		return channelName;
 	}
 
-	unsubscribe(channelName: keyof T & string | string): void {
+	unsubscribe(channelName: keyof T & string): void {
 		const channel = this._channelMap[channelName];
 
 		if (channel) {
@@ -242,7 +238,7 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 		return subs;
 	}
 
-	isSubscribed(channelName: keyof T & string | string, includePending?: boolean): boolean {
+	isSubscribed(channelName: keyof T & string, includePending?: boolean): boolean {
 		const channel = this._channelMap[channelName];
 
 		if (includePending) {
@@ -274,16 +270,10 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 	}
 
 	abstract transmitPublish<U extends keyof T & string>(channelName: U, data: T[U]): Promise<void>;
-	abstract transmitPublish<U>(channelName: string, data: U): Promise<void>;
-	abstract transmitPublish<U>(channelName: keyof T & string | string, data: U): Promise<void>;
 
-	abstract invokePublish<U extends keyof T & string>(channelName: keyof T & string, data: T[U]): Promise<void>
-	abstract invokePublish<U>(channelName: string, data: U): Promise<void>;
-	abstract invokePublish<U>(channelName: keyof T & string | string, data: U): Promise<void>;
+	abstract invokePublish<U extends keyof T & string>(channelName: keyof T, data: T[U]): Promise<void>
 
-	write<U extends keyof T>(channelName: U, data: T[U]): void;
-	write<U>(channelName: string, data: U): void;
-	write<U extends T[keyof T & string]>(channelName: string, data: U): void {
+	write<U extends keyof T & string>(channelName: U, data: T[U]): void {
 		const undecoratedChannelName = this.undecorateChannelName(channelName);
 		const isSubscribed = this.isSubscribed(undecoratedChannelName, true);
 

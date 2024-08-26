@@ -9,17 +9,17 @@ import { ChannelEvent, SubscribeEvent, SubscribeFailEvent, SubscribeStateChangeE
 import { WritableStreamConsumer } from "@socket-mesh/writable-consumable-stream";
 import { ChannelMap } from "./channel-map.js";
 
-export class Channel<TChannelMap extends ChannelMap, TItem> extends ConsumableStream<TItem> {
+export class Channel<TChannelMap extends ChannelMap, TChannelName extends keyof TChannelMap & string> extends ConsumableStream<TChannelMap[TChannelName]> {
 	readonly channels: Channels<TChannelMap>;
 	readonly listeners: ChannelListeners<TChannelMap>;
-	readonly name: string;
+	readonly name: TChannelName;
 	readonly output: ChannelOutput;
 
 	private readonly _eventDemux: StreamDemux<ChannelEvent>;
-	private readonly _dataStream: DemuxedConsumableStream<TItem>;
+	private readonly _dataStream: DemuxedConsumableStream<TChannelMap[TChannelName]>;
 
 	constructor(
-		name: string,
+		name: TChannelName,
 		channels: Channels<TChannelMap>,
 		eventDemux: StreamDemux<ChannelEvent>,
 		dataDemux: StreamDemux<TChannelMap[keyof TChannelMap & string]>
@@ -53,7 +53,7 @@ export class Channel<TChannelMap extends ChannelMap, TItem> extends ConsumableSt
 		return this._eventDemux.listen(`${this.name}/${event}`);
 	}
 
-	createConsumer(timeout?: number): WritableStreamConsumer<TItem> {
+	createConsumer(timeout?: number): WritableStreamConsumer<TChannelMap[TChannelName]> {
 		return this._dataStream.createConsumer(timeout);
 	}
 
@@ -97,11 +97,11 @@ export class Channel<TChannelMap extends ChannelMap, TItem> extends ConsumableSt
 		return this.channels.isSubscribed(this.name, includePending);
 	}
 
-	transmitPublish(data: TItem): Promise<void> {
+	transmitPublish(data: TChannelMap[TChannelName]): Promise<void> {
 		return this.channels.transmitPublish(this.name, data);
 	}
 
-	invokePublish(data: TItem): Promise<void> {
+	invokePublish(data: TChannelMap[TChannelName]): Promise<void> {
 		return this.channels.invokePublish(this.name, data);
 	}
 }

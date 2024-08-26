@@ -23,8 +23,10 @@ interface LoginRequest {
 }
 
 type MyChannels = {
-	foo: string,
-	bar: string
+	foo: string | { abc: number },
+	bar: string | { def: number },
+	priv: string,
+	priv2: string
 }
 
 type ServerIncomingMap = {
@@ -653,7 +655,7 @@ describe('Integration tests', function () {
 				assert.strictEqual(error!.name, 'AuthTokenInvalidError');
 			})();
 
-			const privateChannel = client.channels.subscribe('priv', {waitForAuth: true});
+			const privateChannel = client.channels.subscribe('priv', { waitForAuth: true });
 			assert.strictEqual(privateChannel.state, 'pending');
 
 			(async () => {
@@ -835,12 +837,12 @@ describe('Integration tests', function () {
 				publisherClient.channels.transmitPublish('foo', 'hello');
 				await wait(20);
 				publisherClient.channels.transmitPublish('foo', 'world');
-				publisherClient.channels.transmitPublish('foo', {abc: 123});
+				publisherClient.channels.transmitPublish('foo', { abc: 123 });
 				await wait(10);
 				channel.close();
 			})();
 
-			const receivedMessages: string[] = [];
+			const receivedMessages: (string | { abc: number })[] = [];
 
 			for await (let message of channel) {
 				receivedMessages.push(message);
@@ -865,13 +867,13 @@ describe('Integration tests', function () {
 				await wait(20);
 				await publisherClient.channels.transmitPublish('bar', 'world');
 				// assert.strictEqual(lastServerMessage, 'world');
-				await publisherClient.channels.transmitPublish('bar', {def: 123});
+				await publisherClient.channels.transmitPublish('bar', { def: 123 });
 				// assert.strictEqual(JSON.stringify(clientReceivedMessages[2]), JSON.stringify({def: 123}));
 				await wait(10);
 				channel.close();
 			})();
 
-			let clientReceivedMessages: string[] = [];
+			let clientReceivedMessages: (string | { def: number })[] = [];
 
 			for await (let message of channel) {
 				clientReceivedMessages.push(message);
@@ -880,7 +882,7 @@ describe('Integration tests', function () {
 			assert.strictEqual(clientReceivedMessages.length, 3);
 			assert.strictEqual(clientReceivedMessages[0], 'hi');
 			assert.strictEqual(clientReceivedMessages[1], 'world');
-			assert.strictEqual(JSON.stringify(clientReceivedMessages[2]), JSON.stringify({def: 123}));
+			assert.strictEqual(JSON.stringify(clientReceivedMessages[2]), JSON.stringify({ def: 123 }));
 		});
 	});
 
@@ -1495,7 +1497,7 @@ describe('Integration tests', function () {
 
 			const fooEvents: string[] = [];
 			const barEvents: string[] = [];
-			const barMessages: string[] = [];
+			const barMessages: (string | { def: number })[] = [];
 			const barBackpressures: number[] = [];
 			const allBackpressures: number[] = [];
 

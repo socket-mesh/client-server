@@ -127,7 +127,7 @@ export class ClientChannels<T extends ClientMap> extends Channels<T['Channel']> 
 		});
 	}
 
-	unsubscribe(channelName: keyof T['Channel'] & string | string): void {
+	unsubscribe(channelName: keyof T['Channel'] & string): void {
 		const channel = this._channelMap[channelName];
 
 		if (channel) {
@@ -174,9 +174,7 @@ export class ClientChannels<T extends ClientMap> extends Channels<T['Channel']> 
 		}
 	}
 
-	transmitPublish<U extends keyof T['Channel'] & string>(channelName: U, data: T['Channel'][U]): Promise<void>;
-	transmitPublish<U>(channelName: string, data: U): Promise<void>;
-	transmitPublish<U>(channelName: keyof T['Channel'] & string | string, data: U): Promise<void> {
+	transmitPublish<U extends keyof T['Channel'] & string>(channelName: U, data: T['Channel'][U]): Promise<void> {
 		const pubData = {
 			channel: this.decorateChannelName(channelName),
 			data
@@ -184,9 +182,7 @@ export class ClientChannels<T extends ClientMap> extends Channels<T['Channel']> 
 		return this._transport.transmit('#publish', pubData);
 	}
 
-	invokePublish<U extends keyof T['Channel'] & string>(channelName: keyof T['Channel'] & string, data: T['Channel'][U]): Promise<void>
-	invokePublish<U>(channelName: string, data: U): Promise<void>;
-	invokePublish<U>(channelName: keyof T['Channel'] & string | string, data: U): Promise<void> {
+	invokePublish<U extends keyof T['Channel'] & string>(channelName: keyof T['Channel'] & string, data: T['Channel'][U]): Promise<void> {
 		const pubData = {
 			channel: this.decorateChannelName(channelName),
 			data
