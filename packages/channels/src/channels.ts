@@ -281,7 +281,7 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 	abstract invokePublish<U>(channelName: string, data: U): Promise<void>;
 	abstract invokePublish<U>(channelName: keyof T & string | string, data: U): Promise<void>;
 
-	write<U extends keyof T & string>(channelName: keyof T & string, data: T[U]): void
+	write<U extends keyof T>(channelName: U, data: T[U]): void;
 	write<U>(channelName: string, data: U): void;
 	write<U extends T[keyof T & string]>(channelName: string, data: U): void {
 		const undecoratedChannelName = this.undecorateChannelName(channelName);
