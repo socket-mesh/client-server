@@ -9,7 +9,7 @@ function getPackageJson() {
 
 async function getPublishedVersion(pgk) {
 	try {
-		return (await promisify(exec)(`npm view ${pgk} version`)).stdout.trimEnd();		
+		return (await promisify(exec)(`npm view ${pgk} version`)).stdout.trimEnd();
 	} catch (err) {
 		if (err.stderr && err.stderr.indexOf(' code E404\n') > -1) {
 			return '0.0.0';
