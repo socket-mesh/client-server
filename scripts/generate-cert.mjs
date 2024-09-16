@@ -23,3 +23,9 @@ const subj = `/O=${companyName}/L=${city}/ST=${state}/CN=${hostName}`;
 const cmd = `openssl req -x509 -newkey rsa:${encryptionStrength} -keyout ./certs/${certName ? `${certName}.` : '' }key.pem -out ./certs/${certName ? `${certName}.` : '' }cert.pem -${digestAlgorithm} -days ${expiresInDays} -nodes -subj "${subj}"`;
 
 await promisify(exec)(cmd);
+
+console.log();
+console.log('Your certificates are located at:');
+console.log(`${process.cwd()}\\certs\\${certName ? `${certName}.` : '' }cert.pem`);
+console.log(`${process.cwd()}\\certs\\${certName ? `${certName}.` : '' }key.pem`);
+console.log();
