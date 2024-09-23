@@ -1,11 +1,18 @@
-import { MethodMap, ServiceMap } from "./maps/method-map.js";
-import { SocketMap } from "./maps/socket-map.js";
+import { MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap } from "./maps/method-map.js";
 import { toArray } from "./utils.js";
 
-export type AnyRequest<T extends SocketMap> =
-	ServiceRequest<T['Service']> | MethodRequest<T['PrivateOutgoing']> | MethodRequest<T['Outgoing']>;
+export type AnyRequest<
+	TOutgoing extends PublicMethodMap,
+	TPrivateOutgoing extends PrivateMethodMap,
+	TService extends ServiceMap
+> =
+	ServiceRequest<TService> | MethodRequest<TPrivateOutgoing> | MethodRequest<TOutgoing>;
 
-export function abortRequest<T extends SocketMap>(request: AnyRequest<T>, err: Error): void {
+export function abortRequest<
+	TOutgoing extends PublicMethodMap,
+	TPrivateOutgoing extends PrivateMethodMap,
+	TService extends ServiceMap
+>(request: AnyRequest<TOutgoing, TPrivateOutgoing, TService>, err: Error): void {
 	if (request.sentCallback) {
 		request.sentCallback(err);
 	}
@@ -15,16 +22,20 @@ export function abortRequest<T extends SocketMap>(request: AnyRequest<T>, err: E
 	}
 }
 
-export class RequestCollection<T extends SocketMap> {
-	private readonly _requests: AnyRequest<T>[];
+export class RequestCollection<
+	TOutgoing extends PublicMethodMap,
+	TPrivateOutgoing extends PrivateMethodMap,
+	TService extends ServiceMap
+> {
+	private readonly _requests: AnyRequest<TOutgoing, TPrivateOutgoing, TService>[];
 	private readonly _callbacks: (() => void)[];
 
-	constructor(requests: AnyRequest<T> | AnyRequest<T>[]) {
-		this._requests = toArray(requests).filter(req => !isRequestDone(req));
+	constructor(requests: AnyRequest<TOutgoing, TPrivateOutgoing, TService> | AnyRequest<TOutgoing, TPrivateOutgoing, TService>[]) {
+		this._requests = toArray(requests).filter(req => !isRequestDone<TOutgoing, TPrivateOutgoing, TService>(req));
 		this._callbacks = [];
 	}
 
-	public get items(): ReadonlyArray<AnyRequest<T>> {
+	public get items(): ReadonlyArray<AnyRequest<TOutgoing, TPrivateOutgoing, TService>> {
 		return this._requests;
 	}
 
@@ -108,7 +119,11 @@ export interface InvokeMethodRequest<TMethodMap extends MethodMap, TMethod exten
 	callback: (err: Error, result?: TMethodMap[TMethod]) => void | null
 }
 
-export function isRequestDone<T extends SocketMap>(request: AnyRequest<T>): boolean {
+export function isRequestDone<
+	TOutgoing extends PublicMethodMap,
+	TPrivateOutgoing extends PrivateMethodMap,
+	TService extends ServiceMap
+>(request: AnyRequest<TOutgoing, TPrivateOutgoing, TService>): boolean {
 	if ('callback' in request) {
 		return (request.callback === null);
 	}

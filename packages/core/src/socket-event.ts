@@ -1,11 +1,16 @@
 import ws from "isomorphic-ws";
-import { ClientRequest, IncomingMessage } from "http";
 import { MethodPacket, ServicePacket } from "./packet.js";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
 import { AnyResponse } from "./response.js";
 import { SocketMap } from "./maps/socket-map.js";
+import { MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap } from "./maps/method-map.js";
 
-export type SocketEvent<T extends SocketMap> =
+export type SocketEvent<
+	TIncoming extends MethodMap,
+	TOutgoing extends PublicMethodMap,
+	TPrivateOutgoing extends PrivateMethodMap,
+	TService extends ServiceMap
+> =
 	AuthStateChangeEvent |
 	RemoveAuthTokenEvent |
 	AuthenticateEvent |
@@ -19,8 +24,8 @@ export type SocketEvent<T extends SocketMap> =
 	MessageEvent |
 	PingEvent |
 	PongEvent |
-	RequestEvent<T> |
-	ResponseEvent<T>;
+	RequestEvent<TIncoming, TService> |
+	ResponseEvent<TOutgoing, TPrivateOutgoing, TService>;
 
 export type AuthStateChangeEvent = AuthenticatedChangeEvent | DeauthenticatedChangeEvent;
 
@@ -89,10 +94,17 @@ export interface RemoveAuthTokenEvent {
 	oldAuthToken: SignedAuthToken
 }
 
-export interface RequestEvent<T extends SocketMap> {
-	request: ServicePacket<T['Service']> | MethodPacket<T['Incoming']>
+export interface RequestEvent<
+	TIncoming extends MethodMap,
+	TService extends ServiceMap
+> {
+	request: ServicePacket<TService> | MethodPacket<TIncoming>
 }
 
-export interface ResponseEvent<T extends SocketMap> {
-	response: AnyResponse<T>
+export interface ResponseEvent<
+	TOutgoing extends PublicMethodMap,
+	TPrivateOutgoing extends PrivateMethodMap,
+	TService extends ServiceMap
+> {
+	response: AnyResponse<TOutgoing, TPrivateOutgoing, TService>
 }

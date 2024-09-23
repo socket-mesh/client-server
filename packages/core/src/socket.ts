@@ -2,25 +2,31 @@ import { CodecEngine } from "@socket-mesh/formatter";
 import { AnyPacket } from "./packet.js";
 import { AsyncStreamEmitter } from "@socket-mesh/async-stream-emitter";
 import { SocketEvent, AuthenticateEvent, BadAuthTokenEvent, CloseEvent, ConnectEvent, DisconnectEvent, ErrorEvent, MessageEvent, PingEvent, PongEvent, RequestEvent, ResponseEvent, AuthStateChangeEvent, RemoveAuthTokenEvent, ConnectingEvent, DeauthenticateEvent } from "./socket-event.js";
-import { FunctionReturnType } from "./maps/method-map.js";
+import { FunctionReturnType, MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap } from "./maps/method-map.js";
 import { HandlerMap } from "./maps/handler-map.js";
 import { CallIdGenerator, InvokeMethodOptions, InvokeServiceOptions, SocketTransport } from "./socket-transport.js";
 import { DemuxedConsumableStream, StreamEvent } from "@socket-mesh/stream-demux";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
-import { SocketMap } from "./maps/socket-map.js";
 import { Plugin } from "./plugins/plugin.js";
 
 export type StreamCleanupMode = 'kill' | 'close' | 'none';
 
-export interface SocketOptions<T extends SocketMap, TSocket extends Socket<T> = Socket<T>> {
+export interface SocketOptions<
+	TIncoming extends MethodMap,
+	TOutgoing extends PublicMethodMap,
+	TPrivateOutgoing extends PrivateMethodMap,
+	TService extends ServiceMap,
+	TState extends object,
+	TSocket extends Socket<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> = Socket<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>
+> {
 	ackTimeoutMs?: number,
 	callIdGenerator?: CallIdGenerator,
 	codecEngine?: CodecEngine,
-	handlers?: HandlerMap<T>;
+	handlers?: HandlerMap<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>;
 	isPingTimeoutDisabled?: boolean;
-	plugins?: Plugin<T>[],
-	onUnhandledRequest?: (socket: TSocket, packet: AnyPacket<T>) => boolean,
-	state?: T['State'],
+	plugins?: Plugin<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>[],
+	onUnhandledRequest?: (socket: TSocket, packet: AnyPacket<TIncoming, TService>) => boolean,
+	state?: TState,
 
 	// Lets you specify the default cleanup behaviour for
 	// when a socket becomes disconnected.
@@ -35,11 +41,20 @@ export interface SocketOptions<T extends SocketMap, TSocket extends Socket<T> = 
 
 export type SocketStatus = 'connecting' | 'ready' | 'closing' | 'closed';
 
-export class Socket<T extends SocketMap> extends AsyncStreamEmitter<SocketEvent<T>> {
-	private readonly _transport: SocketTransport<T>;
-	public readonly state: Partial<T['State']>;
+export class Socket<
+	TIncoming extends MethodMap,
+	TOutgoing extends PublicMethodMap,
+	TPrivateOutgoing extends PrivateMethodMap,
+	TService extends ServiceMap,
+	TState extends object
+> extends AsyncStreamEmitter<SocketEvent<TIncoming, TOutgoing, TPrivateOutgoing, TService>> {
+	private readonly _transport: SocketTransport<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>;
+	public readonly state: Partial<TState>;
 
-	protected constructor(transport: SocketTransport<T>, options?: SocketOptions<T>) {
+	protected constructor(
+		transport: SocketTransport<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>,
+		options?: SocketOptions<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>
+	) {
 		super();
 
 		this.state = options?.state || {};
@@ -99,13 +114,13 @@ export class Socket<T extends SocketMap> extends AsyncStreamEmitter<SocketEvent<
 	emit(event: 'ping', data: PingEvent): void;
 	emit(event: 'pong', data: PongEvent): void;
 	emit(event: 'removeAuthToken', data: RemoveAuthTokenEvent): void;
-	emit(event: 'request', data: RequestEvent<T>): void;
-	emit(event: 'response', data: ResponseEvent<T>): void;
-	emit(event: string, data?: SocketEvent<T>): void {
+	emit(event: 'request', data: RequestEvent<TIncoming, TService>): void;
+	emit(event: 'response', data: ResponseEvent<TOutgoing, TPrivateOutgoing, TService>): void;
+	emit(event: string, data?: SocketEvent<TIncoming, TOutgoing, TPrivateOutgoing, TService>): void {
 		super.emit(event, data);
 	}
 	
-	listen(): DemuxedConsumableStream<StreamEvent<SocketEvent<T>>>;
+	listen(): DemuxedConsumableStream<StreamEvent<SocketEvent<TIncoming, TOutgoing, TPrivateOutgoing, TService>>>;
 	listen(event: 'authStateChange'): DemuxedConsumableStream<AuthStateChangeEvent>;
 	listen(event: 'authenticate'): DemuxedConsumableStream<AuthenticateEvent>;
 	listen(event: 'badAuthToken'): DemuxedConsumableStream<BadAuthTokenEvent>;
@@ -121,10 +136,10 @@ export class Socket<T extends SocketMap> extends AsyncStreamEmitter<SocketEvent<
 	listen(event: 'ping'): DemuxedConsumableStream<PingEvent>;
 	listen(event: 'pong'): DemuxedConsumableStream<PongEvent>;
 	listen(event: 'removeAuthToken'): DemuxedConsumableStream<RemoveAuthTokenEvent>;
-	listen(event: 'request'): DemuxedConsumableStream<RequestEvent<T>>;
-	listen(event: 'response'): DemuxedConsumableStream<ResponseEvent<T>>;
-	listen<U extends SocketEvent<T>, V = U>(event: string): DemuxedConsumableStream<V>;
-	listen<U extends SocketEvent<T>, V = U>(event?: string): DemuxedConsumableStream<V> {
+	listen(event: 'request'): DemuxedConsumableStream<RequestEvent<TIncoming, TService>>;
+	listen(event: 'response'): DemuxedConsumableStream<ResponseEvent<TOutgoing, TPrivateOutgoing, TService>>;
+	listen<U extends SocketEvent<TIncoming, TOutgoing, TPrivateOutgoing, TService>, V = U>(event: string): DemuxedConsumableStream<V>;
+	listen<U extends SocketEvent<TIncoming, TOutgoing, TPrivateOutgoing, TService>, V = U>(event?: string): DemuxedConsumableStream<V> {
 		return super.listen(event);
 	}
 
@@ -136,28 +151,28 @@ export class Socket<T extends SocketMap> extends AsyncStreamEmitter<SocketEvent<
 		return this._transport.url;
 	}
 
-	public transmit<TMethod extends keyof T['Outgoing']>(
-		method: TMethod, arg?: Parameters<T['Outgoing'][TMethod]>[0]): Promise<void>;
-	public transmit<TService extends keyof T['Service'], TMethod extends keyof T['Service'][TService]>(
-		options: [TService, TMethod], arg?: Parameters<T['Service'][TService][TMethod]>[0]): Promise<void>;
-	public transmit<TService extends keyof T['Service'], TServiceMethod extends keyof T['Service'][TService], TMethod extends keyof T['Outgoing']>(
-		serviceAndMethod: TMethod | [TService, TServiceMethod],
-		arg?: (Parameters<T['Outgoing'][TMethod] | T['Service'][TService][TServiceMethod]>)[0]): Promise<void> {
+	public transmit<TMethod extends keyof TOutgoing>(
+		method: TMethod, arg?: Parameters<TOutgoing[TMethod]>[0]): Promise<void>;
+	public transmit<TServiceName extends keyof TService, TMethod extends keyof TService[TServiceName]>(
+		options: [TServiceName, TMethod], arg?: Parameters<TService[TServiceName][TMethod]>[0]): Promise<void>;
+	public transmit<TServiceName extends keyof TService, TServiceMethod extends keyof TService[TServiceName], TMethod extends keyof TOutgoing>(
+		serviceAndMethod: TMethod | [TServiceName, TServiceMethod],
+		arg?: (Parameters<TOutgoing[TMethod] | TService[TServiceName][TServiceMethod]>)[0]): Promise<void> {
 
 		return this._transport.transmit(serviceAndMethod as TMethod, arg);
 	}
 
-	public invoke<TMethod extends keyof T['Outgoing']>(
-		method: TMethod, arg?: Parameters<T['Outgoing'][TMethod]>[0]): Promise<FunctionReturnType<T['Outgoing'][TMethod]>>;
-	public invoke<TService extends keyof T['Service'], TMethod extends keyof T['Service'][TService]>(
-		options: [TService, TMethod, (number | false)?], arg?: Parameters<T['Service'][TService][TMethod]>[0]): Promise<FunctionReturnType<T['Service'][TService][TMethod]>>;
-	public invoke<TService extends keyof T['Service'], TMethod extends keyof T['Service'][TService]>(
-		options: InvokeServiceOptions<T['Service'], TService, TMethod>, arg?: Parameters<T['Service'][TService][TMethod]>[0]): Promise<FunctionReturnType<T['Service'][TService][TMethod]>>;
-	public invoke<TMethod extends keyof T['Outgoing']>(
-		options: InvokeMethodOptions<T['Outgoing'], TMethod>, arg?: Parameters<T['Outgoing'][TMethod]>[0]): Promise<FunctionReturnType<T['Outgoing'][TMethod]>>;
-	public invoke<TService extends keyof T['Service'], TServiceMethod extends keyof T['Service'][TService], TMethod extends keyof T['Outgoing']> (
-		methodOptions: TMethod | [TService, TServiceMethod, (number | false)?] | InvokeServiceOptions<T['Service'], TService, TServiceMethod> | InvokeMethodOptions<T['Outgoing'], TMethod>,
-		arg?: Parameters<T['Outgoing'][TMethod] | T['Service'][TService][TServiceMethod]>[0]): Promise<FunctionReturnType<T['Service'][TService][TServiceMethod] | T['Outgoing'][TMethod]>> {
+	public invoke<TMethod extends keyof TOutgoing>(
+		method: TMethod, arg?: Parameters<TOutgoing[TMethod]>[0]): Promise<FunctionReturnType<TOutgoing[TMethod]>>;
+	public invoke<TServiceName extends keyof TService, TMethod extends keyof TService[TServiceName]>(
+		options: [TServiceName, TMethod, (number | false)?], arg?: Parameters<TService[TServiceName][TMethod]>[0]): Promise<FunctionReturnType<TService[TServiceName][TMethod]>>;
+	public invoke<TServiceName extends keyof TService, TMethod extends keyof TService[TServiceName]>(
+		options: InvokeServiceOptions<TService, TServiceName, TMethod>, arg?: Parameters<TService[TServiceName][TMethod]>[0]): Promise<FunctionReturnType<TService[TServiceName][TMethod]>>;
+	public invoke<TMethod extends keyof TOutgoing>(
+		options: InvokeMethodOptions<TOutgoing, TMethod>, arg?: Parameters<TOutgoing[TMethod]>[0]): Promise<FunctionReturnType<TOutgoing[TMethod]>>;
+	public invoke<TServiceName extends keyof TService, TServiceMethod extends keyof TService[TServiceName], TMethod extends keyof TOutgoing> (
+		methodOptions: TMethod | [TServiceName, TServiceMethod, (number | false)?] | InvokeServiceOptions<TService, TServiceName, TServiceMethod> | InvokeMethodOptions<TOutgoing, TMethod>,
+		arg?: Parameters<TOutgoing[TMethod] | TService[TServiceName][TServiceMethod]>[0]): Promise<FunctionReturnType<TService[TServiceName][TServiceMethod] | TOutgoing[TMethod]>> {
 
 		return this._transport.invoke(methodOptions as TMethod, arg)[0];
 	}

@@ -1,7 +1,9 @@
 import { MethodMap, ServiceMap } from "./maps/method-map.js";
-import { SocketMap } from "./maps/socket-map.js";
 
-export type AnyPacket<T extends SocketMap> = ServicePacket<T['Service']> | MethodPacket<T['Incoming']>;
+export type AnyPacket<
+	TIncoming extends MethodMap,
+	TService extends ServiceMap
+> = ServicePacket<TService> | MethodPacket<TIncoming>;
 
 export type ServicePacket<TServiceMap extends ServiceMap> =
 	{ [TService in keyof TServiceMap]:
@@ -36,6 +38,9 @@ export interface MethodRequestPacket<TMethodMap extends MethodMap, TMethod exten
 	ackTimeoutMs?: number | boolean
 }
 
-export function isRequestPacket<T extends SocketMap>(packet: unknown): packet is AnyPacket<T> {
+export function isRequestPacket<
+	TIncoming extends MethodMap,
+	TService extends ServiceMap
+>(packet: unknown): packet is AnyPacket<TIncoming, TService> {
 	return (typeof packet === 'object') && 'method' in packet;
 }
