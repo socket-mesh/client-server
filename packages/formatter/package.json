@@ -3,7 +3,7 @@
 	"description": "Module for serializing and unserializing SocketMesh messages.",
 	"version": "4.1.0",
 	"type": "module",
-  "main": "dist/index.js",
+	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
 	"files": ["./dist"],
 	"contributors": [
@@ -14,8 +14,8 @@
 		"url": "git+https://github.com/socket-mesh/client-server.git"
 	},
 	"scripts": {
-    "build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
-    "deploy": "npm run build && node ../../scripts/publish.mjs",
+		"build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
+		"deploy": "npm run build && node ../../scripts/publish.mjs",
 		"test": "cross-env node --test --loader ts-node/esm test/index.spec.ts"
 	},
 	"keywords": [

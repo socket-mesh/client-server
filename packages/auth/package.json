@@ -1,29 +1,29 @@
 {
-  "name": "@socket-mesh/auth",
-  "version": "2.2.0",
-  "description": "Auth module for SocketMesh",
-  "type": "module",
-  "main": "dist/index.js",
+	"name": "@socket-mesh/auth",
+	"version": "2.2.0",
+	"description": "Auth module for SocketMesh",
+	"type": "module",
+	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
 	"files": ["./dist"],
-  "scripts": {
-    "build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
-    "deploy": "npm run build && node ../../scripts/publish.mjs",
-    "test": "cross-env node --test --loader ts-node/esm test/index.spec.ts"
-  },
-  "keywords": [
-    "auth",
-    "jwt",
-    "socketMesh"
-  ],
-  "author": "Greg Kimmy",
+	"scripts": {
+		"build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
+		"deploy": "npm run build && node ../../scripts/publish.mjs",
+		"test": "cross-env node --test --loader ts-node/esm test/index.spec.ts"
+	},
+	"keywords": [
+		"auth",
+		"jwt",
+		"socketMesh"
+	],
+	"author": "Greg Kimmy",
 	"license": "MIT",
 	"homepage": "https://github.com/socket-mesh/main/tree/main/packages/auth#README.md",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/socket-mesh/client-server.git"
-  },
-  "bugs": {
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/socket-mesh/client-server.git"
+	},
+	"bugs": {
 		"url": "https://github.com/socket-mesh/client-server/labels/auth"
-  }
+	}
 }

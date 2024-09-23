@@ -1,31 +1,31 @@
 {
-  "name": "@socket-mesh/core",
-  "version": "1.0.2",
-  "description": "Core module for SocketMesh Server",
-  "type": "module",
-  "main": "dist/index.js",
+	"name": "@socket-mesh/core",
+	"version": "1.0.2",
+	"description": "Core module for SocketMesh Server",
+	"type": "module",
+	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
 	"files": ["./dist"],
-  "scripts": {
-    "build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
-    "deploy": "npm run build && node ../../scripts/publish.mjs",
-    "test": "cross-env node --test --loader ts-node/esm test/index.spec.ts"
-  },
-  "keywords": [
-    "auth",
-    "jwt",
-    "socketMesh"
-  ],
-  "author": "Greg Kimmy",
+	"scripts": {
+		"build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
+		"deploy": "npm run build && node ../../scripts/publish.mjs",
+		"test": "cross-env node --test --loader ts-node/esm test/index.spec.ts"
+	},
+	"keywords": [
+		"auth",
+		"jwt",
+		"socketMesh"
+	],
+	"author": "Greg Kimmy",
 	"license": "MIT",
 	"homepage": "https://github.com/socket-mesh/main/tree/main/packages/core#README.md",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/socket-mesh/client-server.git"
-  },
-  "bugs": {
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/socket-mesh/client-server.git"
+	},
+	"bugs": {
 		"url": "https://github.com/socket-mesh/client-server/labels/core"
-  },
+	},
 	"devDependencies": {
 		"@types/base64id": "^2.0.2",
 		"@types/ws": "^8.5.11"

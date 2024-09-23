@@ -2,25 +2,25 @@
 	"name": "@socket-mesh/channels",
 	"description": "Channel object for SocketMesh",
 	"version": "6.1.2",
-  "type": "module",
-  "main": "dist/index.js",
+	"type": "module",
+	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
 	"files": ["./dist"],
 	"author": {
 		"name": "Greg Kimmy"
 	},
 	"scripts": {
-    "build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
-    "deploy": "npm run build && node ../../scripts/publish.mjs",
+		"build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
+		"deploy": "npm run build && node ../../scripts/publish.mjs",
 		"test": "cross-env node --test --import=./run-test.js test/server-test.ts"
 	},
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/socket-mesh/client-server.git"
-  },
-  "bugs": {
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/socket-mesh/client-server.git"
+	},
+	"bugs": {
 		"url": "https://github.com/socket-mesh/client-server/labels/channels"
-  },	
+	},	
 	"dependencies": {
 		"@socket-mesh/async-stream-emitter": "^7.1.2",
 		"@socket-mesh/consumable-stream": "^3.2.1",
