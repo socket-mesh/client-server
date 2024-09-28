@@ -1,4 +1,4 @@
-import { AnyRequest, EmptySocketMap, MethodMap, Plugin, PrivateMethodMap, PublicMethodMap, SendRequestPluginArgs, ServiceMap, SocketMap } from "@socket-mesh/core";
+import { AnyRequest, MethodMap, Plugin, PrivateMethodMap, PublicMethodMap, SendRequestPluginArgs, ServiceMap } from "@socket-mesh/core";
 
 const SYSTEM_METHODS = ['#handshake', '#removeAuthToken'];
 

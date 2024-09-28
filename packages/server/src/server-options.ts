@@ -1,6 +1,6 @@
 import ws from "ws";
 import { AuthEngine, AuthOptions } from "@socket-mesh/auth-engine";
-import { CallIdGenerator, HandlerMap, EmptySocketMap, StreamCleanupMode, ServiceMap, PublicMethodMap, PrivateMethodMap } from "@socket-mesh/core";
+import { CallIdGenerator, HandlerMap, StreamCleanupMode, ServiceMap, PublicMethodMap, PrivateMethodMap } from "@socket-mesh/core";
 import { CodecEngine } from "@socket-mesh/formatter";
 import { ServerPlugin } from "./plugin/server-plugin.js";
 import { Broker } from "./broker/broker.js";

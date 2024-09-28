@@ -1,15 +1,5 @@
 import { SignedAuthToken } from "@socket-mesh/auth";
-import { ChannelMap, PublishOptions } from "@socket-mesh/channels";
-import { MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap } from "@socket-mesh/core";
-
-export interface ClientMap {
-	Channel: ChannelMap,
-	Incoming: MethodMap,
-	Service: ServiceMap,
-	Outgoing: PublicMethodMap,
-	PrivateOutgoing: PrivateMethodMap,
-	State: object
-}
+import { PublishOptions } from "@socket-mesh/channels";
 
 export interface KickOutOptions {
 	channel: string,

@@ -1,5 +1,5 @@
 import { RawData } from "ws";
-import { EmptySocketMap, MessageRawPluginArgs, MethodMap, Plugin, PluginArgs, PrivateMethodMap, PublicMethodMap, ServiceMap, SocketMap } from "@socket-mesh/core";
+import { MessageRawPluginArgs, MethodMap, Plugin, PluginArgs, PrivateMethodMap, PublicMethodMap, ServiceMap } from "@socket-mesh/core";
 import { WritableConsumableStream } from "@socket-mesh/writable-consumable-stream";
 import ws from "isomorphic-ws";
 

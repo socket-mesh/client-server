@@ -1,4 +1,3 @@
-import { EmptySocketMap, SocketMap } from "../maps/socket-map.js";
 import { AnyPacket } from "../packet.js";
 import { AnyRequest } from "../request.js";
 import { AnyResponse } from "../response.js";

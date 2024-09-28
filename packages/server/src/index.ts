@@ -6,8 +6,6 @@ import { PrivateMethodMap, PublicMethodMap, ServiceMap } from "@socket-mesh/core
 export { Server } from "./server.js";
 export { ServerSocket } from "./server-socket.js";
 export { PluginType } from "@socket-mesh/core";
-export { BasicServerMap } from "./maps/server-map.js";
-export { BasicSocketMapServer } from "./maps/socket-map.js";
 export { ServerRequestHandlerArgs } from './handlers/server-request-handler.js';
 
 /**
@@ -29,7 +27,6 @@ export function listen<
 	TServerState extends object = {},
 	TState extends object = {}
 >(): Server<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>;
-//export function listen<T extends ServerMap>(port: number, fn: () => void): Server<T>;
 export function listen<
 	TIncoming extends PublicMethodMap = {},
 	TChannel extends ChannelMap = {},

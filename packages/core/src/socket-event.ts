@@ -2,7 +2,6 @@ import ws from "isomorphic-ws";
 import { MethodPacket, ServicePacket } from "./packet.js";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
 import { AnyResponse } from "./response.js";
-import { SocketMap } from "./maps/socket-map.js";
 import { MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap } from "./maps/method-map.js";
 
 export type SocketEvent<
