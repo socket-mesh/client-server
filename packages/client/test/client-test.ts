@@ -2,10 +2,9 @@ import assert from 'node:assert';
 import { beforeEach, afterEach, describe, it, mock } from "node:test";
 import { ClientSocket, ClientSocketOptions, LocalStorageAuthEngine, OfflinePlugin } from '../src/index.js';
 import { AuthStateChangeEvent, CloseEvent, DisconnectEvent, SocketStatus, RequestHandlerArgs, wait } from '@socket-mesh/core';
-import { Server, listen } from '@socket-mesh/server';
+import { Server, ServerRequestHandlerArgs, listen } from '@socket-mesh/server';
 import localStorage from '@socket-mesh/local-storage';
 import jwt from "jsonwebtoken";
-import { ServerRequestHandlerArgs } from 'packages/server/src/handlers/server-request-handler.js';
 
 // Add to the global scope like in browser.
 global.localStorage = localStorage;

@@ -4,7 +4,6 @@ import { Server, ServerSocket, listen } from "../src/index.js";
 import { ServerOptions } from "../src/server-options.js";
 import { AuthToken } from "@socket-mesh/auth";
 import jwt from "jsonwebtoken";
-import { ServerTransport } from "../src/server-transport.js";
 import { AuthInfo } from "../src/handlers/authenticate.js";
 import assert from "node:assert";
 import localStorage from "@socket-mesh/local-storage";

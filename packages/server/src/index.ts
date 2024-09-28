@@ -8,6 +8,7 @@ export { ServerSocket } from "./server-socket.js";
 export { PluginType } from "@socket-mesh/core";
 export { BasicServerMap } from "./maps/server-map.js";
 export { BasicSocketMapServer } from "./maps/socket-map.js";
+export { ServerRequestHandlerArgs } from './handlers/server-request-handler.js';
 
 /**
  * Creates an http.Server exclusively used for WS upgrades.
