@@ -20,9 +20,9 @@ export { ServerRequestHandlerArgs } from './handlers/server-request-handler.js';
  * @api public
  */
 export function listen<
+	TIncoming extends PublicMethodMap = {},
 	TChannel extends ChannelMap = {},
 	TService extends ServiceMap = {},
-	TIncoming extends PublicMethodMap = {},
 	TOutgoing extends PublicMethodMap = {},
 	TPrivateIncoming extends PrivateMethodMap = {},
 	TPrivateOutgoing extends PrivateMethodMap = {},
@@ -31,9 +31,9 @@ export function listen<
 >(): Server<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>;
 //export function listen<T extends ServerMap>(port: number, fn: () => void): Server<T>;
 export function listen<
+	TIncoming extends PublicMethodMap = {},
 	TChannel extends ChannelMap = {},
 	TService extends ServiceMap = {},
-	TIncoming extends PublicMethodMap = {},
 	TOutgoing extends PublicMethodMap = {},
 	TPrivateIncoming extends PrivateMethodMap = {},
 	TPrivateOutgoing extends PrivateMethodMap = {},
@@ -44,9 +44,9 @@ export function listen<
 	options: ServerOptions<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>
 ): Server<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>;
 export function listen<
+	TIncoming extends PublicMethodMap = {},
 	TChannel extends ChannelMap = {},
 	TService extends ServiceMap = {},
-	TIncoming extends PublicMethodMap = {},
 	TOutgoing extends PublicMethodMap = {},
 	TPrivateIncoming extends PrivateMethodMap = {},
 	TPrivateOutgoing extends PrivateMethodMap = {},
@@ -57,9 +57,9 @@ export function listen<
 	options: ServerOptions<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>, fn: () => void
 ): Server<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>;
 export function listen<
+	TIncoming extends PublicMethodMap,
 	TChannel extends ChannelMap,
 	TService extends ServiceMap,
-	TIncoming extends PublicMethodMap,
 	TOutgoing extends PublicMethodMap,
 	TPrivateIncoming extends PrivateMethodMap,
 	TPrivateOutgoing extends PrivateMethodMap,

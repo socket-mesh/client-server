@@ -78,7 +78,7 @@ const clientOptions: ClientSocketOptions<ServerIncomingMap> = {
 
 describe('Integration tests', function () {
 	beforeEach(async function () {
-		server = listen<MyChannels, {}, ServerIncomingMap>(
+		server = listen<ServerIncomingMap, MyChannels>(
 			PORT_NUMBER,
 			{
 				authEngine: { authKey: SERVER_AUTH_KEY },
