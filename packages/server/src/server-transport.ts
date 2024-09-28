@@ -13,9 +13,9 @@ import { ClientPrivateMap, ServerPrivateMap } from "@socket-mesh/client";
 import { ServerSocketState } from "./server-socket-state.js";
 
 export class ServerTransport<
+	TIncoming extends PublicMethodMap = {},
 	TChannel extends ChannelMap = {},
 	TService extends ServiceMap = {},
-	TIncoming extends PublicMethodMap = {},
 	TOutgoing extends PublicMethodMap = {},
 	TPrivateIncoming extends PrivateMethodMap = {},
 	TPrivateOutgoing extends PrivateMethodMap = {},
@@ -32,7 +32,7 @@ export class ServerTransport<
 	public readonly service?: string;
 	public readonly request: IncomingMessage;
 
-	constructor(options: ServerSocketOptions<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>) {
+	constructor(options: ServerSocketOptions<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>) {
 		super(options);
 
 		this.type = 'server';
@@ -317,11 +317,11 @@ export class ServerTransport<
 		this.socket.server.emit('socketConnect', { socket: this.socket, pingTimeoutMs, id: this.socket.id, isAuthenticated: !!this.signedAuthToken, authError });
 	}
 
-	public override get socket(): ServerSocket<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState> {
-		return super.socket as ServerSocket<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>;
+	public override get socket(): ServerSocket< TIncoming, TChannel, TService,TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState> {
+		return super.socket as ServerSocket<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>;
 	}
 
-	public override set socket(value: ServerSocket<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>) {
+	public override set socket(value: ServerSocket<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>) {
 		super.socket = value;
 	}
 

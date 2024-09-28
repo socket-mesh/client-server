@@ -15,8 +15,8 @@ export async function publishHandler(
 			ClientPrivateMap,
 			{},
 			ServerSocketState,
-			ServerSocket<{ [channel: string]: any }>,
-			ServerTransport<{ [channel: string]: any }>
+			ServerSocket<{}, { [channel: string]: any }>,
+			ServerTransport<{}, { [channel: string]: any }>
 		>
 ): Promise<void> {
 	if (!socket.server.allowClientPublish) {

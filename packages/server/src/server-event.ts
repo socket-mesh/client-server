@@ -54,7 +54,7 @@ export interface ConnectionEvent<
 	TServerState extends object,
 	TState extends object
 > {
-	socket: ServerSocket<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>,
+	socket: ServerSocket<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>,
 	upgradeReq: IncomingMessage
 }
 
@@ -75,7 +75,7 @@ export interface HandshakeEvent<
 	TServerState extends object,
 	TState extends object
 > {
-	socket: ServerSocket<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>
+	socket: ServerSocket<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>
 }
 
 export interface WarningEvent {
@@ -101,7 +101,7 @@ export interface ServerSocketEvent<
 > {
 	socket:
 		ClientSocket<PublicMethodMap, TChannel, TService, TState, TOutgoing & TPrivateOutgoing, TPrivateIncoming> |
-		ServerSocket<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>
+		ServerSocket<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>
 }
 
 export type SocketAuthStateChangeEvent<

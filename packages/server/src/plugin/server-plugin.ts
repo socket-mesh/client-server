@@ -17,8 +17,8 @@ export interface HandshakePluginArgs<
 	TServerState extends object,
 	TState extends object
 > {
-	socket: ServerSocket<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>,
-	transport: ServerTransport<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>	
+	socket: ServerSocket<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>,
+	transport: ServerTransport<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>	
 	authInfo: AuthInfo
 }
 
@@ -34,8 +34,8 @@ export interface PublishPluginArgs<
 > {
 	channel: string,
 	data: any,
-	socket: ServerSocket<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>,
-	transport: ServerTransport<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>
+	socket: ServerSocket<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>,
+	transport: ServerTransport<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>
 }
 
 export interface SubscribePluginArgs<
@@ -50,8 +50,8 @@ export interface SubscribePluginArgs<
 > {
 	channel: string,
 	options: ChannelOptions,
-	socket: ServerSocket<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>,
-	transport: ServerTransport<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>
+	socket: ServerSocket<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>,
+	transport: ServerTransport<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>
 }
 
 export interface ServerPlugin<

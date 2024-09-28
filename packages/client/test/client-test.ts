@@ -43,7 +43,7 @@ const allowedUsers: { [name: string]: true } = {
 };
 
 let client: ClientSocket<ServerIncomingMap, MyChannels>;
-let server: Server<MyChannels, {}, ServerIncomingMap>;
+let server: Server<ServerIncomingMap, MyChannels>;
 
 let performTaskTriggered: boolean;
 

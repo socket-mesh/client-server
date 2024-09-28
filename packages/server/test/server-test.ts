@@ -62,7 +62,7 @@ type ServerIncomingMap = {
 	proc: (num: number) => string
 }
 
-function bindFailureHandlers(server: Server<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>) {
+function bindFailureHandlers(server: Server<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>) {
 	if (LOG_ERRORS) {
 		(async () => {
 			for await (let {error} of server.listen('error')) {
@@ -185,7 +185,7 @@ const serverOptions: ServerOptions<MyChannels, {}, ServerIncomingMap, ClientInco
 }
 
 let client: ClientSocket<ServerIncomingMap, MyChannels>;
-let server: Server<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>;
+let server: Server<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>;
 
 describe('Integration tests', function () {
 	afterEach(async function () {
@@ -882,7 +882,7 @@ describe('Integration tests', function () {
 
 			client = new ClientSocket(clientOptions);
 
-			let serverSocket: ServerSocket<MyChannels, {}, ServerIncomingMap, ClientIncomingMap> | null = null;
+			let serverSocket: ServerSocket<ServerIncomingMap, MyChannels, {}, ClientIncomingMap> | null = null;
 
 			(async () => {
 				for await (let {socket} of server.listen('handshake')) {
@@ -2665,7 +2665,7 @@ describe('Integration tests', function () {
 			bindFailureHandlers(server);
 
 			const errorList: Error[] = [];
-			let serverSocket: ServerSocket<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>;
+			let serverSocket: ServerSocket<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>;
 			let wasKickOutCalled = false;
 
 			(async () => {

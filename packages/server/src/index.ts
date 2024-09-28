@@ -27,7 +27,7 @@ export function listen<
 	TPrivateOutgoing extends PrivateMethodMap = {},
 	TServerState extends object = {},
 	TState extends object = {}
->(): Server<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>;
+>(): Server<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>;
 //export function listen<T extends ServerMap>(port: number, fn: () => void): Server<T>;
 export function listen<
 	TChannel extends ChannelMap = {},
@@ -41,7 +41,7 @@ export function listen<
 >(
 	port: number,
 	options: ServerOptions<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>
-): Server<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>;
+): Server<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>;
 export function listen<
 	TChannel extends ChannelMap = {},
 	TService extends ServiceMap = {},
@@ -54,7 +54,7 @@ export function listen<
 >(
 	port: number,
 	options: ServerOptions<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>, fn: () => void
-): Server<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>;
+): Server<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>;
 export function listen<
 	TChannel extends ChannelMap,
 	TService extends ServiceMap,
@@ -67,7 +67,7 @@ export function listen<
 >(
 	port?: number,
 	options?: ServerOptions<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState> | (() => void), fn?: () => void
-): Server<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState> {
+): Server<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState> {
   if (typeof options === 'function') {
     fn = options;
     options = {};
@@ -109,7 +109,7 @@ export function attach<
 >(
 	server: http.Server,
 	options?: ServerOptions<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>
-): Server<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState> {
+): Server<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState> {
   if (options == null) {
     options = {};
   }

@@ -23,9 +23,9 @@ import { ChannelMap } from "@socket-mesh/channels";
 import { ServerSocketState } from "./server-socket-state.js";
 
 export class Server<
-	TChannel extends ChannelMap,
-	TService extends ServiceMap = {},
 	TIncoming extends PublicMethodMap = {},
+	TChannel extends ChannelMap = {},
+	TService extends ServiceMap = {},
 	TOutgoing extends PublicMethodMap = {},
 	TPrivateIncoming extends PrivateMethodMap = {},
 	TPrivateOutgoing extends PrivateMethodMap = {},
@@ -58,10 +58,10 @@ export class Server<
 
 	public readonly auth: AuthEngine;
 	public readonly brokerEngine: Broker<TChannel>;
-	public readonly clients: { [ id: string ]: ServerSocket<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState> };
+	public readonly clients: { [ id: string ]: ServerSocket<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState> };
 	public clientCount: number;
 	public readonly codecEngine: CodecEngine;
-	public readonly pendingClients: { [ id: string ]: ServerSocket<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState> };	
+	public readonly pendingClients: { [ id: string ]: ServerSocket< TIncoming, TChannel, TService,TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState> };	
 	public pendingClientCount: number;
 	public readonly socketStreamCleanupMode: StreamCleanupMode;
 	public readonly httpServer: HttpServer;
@@ -151,7 +151,7 @@ export class Server<
 		this.plugins.push(...plugin);
 	}
 
-	private bind(socket: ServerSocket<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>) {
+	private bind(socket: ServerSocket<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>) {
 /*
 		if (socket.type === 'client') {
 			(async () => {
@@ -249,7 +249,7 @@ export class Server<
 			wsSocket.upgradeReq = upgradeReq;
 		}
 */
-		const socket = new ServerSocket<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>({
+		const socket = new ServerSocket<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>({
 			ackTimeoutMs: this.ackTimeoutMs,
 			callIdGenerator: this._callIdGenerator,
 			codecEngine: this.codecEngine,
@@ -295,7 +295,7 @@ export class Server<
 	private onUnhandledRequest(
 		socket:
 			ClientSocket<PublicMethodMap, TChannel, TService, TState, TOutgoing & TPrivateOutgoing, TPrivateIncoming> |
-			ServerSocket<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>,
+			ServerSocket<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>,
 		packet: AnyPacket<TIncoming & TPrivateIncoming & ServerPrivateMap, TService>
 	): void {
 
@@ -304,7 +304,7 @@ export class Server<
 	private socketDisconnected(
 		socket:
 			ClientSocket<PublicMethodMap, TChannel, TService, TState, TOutgoing & TPrivateOutgoing, TPrivateIncoming> |
-			ServerSocket<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>
+			ServerSocket<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>
 	): void {
 		if (!!this.pendingClients[socket.id]) {
 			delete this.pendingClients[socket.id];
