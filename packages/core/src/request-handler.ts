@@ -1,13 +1,17 @@
 import { TimeoutError } from "@socket-mesh/errors";
 import { Socket } from "./socket.js";
 import { SocketTransport } from "./socket-transport.js";
-import { EmptySocketMap, SocketMap } from "./maps/socket-map.js";
+import { MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap } from "./maps/method-map.js";
 
 export interface RequestHandlerArgsOptions<
 	TOptions,
-	T extends SocketMap,
-	TSocket extends Socket<T> = Socket<T>,
-	TTransport extends SocketTransport<T> = SocketTransport<T>
+	TIncoming extends MethodMap,
+	TOutgoing extends PublicMethodMap,
+	TPrivateOutgoing extends PrivateMethodMap,
+	TService extends ServiceMap,
+	TState extends object,
+	TSocket extends Socket<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> = Socket<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>,
+	TTransport extends SocketTransport<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> = SocketTransport<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>
 > {
 	isRpc: boolean,
 	method: string,
@@ -19,9 +23,13 @@ export interface RequestHandlerArgsOptions<
 
 export class RequestHandlerArgs<
 	TOptions,
-	T extends SocketMap = EmptySocketMap,
-	TSocket extends Socket<T> = Socket<T>,
-	TTransport extends SocketTransport<T> = SocketTransport<T>
+	TIncoming extends MethodMap = {},
+	TOutgoing extends PublicMethodMap = {},
+	TPrivateOutgoing extends PrivateMethodMap = {},
+	TService extends ServiceMap = {},
+	TState extends object = {},
+	TSocket extends Socket<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> = Socket<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>,
+	TTransport extends SocketTransport<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> = SocketTransport<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>
 > {
 	public isRpc: boolean;
 	public method: string;
@@ -31,7 +39,7 @@ export class RequestHandlerArgs<
 	public timeoutMs?: number | boolean;
 	public transport: TTransport;
 
-	constructor(options: RequestHandlerArgsOptions<TOptions, T, TSocket, TTransport>) {
+	constructor(options: RequestHandlerArgsOptions<TOptions, TIncoming, TOutgoing, TPrivateOutgoing, TService, TState, TSocket, TTransport>) {
 		this.isRpc = options.isRpc;
 		this.method = options.method;
 		this.options = options.options;
@@ -58,7 +66,11 @@ export class RequestHandlerArgs<
 
 export type RequestHandler<
 	TOptions, U,
-	T extends SocketMap,
-	TSocket extends Socket<T> = Socket<T>,
-	TTransport extends SocketTransport<T> = SocketTransport<T>
-> = (args: RequestHandlerArgs<TOptions, T, TSocket, TTransport>) => Promise<U>;
+	TIncoming extends MethodMap,
+	TOutgoing extends PublicMethodMap,
+	TPrivateOutgoing extends PrivateMethodMap,
+	TService extends ServiceMap,
+	TState extends object,
+	TSocket extends Socket<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> = Socket<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>,
+	TTransport extends SocketTransport<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> = SocketTransport<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>
+> = (args: RequestHandlerArgs<TOptions, TIncoming, TOutgoing, TPrivateOutgoing, TService, TState, TSocket, TTransport>) => Promise<U>;

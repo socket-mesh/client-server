@@ -1,29 +1,66 @@
-import { HandlerMap, Socket, SocketOptions } from "@socket-mesh/core";
+import { HandlerMap, PrivateMethodMap, PublicMethodMap, ServiceMap, Socket, SocketOptions } from "@socket-mesh/core";
 import ws from "ws";
 import { ServerTransport } from "./server-transport.js";
-import { SocketMapFromServer } from "./maps/socket-map.js";
-import { ServerMap } from "./maps/server-map.js";
 import { Exchange } from "./broker/exchange.js";
 import { Server } from "./server.js";
 import { IncomingMessage } from "http";
 import { ServerPlugin } from "./plugin/server-plugin.js";
+import { ChannelMap } from "@socket-mesh/channels";
+import { ServerSocketState } from "./server-socket-state.js";
+import { ClientPrivateMap, ServerPrivateMap } from "@socket-mesh/client";
 
-export interface ServerSocketOptions<T extends ServerMap> extends SocketOptions<SocketMapFromServer<T>> {
-	handlers: HandlerMap<SocketMapFromServer<T>>,
-	plugins?: ServerPlugin<T>[],
+export interface ServerSocketOptions<
+	TIncoming extends PublicMethodMap,
+	TChannel extends ChannelMap,
+	TService extends ServiceMap,
+	TOutgoing extends PublicMethodMap,
+	TPrivateIncoming extends PrivateMethodMap,
+	TPrivateOutgoing extends PrivateMethodMap,
+	TServerState extends object,
+	TState extends object
+> extends SocketOptions<
+	TIncoming & TPrivateIncoming & ServerPrivateMap,
+	TOutgoing,
+	TPrivateOutgoing & ClientPrivateMap,
+	TService,
+	TState & ServerSocketState
+> {
+	handlers: HandlerMap<
+		TIncoming & TPrivateIncoming & ServerPrivateMap,
+		TOutgoing,
+		TPrivateOutgoing & ClientPrivateMap,
+		TService,
+		TState & ServerSocketState
+	>,
+	plugins?: ServerPlugin<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>[],
 	id?: string,
 	service?: string,
-	server: Server<T>,
+	server: Server<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>,
 	request: IncomingMessage,
 	socket: ws.WebSocket
 }
 
-export class ServerSocket<T extends ServerMap> extends Socket<SocketMapFromServer<T>> {
-	public readonly server: Server<T>;
-	private _serverTransport: ServerTransport<T>;
+export class ServerSocket<
+	TIncoming extends PublicMethodMap = {},
+	TChannel extends ChannelMap = {},
+	TService extends ServiceMap = {},
+	TOutgoing extends PublicMethodMap = {},
+	TPrivateIncoming extends PrivateMethodMap = {},
+	TPrivateOutgoing extends PrivateMethodMap = {},
+	TServerState extends object = {},
+	TState extends object = {}
+> extends Socket<
+	TIncoming & TPrivateIncoming & ServerPrivateMap,
+	TOutgoing,
+	TPrivateOutgoing & ClientPrivateMap,
+	TService,
+	TState & ServerSocketState
+> {
+	public readonly server: Server<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>;
+	private _serverTransport: ServerTransport<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>;
 
-	constructor(options: ServerSocketOptions<T>) {
-		const transport = new ServerTransport<T>(options);
+	constructor(options: ServerSocketOptions<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>) {
+		const transport = new ServerTransport<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>(options);
 
 		super(transport, options);
 
@@ -53,7 +90,7 @@ export class ServerSocket<T extends ServerMap> extends Socket<SocketMapFromServe
 		}
 	}
 
-	public get exchange(): Exchange<T['Channel']> {
+	public get exchange(): Exchange<TChannel> {
 		return this.server.exchange;
 	}
 

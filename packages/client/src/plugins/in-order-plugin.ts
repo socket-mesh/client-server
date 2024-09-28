@@ -1,20 +1,32 @@
 import { RawData } from "ws";
-import { EmptySocketMap, MessageRawPluginArgs, Plugin, PluginArgs, SocketMap } from "@socket-mesh/core";
+import { MessageRawPluginArgs, MethodMap, Plugin, PluginArgs, PrivateMethodMap, PublicMethodMap, ServiceMap } from "@socket-mesh/core";
 import { WritableConsumableStream } from "@socket-mesh/writable-consumable-stream";
 import ws from "isomorphic-ws";
 
-interface InboundMessage<T extends SocketMap> extends MessageRawPluginArgs<T> {
+interface InboundMessage<
+	TIncoming extends MethodMap,
+	TOutgoing extends PublicMethodMap,
+	TPrivateOutgoing extends PrivateMethodMap,
+	TService extends ServiceMap,
+	TState extends object
+> extends MessageRawPluginArgs<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> {
 	callback: (err: Error | null, data: string | ws.RawData) => void
 }
 
-export class InOrderPlugin<T extends SocketMap = EmptySocketMap> implements Plugin<T> {
+export class InOrderPlugin<
+	TIncoming extends MethodMap,
+	TOutgoing extends PublicMethodMap,
+	TPrivateOutgoing extends PrivateMethodMap,
+	TService extends ServiceMap,
+	TState extends object
+> implements Plugin<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> {
 	type: 'inOrder'
 
-	private readonly _inboundMessageStream: WritableConsumableStream<InboundMessage<T>>;
+	private readonly _inboundMessageStream: WritableConsumableStream<InboundMessage<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>>;
 	//private readonly _outboundMessageStream: WritableConsumableStream<SendRequestPluginArgs<T>>;
 
 	constructor() {
-		this._inboundMessageStream = new WritableConsumableStream<InboundMessage<T>>();
+		this._inboundMessageStream = new WritableConsumableStream<InboundMessage<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>>();
 		//this._outboundMessageStream = new WritableConsumableStream<SendRequestPluginArgs<T>>;
 		this.handleInboundMessageStream();
 		//this.handleOutboundMessageStream();
@@ -57,7 +69,7 @@ export class InOrderPlugin<T extends SocketMap = EmptySocketMap> implements Plug
 	}
 */
 
-	onEnd({ transport }: PluginArgs<T>): void {
+	onEnd({ transport }: PluginArgs<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>): void {
 		if (transport.streamCleanupMode === 'close') {
 			this._inboundMessageStream.close();
 			//this._outboundMessageStream.close();
@@ -67,7 +79,7 @@ export class InOrderPlugin<T extends SocketMap = EmptySocketMap> implements Plug
 		}
 	}
 
-	onMessageRaw(options: MessageRawPluginArgs<T>): Promise<string | RawData> {
+	onMessageRaw(options: MessageRawPluginArgs<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>): Promise<string | RawData> {
 		let callback: (err: Error | null, data: string | ws.RawData) => void;
 
 		const promise = new Promise<string | RawData>((resolve, reject) => {

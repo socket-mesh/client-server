@@ -1,23 +1,38 @@
-import { ServerMap } from "./maps/server-map.js";
 import { ServerSocket, ServerSocketOptions } from "./server-socket.js";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
 import { AuthError, BrokerError, InvalidActionError, socketProtocolErrorStatuses } from "@socket-mesh/errors";
-import { SocketMapFromServer } from "./maps/socket-map.js";
 import jwt from 'jsonwebtoken';
 import { AuthTokenOptions } from "@socket-mesh/auth-engine";
 import { Data } from "ws";
-import { AnyPacket, AnyResponse, SocketStatus, SocketTransport, abortRequest, InvokeMethodRequest, InvokeServiceRequest, TransmitMethodRequest, TransmitServiceRequest, InboundMessage } from "@socket-mesh/core";
+import { AnyPacket, AnyResponse, SocketStatus, SocketTransport, abortRequest, InvokeMethodRequest, InvokeServiceRequest, TransmitMethodRequest, TransmitServiceRequest, InboundMessage, ServiceMap, PublicMethodMap, PrivateMethodMap } from "@socket-mesh/core";
 import { IncomingMessage } from "http";
 import { ServerPlugin } from "./plugin/server-plugin.js";
-import { PublishOptions } from "@socket-mesh/channels";
+import { ChannelMap, PublishOptions } from "@socket-mesh/channels";
 import base64id from "base64id";
+import { ClientPrivateMap, ServerPrivateMap } from "@socket-mesh/client";
+import { ServerSocketState } from "./server-socket-state.js";
 
-export class ServerTransport<T extends ServerMap> extends SocketTransport<SocketMapFromServer<T>> {
-	public readonly plugins: ServerPlugin<T>[];
+export class ServerTransport<
+	TIncoming extends PublicMethodMap = {},
+	TChannel extends ChannelMap = {},
+	TService extends ServiceMap = {},
+	TOutgoing extends PublicMethodMap = {},
+	TPrivateIncoming extends PrivateMethodMap = {},
+	TPrivateOutgoing extends PrivateMethodMap = {},
+	TServerState extends object = {},
+	TState extends object = {}
+> extends SocketTransport<
+	TIncoming & TPrivateIncoming & ServerPrivateMap,
+	TOutgoing,
+	TPrivateOutgoing & ClientPrivateMap,
+	TService,
+	TState & ServerSocketState
+> {
+	public readonly plugins: ServerPlugin<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>[];
 	public readonly service?: string;
 	public readonly request: IncomingMessage;
 
-	constructor(options: ServerSocketOptions<T>) {
+	constructor(options: ServerSocketOptions<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>) {
 		super(options);
 
 		this.type = 'server';
@@ -50,8 +65,10 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 
 		return false;
 	}
-	
-	protected handleInboudMessage({ packet, timestamp }: InboundMessage<SocketMapFromServer<T>>): Promise<void> {
+
+	protected handleInboudMessage(
+		{ packet, timestamp }: InboundMessage<TIncoming & TPrivateIncoming & ServerPrivateMap, TOutgoing, TPrivateOutgoing & ClientPrivateMap, TService>
+	): Promise<void> {
 		if ((packet === null || typeof packet !== 'object') && this.socket.server.strictHandshake && this.status === 'connecting') {
 			this.disconnect(4009);
 			return;
@@ -115,10 +132,10 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 	}
 	
 	protected override onInvoke<
-		TService extends keyof T["Service"],
-		TServiceMethod extends keyof T["Service"][TService],
-		TMethod extends keyof T["Outgoing"], TPrivateMethod extends keyof T["PrivateOutgoing"]
-	>(request: InvokeMethodRequest<T["Outgoing"], TMethod> | InvokeMethodRequest<T["PrivateOutgoing"], TPrivateMethod> | InvokeServiceRequest<T["Service"], TService, TServiceMethod>): void {
+		TServiceName extends keyof TService,
+		TServiceMethod extends keyof TService[TServiceName],
+		TMethod extends keyof TOutgoing, TPrivateMethod extends keyof TPrivateOutgoing
+	>(request: InvokeMethodRequest<TOutgoing, TMethod> | InvokeMethodRequest<TPrivateOutgoing, TPrivateMethod> | InvokeServiceRequest<TService, TServiceName, TServiceMethod>): void {
 		if (request.method !== '#publish') {
 			super.onInvoke(request);
 			return;
@@ -129,7 +146,7 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 				super.onInvoke(request);
 			})
 			.catch(err => {
-				abortRequest(request as InvokeMethodRequest<T["Outgoing"], TMethod>, err);
+				abortRequest(request as InvokeMethodRequest<TOutgoing, TMethod>, err);
 			});
 	}
 
@@ -173,7 +190,11 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		options.data = data;
 	}
 
-	protected override async onRequest(packet: AnyPacket<SocketMapFromServer<T>>, timestamp: Date, pluginError?: Error): Promise<boolean> {
+	protected override async onRequest(
+		packet: AnyPacket<TIncoming & TPrivateIncoming & ServerPrivateMap, TService>,
+		timestamp: Date,
+		pluginError?: Error
+	): Promise<boolean> {
 		let wasHandled = false;
 
 		if (!this.service || !('service' in packet) || packet.service === this.service) {
@@ -190,16 +211,16 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		return wasHandled;
 	}
 	
-	protected override onResponse(response: AnyResponse<SocketMapFromServer<T>>): void {
+	protected override onResponse(response: AnyResponse<TOutgoing, TPrivateOutgoing & ClientPrivateMap, TService>): void {
 		super.onResponse(response);
 		this.socket.server.emit('socketResponse', { socket: this.socket, response });
 	}
 
 	protected override onTransmit<
-		TService extends keyof T["Service"],
-		TServiceMethod extends keyof T["Service"][TService],
-		TMethod extends keyof T["Outgoing"]
-	>(request: TransmitMethodRequest<T["Outgoing"], TMethod> | TransmitServiceRequest<T["Service"], TService, TServiceMethod>): void {
+		TServiceName extends keyof TService,
+		TServiceMethod extends keyof TService[TServiceName],
+		TMethod extends keyof TOutgoing
+	>(request: TransmitMethodRequest<TOutgoing, TMethod> | TransmitServiceRequest<TService, TServiceName, TServiceMethod>): void {
 		if (request.method !== '#publish') {
 			super.onTransmit(request);
 			return;
@@ -209,7 +230,7 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 				super.onTransmit(request);
 			})
 			.catch(err => {
-				abortRequest(request as TransmitMethodRequest<T["Outgoing"], TMethod>, err);
+				abortRequest(request as TransmitMethodRequest<TOutgoing, TMethod>, err);
 			});
 	}
 
@@ -296,11 +317,11 @@ export class ServerTransport<T extends ServerMap> extends SocketTransport<Socket
 		this.socket.server.emit('socketConnect', { socket: this.socket, pingTimeoutMs, id: this.socket.id, isAuthenticated: !!this.signedAuthToken, authError });
 	}
 
-	public override get socket(): ServerSocket<T> {
-		return super.socket as ServerSocket<T>;
+	public override get socket(): ServerSocket< TIncoming, TChannel, TService,TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState> {
+		return super.socket as ServerSocket<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>;
 	}
 
-	public override set socket(value: ServerSocket<T>) {
+	public override set socket(value: ServerSocket<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>) {
 		super.socket = value;
 	}
 

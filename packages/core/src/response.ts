@@ -1,10 +1,17 @@
-import { MethodMap, ServiceMap } from "./maps/method-map.js";
-import { SocketMap } from "./maps/socket-map.js";
+import { MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap } from "./maps/method-map.js";
 
-export type AnyResponse<T extends SocketMap> =
-	Response | ErrorResponse | ServiceDataResponse<T['Service']> | MethodDataResponse<T['PrivateOutgoing']> | MethodDataResponse<T['Outgoing']>;
+export type AnyResponse<
+	TOutgoing extends PublicMethodMap,
+	TPrivateOutgoing extends PrivateMethodMap,
+	TService extends ServiceMap
+> =
+	Response | ErrorResponse | ServiceDataResponse<TService> | MethodDataResponse<TPrivateOutgoing> | MethodDataResponse<TOutgoing>;
 
-export function isResponsePacket<T extends SocketMap>(packet?: unknown): packet is AnyResponse<T> {
+export function isResponsePacket<
+	TOutgoing extends PublicMethodMap,
+	TPrivateOutgoing extends PrivateMethodMap,
+	TService extends ServiceMap
+>(packet?: unknown): packet is AnyResponse<TOutgoing, TPrivateOutgoing, TService> {
 	return (typeof packet === 'object') && 'rid' in packet;
 }
 

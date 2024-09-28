@@ -1,11 +1,21 @@
 import { RequestHandlerArgs } from "@socket-mesh/core";
 import { ClientSocket } from "../client-socket.js";
 import { ClientTransport } from "../client-transport.js";
-import { ClientMap, KickOutOptions } from "../maps/client-map.js";
-import { BasicSocketMapClient } from "../maps/socket-map.js";
+import { ClientPrivateMap, KickOutOptions } from "../maps/client-map.js";
+import { ServerPrivateMap } from "../maps/server-map.js";
+import { ChannelMap } from "@socket-mesh/channels";
 
 export async function kickOutHandler(
-	{ socket, options }: RequestHandlerArgs<KickOutOptions, BasicSocketMapClient, ClientSocket<ClientMap>, ClientTransport<ClientMap>>
+	{ socket, options }: RequestHandlerArgs<
+		KickOutOptions,
+		ClientPrivateMap,
+		{},
+		ServerPrivateMap,
+		{},
+		{},
+		ClientSocket<{}, ChannelMap>,
+		ClientTransport<{}, {}, {}, {}, {}>
+	>
 ): Promise<void> {
 	if (typeof options.channel !== 'string') return;
 

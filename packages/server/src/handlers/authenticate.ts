@@ -1,11 +1,10 @@
-import { RequestHandlerArgs, SocketTransport } from "@socket-mesh/core";
 import jwt from "jsonwebtoken";
 import { AuthTokenError, AuthTokenExpiredError, AuthTokenInvalidError, AuthTokenNotBeforeError, InvalidActionError } from "@socket-mesh/errors";
 import { AuthEngine } from "@socket-mesh/auth-engine";
 import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
-import { BasicSocketMapServer } from "../maps/socket-map.js";
 import { ServerSocket } from "../server-socket.js";
-import { BasicServerMap } from "../maps/server-map.js";
+import { ServerTransport } from "../server-transport.js";
+import { ServerRequestHandlerArgs } from "./server-request-handler.js";
 
 const HANDSHAKE_REJECTION_STATUS_CODE = 4008;
 
@@ -22,7 +21,7 @@ export interface ValidAuthInfo {
 }
 
 export async function authenticateHandler(
-	{ isRpc, options: signedAuthToken, socket, transport }: RequestHandlerArgs<string, BasicSocketMapServer, ServerSocket<BasicServerMap>>
+	{ isRpc, options: signedAuthToken, socket, transport }: ServerRequestHandlerArgs<string>
 ): Promise<void> {
 	if (!isRpc) {
 		socket.disconnect(HANDSHAKE_REJECTION_STATUS_CODE);
@@ -68,8 +67,8 @@ function processTokenError(err: jwt.VerifyErrors): AuthTokenError {
 }
 
 export async function processAuthentication(
-	socket: ServerSocket<BasicServerMap>,
-	transport: SocketTransport<BasicSocketMapServer>,
+	socket: ServerSocket,
+	transport: ServerTransport,
 	authInfo: AuthInfo
 ): Promise<boolean> {
 	if ('authError' in authInfo) {

@@ -4,20 +4,34 @@ import { setAuthTokenHandler } from "./handlers/set-auth-token.js";
 import { removeAuthTokenHandler } from "./handlers/remove-auth-token.js";
 import { SignedAuthToken } from "@socket-mesh/auth";
 import { hydrateError } from "@socket-mesh/errors";
-import { Socket, wait } from "@socket-mesh/core";
+import { MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap, Socket, wait } from "@socket-mesh/core";
 import { ClientChannels } from "./client-channels.js";
-import { SocketMapFromClient } from "./maps/socket-map.js";
-import { ClientMap } from "./maps/client-map.js";
+import { ClientPrivateMap } from "./maps/client-map.js";
 import { publishHandler } from "./handlers/publish.js";
 import { kickOutHandler } from "./handlers/kickout.js";
+import { ChannelMap } from "@socket-mesh/channels";
+import { ServerPrivateMap } from "./maps/server-map.js";
 
-export class ClientSocket<T extends ClientMap> extends Socket<SocketMapFromClient<T>> {
-	private readonly _clientTransport: ClientTransport<T>;
-	public readonly channels: ClientChannels<T>;
+export class ClientSocket<
+	TOutgoing extends PublicMethodMap = {},
+	TChannel extends ChannelMap = ChannelMap,
+	TService extends ServiceMap = {},
+	TState extends object = {},
+	TIncoming extends MethodMap = {},
+	TPrivateOutgoing extends PrivateMethodMap = {}
+> extends Socket<
+	TIncoming & ClientPrivateMap,
+	TOutgoing,
+	TPrivateOutgoing & ServerPrivateMap,
+	TService,
+	TState
+> {
+	private readonly _clientTransport: ClientTransport<TIncoming, TService, TOutgoing, TPrivateOutgoing, TState>;
+	public readonly channels: ClientChannels<TChannel, TIncoming, TService, TOutgoing, TPrivateOutgoing, TState>;
 
 	constructor(address: string | URL);
-	constructor(options: ClientSocketOptions<T>);
-	constructor(options: ClientSocketOptions<T> | string | URL) {
+	constructor(options: ClientSocketOptions<TOutgoing, TService, TIncoming, TPrivateOutgoing, TState>);
+	constructor(options: ClientSocketOptions<TOutgoing, TService, TIncoming, TPrivateOutgoing, TState> | string | URL) {
 		options = parseClientOptions(options);
 
 		options.handlers = 
@@ -36,7 +50,7 @@ export class ClientSocket<T extends ClientMap> extends Socket<SocketMapFromClien
 		super(clientTransport, options);
 
 		this._clientTransport = clientTransport;
-		this.channels = new ClientChannels<T>(this._clientTransport, options);
+		this.channels = new ClientChannels<TChannel, TIncoming, TService, TOutgoing, TPrivateOutgoing, TState>(this._clientTransport, options);
 
 		if (options.autoConnect !== false) {
 			this.connect(options);
