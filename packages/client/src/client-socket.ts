@@ -30,8 +30,8 @@ export class ClientSocket<
 	public readonly channels: ClientChannels<TChannel, TIncoming, TService, TOutgoing, TPrivateOutgoing, TState>;
 
 	constructor(address: string | URL);
-	constructor(options: ClientSocketOptions<TIncoming, TService, TOutgoing, TPrivateOutgoing, TState>);
-	constructor(options: ClientSocketOptions<TIncoming, TService, TOutgoing, TPrivateOutgoing, TState> | string | URL) {
+	constructor(options: ClientSocketOptions<TOutgoing, TIncoming, TService, TPrivateOutgoing, TState>);
+	constructor(options: ClientSocketOptions<TOutgoing, TIncoming, TService, TPrivateOutgoing, TState> | string | URL) {
 		options = parseClientOptions(options);
 
 		options.handlers = 

@@ -18,9 +18,9 @@ export interface ConnectOptions {
 }
 
 export interface ClientSocketOptions<
+	TOutgoing extends PublicMethodMap = {},
 	TIncoming extends MethodMap = {},
 	TService extends ServiceMap = {},
-	TOutgoing extends PublicMethodMap = {},
 	TPrivateOutgoing extends PrivateMethodMap = {},
 	TState extends object = {}
 > extends SocketOptions<
@@ -56,10 +56,10 @@ export function parseClientOptions<
 	TOutgoing extends PublicMethodMap,
 	TPrivateOutgoing extends PrivateMethodMap,
 	TState extends object
->(options: ClientSocketOptions<TIncoming, TService, TOutgoing, TPrivateOutgoing, TState> | string | URL): ClientSocketOptions<TIncoming, TService, TOutgoing, TPrivateOutgoing, TState> {
+>(options: ClientSocketOptions<TOutgoing, TIncoming, TService, TPrivateOutgoing, TState> | string | URL): ClientSocketOptions<TOutgoing, TIncoming, TService, TPrivateOutgoing, TState> {
 	if (typeof options === 'string' || 'pathname' in options) {
-		options = { address: options } as ClientSocketOptions<TIncoming, TService, TOutgoing, TPrivateOutgoing, TState>;
+		options = { address: options } as ClientSocketOptions<TOutgoing, TIncoming, TService, TPrivateOutgoing, TState>;
 	}
 	
-	return Object.assign<ClientSocketOptions<TIncoming, TService, TOutgoing, TPrivateOutgoing, TState>, ClientSocketOptions<TIncoming, TService, TOutgoing, TPrivateOutgoing, TState>>({}, options);
+	return Object.assign<ClientSocketOptions<TOutgoing, TIncoming, TService, TPrivateOutgoing, TState>, ClientSocketOptions<TOutgoing, TIncoming, TService, TPrivateOutgoing, TState>>({}, options);
 }

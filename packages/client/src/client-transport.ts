@@ -34,7 +34,7 @@ export class ClientTransport<
 	private _pingTimeoutMs: number;
 	public isPingTimeoutDisabled: boolean;
 
-	constructor(options: ClientSocketOptions<TIncoming, TService, TOutgoing, TPrivateOutgoing, TState>) {
+	constructor(options: ClientSocketOptions<TOutgoing, TIncoming, TService, TPrivateOutgoing, TState>) {
 		super(options);
 
 		this.type = 'client';

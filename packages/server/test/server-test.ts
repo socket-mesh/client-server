@@ -165,7 +165,7 @@ async function procHandler(
 	return `success ${data}`;
 }
 
-const clientOptions: ClientSocketOptions<{}, {}, ServerIncomingMap> = {
+const clientOptions: ClientSocketOptions<ServerIncomingMap> = {
 	authEngine: { authTokenName },
 	address: `ws://127.0.0.1:${PORT_NUMBER}`
 }
@@ -911,9 +911,9 @@ describe('Integration tests', function () {
 
 			client = new ClientSocket(
 				Object.assign<
-					ClientSocketOptions<{}, {}, ServerIncomingMap>,
-					ClientSocketOptions<{}, {}, ServerIncomingMap>,
-					ClientSocketOptions<{}, {}, ServerIncomingMap>
+					ClientSocketOptions<ServerIncomingMap>,
+					ClientSocketOptions<ServerIncomingMap>,
+					ClientSocketOptions<ServerIncomingMap>
 				>(
 					{},
 					clientOptions,
@@ -980,8 +980,8 @@ describe('Integration tests', function () {
 
 			client = new ClientSocket(
 				Object.assign<
-					ClientSocketOptions<{}, {}, ServerIncomingMap>,
-					ClientSocketOptions<{}, {}, ServerIncomingMap>
+					ClientSocketOptions<ServerIncomingMap>,
+					ClientSocketOptions<ServerIncomingMap>
 				>(
 					{
 						plugins: [{
@@ -1013,8 +1013,8 @@ describe('Integration tests', function () {
 
 			client = new ClientSocket(
 				Object.assign<
-					ClientSocketOptions<{}, {}, ServerIncomingMap>,
-					ClientSocketOptions<{}, {}, ServerIncomingMap>
+					ClientSocketOptions<ServerIncomingMap>,
+					ClientSocketOptions<ServerIncomingMap>
 				>(
 					{
 						plugins: [{
@@ -1048,8 +1048,8 @@ describe('Integration tests', function () {
 
 			client = new ClientSocket(
 				Object.assign<
-					ClientSocketOptions<{}, {}, ServerIncomingMap>,
-					ClientSocketOptions<{}, {}, ServerIncomingMap>
+					ClientSocketOptions<ServerIncomingMap>,
+					ClientSocketOptions<ServerIncomingMap>
 				>(
 					{
 						plugins: [{
@@ -1213,9 +1213,9 @@ describe('Integration tests', function () {
 			for (let i = 0; i < 100; i++) {
 				client = new ClientSocket(
 					Object.assign<
-						ClientSocketOptions<{}, {}, ServerIncomingMap>,
-						ClientSocketOptions<{}, {}, ServerIncomingMap>,
-						ClientSocketOptions<{}, {}, ServerIncomingMap>
+						ClientSocketOptions<ServerIncomingMap>,
+						ClientSocketOptions<ServerIncomingMap>,
+						ClientSocketOptions<ServerIncomingMap>
 					>(
 						{},
 						clientOptions,
@@ -1599,9 +1599,9 @@ describe('Integration tests', function () {
 			await server.listen('ready').once(100);
 			client = new ClientSocket(
 				Object.assign<
-					ClientSocketOptions<{}, {}, ServerIncomingMap>,
-					ClientSocketOptions<{}, {}, ServerIncomingMap>,
-					ClientSocketOptions<{}, {}, ServerIncomingMap>
+					ClientSocketOptions<ServerIncomingMap>,
+					ClientSocketOptions<ServerIncomingMap>,
+					ClientSocketOptions<ServerIncomingMap>
 				>(
 				{},
 					clientOptions,
@@ -1861,9 +1861,9 @@ describe('Integration tests', function () {
 
 			client = new ClientSocket(
 				Object.assign<
-					ClientSocketOptions<{}, {}, ServerIncomingMap>,
-					ClientSocketOptions<{}, {}, ServerIncomingMap>,
-					ClientSocketOptions<{}, {}, ServerIncomingMap>
+					ClientSocketOptions<ServerIncomingMap>,
+					ClientSocketOptions<ServerIncomingMap>,
+					ClientSocketOptions<ServerIncomingMap>
 				>(
 					{},
 					clientOptions,
@@ -1917,9 +1917,9 @@ describe('Integration tests', function () {
 
 				client = new ClientSocket(
 					Object.assign<
-						ClientSocketOptions<{}, {}, ServerIncomingMap>,
-						ClientSocketOptions<{}, {}, ServerIncomingMap>,
-						ClientSocketOptions<{}, {}, ServerIncomingMap>
+						ClientSocketOptions<ServerIncomingMap>,
+						ClientSocketOptions<ServerIncomingMap>,
+						ClientSocketOptions<ServerIncomingMap>
 					>(
 						{},
 						clientOptions,
@@ -2042,8 +2042,8 @@ describe('Integration tests', function () {
 
 			client = new ClientSocket(
 				Object.assign<
-					ClientSocketOptions<{}, {}, ServerIncomingMap>,
-					ClientSocketOptions<{}, {}, ServerIncomingMap>
+					ClientSocketOptions<ServerIncomingMap>,
+					ClientSocketOptions<ServerIncomingMap>
 				>(
 					{
 						plugins: [
@@ -2156,8 +2156,8 @@ describe('Integration tests', function () {
 
 			client = new ClientSocket(
 				Object.assign<
-					ClientSocketOptions<{}, {}, ServerIncomingMap>,
-					ClientSocketOptions<{}, {}, ServerIncomingMap>
+					ClientSocketOptions<ServerIncomingMap>,
+					ClientSocketOptions<ServerIncomingMap>
 				>(
 					{
 						autoConnect: false
@@ -2213,8 +2213,8 @@ describe('Integration tests', function () {
 
 			client = new ClientSocket(
 				Object.assign<
-					ClientSocketOptions<{}, {}, ServerIncomingMap>,
-					ClientSocketOptions<{}, {}, ServerIncomingMap>
+					ClientSocketOptions<ServerIncomingMap>,
+					ClientSocketOptions<ServerIncomingMap>
 				>(
 					{
 						plugins: [
@@ -2267,8 +2267,8 @@ describe('Integration tests', function () {
 
 			client = new ClientSocket(
 				Object.assign<
-					ClientSocketOptions<{}, {}, ServerIncomingMap>,
-					ClientSocketOptions<{}, {}, ServerIncomingMap>
+					ClientSocketOptions<ServerIncomingMap>,
+					ClientSocketOptions<ServerIncomingMap>
 				>(
 					{
 						plugins: [
@@ -2764,8 +2764,8 @@ describe('Integration tests', function () {
 
 			client = new ClientSocket(
 				Object.assign<
-					ClientSocketOptions<{}, {}, ServerIncomingMap>,
-					ClientSocketOptions<{}, {}, ServerIncomingMap>
+					ClientSocketOptions<ServerIncomingMap>,
+					ClientSocketOptions<ServerIncomingMap>
 				>(
 					{
 						plugins: [
@@ -2856,8 +2856,8 @@ describe('Integration tests', function () {
 
 			client = new ClientSocket(
 				Object.assign<
-					ClientSocketOptions<{}, {}, ServerIncomingMap>,
-					ClientSocketOptions<{}, {}, ServerIncomingMap>
+					ClientSocketOptions<ServerIncomingMap>,
+					ClientSocketOptions<ServerIncomingMap>
 				>(
 					{
 						autoConnect: false,
@@ -2979,8 +2979,8 @@ describe('Integration tests', function () {
 			it('Should not disconnect socket if server does not receive a pong from client before timeout', async function () {
 				client = new ClientSocket(
 					Object.assign<
-						ClientSocketOptions<{}, {}, ServerIncomingMap>,
-						ClientSocketOptions<{}, {}, ServerIncomingMap>
+						ClientSocketOptions<ServerIncomingMap>,
+						ClientSocketOptions<ServerIncomingMap>
 					>(
 						{
 							isPingTimeoutDisabled: true
@@ -3118,9 +3118,9 @@ describe('Integration tests', function () {
 				const clientA = new ClientSocket(clientOptions);
 				const clientB = new ClientSocket(
 					Object.assign<
-						ClientSocketOptions<{}, {}, ServerIncomingMap>,
-						ClientSocketOptions<{}, {}, ServerIncomingMap>,
-						ClientSocketOptions<{}, {}, ServerIncomingMap>
+						ClientSocketOptions<ServerIncomingMap>,
+						ClientSocketOptions<ServerIncomingMap>,
+						ClientSocketOptions<ServerIncomingMap>
 					>(
 						{},
 						clientOptions,
@@ -3341,9 +3341,9 @@ describe('Integration tests', function () {
 				const clientA = new ClientSocket(clientOptions);
 				const clientB = new ClientSocket(
 					Object.assign<
-						ClientSocketOptions<{}, {}, ServerIncomingMap>,
-						ClientSocketOptions<{}, {}, ServerIncomingMap>,
-						ClientSocketOptions<{}, {}, ServerIncomingMap>
+						ClientSocketOptions<ServerIncomingMap>,
+						ClientSocketOptions<ServerIncomingMap>,
+						ClientSocketOptions<ServerIncomingMap>
 					>(
 						{},
 						clientOptions,
@@ -3583,9 +3583,9 @@ describe('Integration tests', function () {
 				const clientA = new ClientSocket(clientOptions);
 				const clientB = new ClientSocket(
 					Object.assign<
-						ClientSocketOptions<{}, {}, ServerIncomingMap>,
-						ClientSocketOptions<{}, {}, ServerIncomingMap>,
-						ClientSocketOptions<{}, {}, ServerIncomingMap>
+						ClientSocketOptions<ServerIncomingMap>,
+						ClientSocketOptions<ServerIncomingMap>,
+						ClientSocketOptions<ServerIncomingMap>
 					>(
 						{},
 						clientOptions,
@@ -3731,8 +3731,8 @@ describe('Integration tests', function () {
 
 				const client = new ClientSocket(
 					Object.assign<
-						ClientSocketOptions<{}, {}, ServerIncomingMap>,
-						ClientSocketOptions<{}, {}, ServerIncomingMap>>(
+						ClientSocketOptions<ServerIncomingMap>,
+						ClientSocketOptions<ServerIncomingMap>>(
 							{ autoConnect: false },
 							clientOptions
 						)
