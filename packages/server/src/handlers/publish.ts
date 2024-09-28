@@ -1,23 +1,9 @@
-import { RequestHandlerArgs } from "@socket-mesh/core";
 import { InvalidActionError } from "@socket-mesh/errors";
 import { PublishOptions } from "@socket-mesh/channels";
-import { ServerSocket } from "../server-socket.js";
-import { ServerTransport } from "../server-transport.js";
-import { ServerSocketState } from "../server-socket-state.js";
-import { ClientPrivateMap, ServerPrivateMap } from "@socket-mesh/client";
+import { ServerRequestHandlerArgs } from "./server-request-handler.js";
 
 export async function publishHandler(
-	{ socket, transport, options }:
-		RequestHandlerArgs<
-			PublishOptions,
-			ServerPrivateMap,
-			{},
-			ClientPrivateMap,
-			{},
-			ServerSocketState,
-			ServerSocket<{}, { [channel: string]: any }>,
-			ServerTransport<{}, { [channel: string]: any }>
-		>
+	{ socket, transport, options }: ServerRequestHandlerArgs<PublishOptions, {}, { [channel: string]: any }>
 ): Promise<void> {
 	if (!socket.server.allowClientPublish) {
 		throw new InvalidActionError('Client publish feature is disabled');

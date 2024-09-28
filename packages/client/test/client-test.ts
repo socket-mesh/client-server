@@ -1,11 +1,11 @@
 import assert from 'node:assert';
 import { beforeEach, afterEach, describe, it, mock } from "node:test";
-import { ClientPrivateMap, ClientSocket, ClientSocketOptions, LocalStorageAuthEngine, OfflinePlugin, ServerPrivateMap } from '../src/index.js';
+import { ClientSocket, ClientSocketOptions, LocalStorageAuthEngine, OfflinePlugin } from '../src/index.js';
 import { AuthStateChangeEvent, CloseEvent, DisconnectEvent, SocketStatus, RequestHandlerArgs, wait } from '@socket-mesh/core';
-import { Server, ServerSocket, listen } from '@socket-mesh/server';
+import { Server, listen } from '@socket-mesh/server';
 import localStorage from '@socket-mesh/local-storage';
 import jwt from "jsonwebtoken";
-import { ServerSocketState } from 'packages/server/src/server-socket-state.js';
+import { ServerRequestHandlerArgs } from 'packages/server/src/handlers/server-request-handler.js';
 
 // Add to the global scope like in browser.
 global.localStorage = localStorage;
@@ -67,9 +67,7 @@ async function performTaskHandler({ options }: RequestHandlerArgs<number>): Prom
 	await wait(options);
 }
 
-async function setAuthKeyHandler(
-	{ socket, options: secret }: RequestHandlerArgs<jwt.Secret, ServerPrivateMap, {}, ClientPrivateMap, {}, ServerSocketState, ServerSocket>
-): Promise<void> {
+async function setAuthKeyHandler({ socket, options: secret }: ServerRequestHandlerArgs<jwt.Secret>): Promise<void> {
 	socket.server!.auth.authKey = secret;
 }
 

@@ -1,22 +1,8 @@
-import { RequestHandlerArgs } from "@socket-mesh/core";
 import { BrokerError } from "@socket-mesh/errors";
-import { ServerSocket } from "../server-socket.js";
-import { ServerTransport } from "../server-transport.js";
-import { ClientPrivateMap, ServerPrivateMap } from "@socket-mesh/client";
-import { ServerSocketState } from "../server-socket-state.js";
+import { ServerRequestHandlerArgs } from "./server-request-handler.js";
 
 export async function unsubscribeHandler(
-	{ transport, options: channel }:
-		RequestHandlerArgs<
-			string,
-			ServerPrivateMap,
-			{},
-			ClientPrivateMap,
-			{},
-			ServerSocketState,
-			ServerSocket,
-			ServerTransport
-		>
+	{ transport, options: channel }: ServerRequestHandlerArgs<string>
 ): Promise<void> {
 	try {
 		await transport.unsubscribe(channel);

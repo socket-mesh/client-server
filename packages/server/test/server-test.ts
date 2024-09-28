@@ -17,6 +17,7 @@ import { SimpleBroker } from "../src/broker/simple-broker.js";
 import { ExchangeClient } from "../src/broker/exchange-client.js";
 import { Channel, ChannelOptions, isPublishOptions, JsonValue, UnsubscribeEvent } from "@socket-mesh/channels";
 import { ServerSocketState } from "../src/server-socket-state.js";
+import { ServerRequestHandlerArgs } from "../src/handlers/server-request-handler.js";
 
 // Add to the global scope like in browser.
 global.localStorage = localStorage;
@@ -94,10 +95,7 @@ async function loginHandler({ transport, options: authToken }: RequestHandlerArg
 	await transport.setAuthorization(authToken);
 }
 
-async function loginWithTenDayExpiryHandler(
-	{ transport, options: authToken }:
-		RequestHandlerArgs<AuthToken, ServerPrivateMap, {}, ClientPrivateMap, {}, ServerSocketState, ServerSocket, ServerTransport>
-): Promise<void> {
+async function loginWithTenDayExpiryHandler({ transport, options: authToken }: ServerRequestHandlerArgs<AuthToken>): Promise<void> {
 	if (!allowedUsers[authToken.username]) {
 		const err = new Error('Failed to login');
 		err.name = 'FailedLoginError';
@@ -107,10 +105,7 @@ async function loginWithTenDayExpiryHandler(
 	await transport.setAuthorization(authToken, { expiresIn: TEN_DAYS_IN_SECONDS });
 }
 
-async function loginWithTenDayExpHandler(
-	{ transport, options: authToken }: 
-		RequestHandlerArgs<AuthToken, ServerPrivateMap, {}, ClientPrivateMap, {}, ServerSocketState, ServerSocket, ServerTransport>
-): Promise<void> {
+async function loginWithTenDayExpHandler({ transport, options: authToken }: ServerRequestHandlerArgs<AuthToken>): Promise<void> {
 	if (!allowedUsers[authToken.username]) {
 		const err = new Error('Failed to login');
 		err.name = 'FailedLoginError';
@@ -122,10 +117,7 @@ async function loginWithTenDayExpHandler(
 	await transport.setAuthorization(authToken);
 }
 
-async function loginWithTenDayExpAndExpiryHandler(
-	{ transport, options: authToken }:
-		RequestHandlerArgs<AuthToken, ServerPrivateMap, {}, ClientPrivateMap, {}, ServerSocketState, ServerSocket, ServerTransport>
-): Promise<void> {
+async function loginWithTenDayExpAndExpiryHandler({ transport, options: authToken }: ServerRequestHandlerArgs<AuthToken>): Promise<void> {
 	if (!allowedUsers[authToken.username]) {
 		const err = new Error('Failed to login');
 		err.name = 'FailedLoginError';
@@ -137,10 +129,7 @@ async function loginWithTenDayExpAndExpiryHandler(
 	await transport.setAuthorization(authToken, { expiresIn: TEN_DAYS_IN_SECONDS * 100 });
 }
 
-async function loginWithIssAndIssuerHandler(
-	{ transport, options: authToken }:
-		RequestHandlerArgs<AuthToken, ServerPrivateMap, {}, ClientPrivateMap, {}, ServerSocketState, ServerSocket, ServerTransport>
-): Promise<void> {
+async function loginWithIssAndIssuerHandler({ transport, options: authToken }: ServerRequestHandlerArgs<AuthToken>): Promise<void> {
 	if (!allowedUsers[authToken.username]) {
 		const err = new Error('Failed to login');
 		err.name = 'FailedLoginError';
@@ -152,10 +141,7 @@ async function loginWithIssAndIssuerHandler(
 	await transport.setAuthorization(authToken, { issuer: 'bar' });
 }
 
-async function setAuthKeyHandler(
-	{ socket, options: secret }:
-		RequestHandlerArgs<jwt.Secret, ServerPrivateMap, {}, ClientPrivateMap, {}, ServerSocketState, ServerSocket>
-): Promise<void> {
+async function setAuthKeyHandler({ socket, options: secret }: ServerRequestHandlerArgs<jwt.Secret>): Promise<void> {
 	socket.server!.auth.authKey = secret;
 }
 
@@ -670,7 +656,7 @@ describe('Integration tests', function () {
 					serverOptions,
 					{
 						handlers: {
-							login: async ({ socket, transport, options: authToken }: RequestHandlerArgs<AuthToken, ServerPrivateMap, {}, ClientPrivateMap, {}, ServerSocketState, ServerSocket, ServerTransport>) => {
+							login: async ({ socket, transport, options: authToken }: ServerRequestHandlerArgs<AuthToken>) => {
 								if (!allowedUsers[authToken.username]) {
 									const err = new Error('Failed to login');
 									err.name = 'FailedLoginError';
@@ -746,7 +732,7 @@ describe('Integration tests', function () {
 					serverOptions,
 					{
 						handlers: {
-							login: async ({ socket, transport, options: authToken }: RequestHandlerArgs<AuthToken, ServerPrivateMap, {}, ClientPrivateMap, {}, ServerSocketState, ServerSocket, ServerTransport>) => {
+							login: async ({ socket, transport, options: authToken }: ServerRequestHandlerArgs<AuthToken>) => {
 								if (!allowedUsers[authToken.username]) {
 									const err = new Error('Failed to login');
 									err.name = 'FailedLoginError';

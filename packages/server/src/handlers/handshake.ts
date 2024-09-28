@@ -1,25 +1,13 @@
-import { ClientPrivateMap, HandshakeOptions, HandshakeStatus, ServerPrivateMap } from "@socket-mesh/client";
-import { RequestHandlerArgs, wait } from "@socket-mesh/core";
+import { HandshakeOptions, HandshakeStatus } from "@socket-mesh/client";
+import { wait } from "@socket-mesh/core";
 import { processAuthentication, validateAuthToken } from "./authenticate.js";
 import { dehydrateError } from "@socket-mesh/errors";
-import { ServerSocket } from "../server-socket.js";
-import { ServerTransport } from "../server-transport.js";
-import { ServerSocketState } from "../server-socket-state.js";
+import { ServerRequestHandlerArgs } from "./server-request-handler.js";
 
 const HANDSHAKE_REJECTION_STATUS_CODE = 4008;
 
 export async function handshakeHandler(
-	{ options, socket, transport }:
-		RequestHandlerArgs<
-			HandshakeOptions,
-			ServerPrivateMap,
-			{},
-			ClientPrivateMap,
-			{},
-			ServerSocketState,
-			ServerSocket,
-			ServerTransport
-		>
+	{ options, socket, transport }: ServerRequestHandlerArgs<HandshakeOptions>
 ): Promise<HandshakeStatus> {
 
 	const server = socket.server;
