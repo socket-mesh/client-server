@@ -1,13 +1,22 @@
 import { BrokerError, InvalidActionError } from "@socket-mesh/errors";
-import { BasicServerMap } from "../maps/server-map.js";
-import { BasicSocketMapServer } from "../maps/socket-map.js";
-import { SubscribeOptions } from "@socket-mesh/client";
+import { ClientPrivateMap, ServerPrivateMap, SubscribeOptions } from "@socket-mesh/client";
 import { RequestHandlerArgs } from "@socket-mesh/core";
 import { ServerSocket } from "../server-socket.js";
 import { ServerTransport } from "../server-transport.js";
+import { ServerSocketState } from "../server-socket-state.js";
 
 export async function subscribeHandler(
-	{ socket, transport, options }: RequestHandlerArgs<SubscribeOptions, BasicSocketMapServer, ServerSocket<BasicServerMap>, ServerTransport<BasicServerMap>>
+	{ socket, transport, options }:
+		RequestHandlerArgs<
+			SubscribeOptions,
+			ServerPrivateMap,
+			{},
+			ClientPrivateMap,
+			{},
+			ServerSocketState,
+			ServerSocket,
+			ServerTransport
+		>
 ): Promise<void> {
 	if (socket.status !== 'ready') {
 		// This is an invalid state; it means the client tried to subscribe before

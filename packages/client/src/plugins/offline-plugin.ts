@@ -1,11 +1,17 @@
-import { AnyRequest, EmptySocketMap, Plugin, SendRequestPluginArgs, SocketMap } from "@socket-mesh/core";
+import { AnyRequest, EmptySocketMap, MethodMap, Plugin, PrivateMethodMap, PublicMethodMap, SendRequestPluginArgs, ServiceMap, SocketMap } from "@socket-mesh/core";
 
 const SYSTEM_METHODS = ['#handshake', '#removeAuthToken'];
 
-export class OfflinePlugin<T extends SocketMap = EmptySocketMap> implements Plugin<T> {
+export class OfflinePlugin<
+	TIncoming extends MethodMap,
+	TOutgoing extends PublicMethodMap,
+	TPrivateOutgoing extends PrivateMethodMap,
+	TService extends ServiceMap,
+	TState extends object
+> implements Plugin<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> {
 	private _isReady: boolean;
-	private _requests: AnyRequest<T>[][];
-	private _continue: (requests: AnyRequest<T>[], cb?: (error?: Error) => void) => void| null;
+	private _requests: AnyRequest<TOutgoing, TPrivateOutgoing, TService>[][];
+	private _continue: (requests: AnyRequest<TOutgoing, TPrivateOutgoing, TService>[], cb?: (error?: Error) => void) => void| null;
 
 	constructor() {
 		this.type = 'offline';
@@ -16,14 +22,14 @@ export class OfflinePlugin<T extends SocketMap = EmptySocketMap> implements Plug
 
 	type: "offline";
 
-	public sendRequest({ requests, cont }: SendRequestPluginArgs<T>): void {
+	public sendRequest({ requests, cont }: SendRequestPluginArgs<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>): void {
 		if (this._isReady) {
 			cont(requests);
 			return;
 		}
 
 		const systemRequests = requests.filter(item => SYSTEM_METHODS.indexOf(String(item.method)) > -1);
-		let otherRequests: AnyRequest<T>[] = requests;
+		let otherRequests: AnyRequest<TOutgoing, TPrivateOutgoing, TService>[] = requests;
 
 		if (systemRequests.length) {
 			otherRequests = (systemRequests.length === requests.length) ? [] : requests.filter(item => SYSTEM_METHODS.indexOf(String(item.method)) < 0);

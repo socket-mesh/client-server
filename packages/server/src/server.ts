@@ -3,8 +3,8 @@ import { ServerProtocolError } from "@socket-mesh/errors";
 import { ServerSocket } from "./server-socket.js";
 import { IncomingMessage, Server as HttpServer, OutgoingHttpHeaders } from 'http';
 import defaultCodec, { CodecEngine } from "@socket-mesh/formatter";
-import { ClientSocket, removeAuthTokenHandler } from "@socket-mesh/client";
-import { AnyPacket, CallIdGenerator, HandlerMap, StreamCleanupMode } from "@socket-mesh/core";
+import { ClientPrivateMap, ClientSocket, removeAuthTokenHandler, ServerPrivateMap } from "@socket-mesh/client";
+import { AnyPacket, CallIdGenerator, HandlerMap, PrivateMethodMap, PublicMethodMap, ServiceMap, StreamCleanupMode } from "@socket-mesh/core";
 import { AuthEngine, defaultAuthEngine, isAuthEngine } from "@socket-mesh/auth-engine";
 import { handshakeHandler } from "./handlers/handshake.js";
 import { ServerPlugin } from "./plugin/server-plugin.js";
@@ -13,23 +13,38 @@ import { CloseEvent, ConnectionEvent, ErrorEvent, HandshakeEvent, HeadersEvent, 
 import { AsyncStreamEmitter } from "@socket-mesh/async-stream-emitter";
 import { DemuxedConsumableStream, StreamEvent } from "@socket-mesh/stream-demux";
 import { ServerOptions } from "./server-options.js";
-import { SocketMapFromServer } from "./maps/socket-map.js";
-import { ServerMap } from "./maps/server-map.js";
-import { ClientMapFromServer } from "./maps/client-map.js";
 import { subscribeHandler } from "./handlers/subscribe.js";
 import { unsubscribeHandler } from "./handlers/unsubscribe.js";
 import { Broker } from "./broker/broker.js";
 import { SimpleBroker } from "./broker/simple-broker.js";
 import { Exchange } from "./broker/exchange.js";
 import { publishHandler } from "./handlers/publish.js";
+import { ChannelMap } from "@socket-mesh/channels";
+import { ServerSocketState } from "./server-socket-state.js";
 
-export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<T>> {
+export class Server<
+	TChannel extends ChannelMap,
+	TService extends ServiceMap = {},
+	TIncoming extends PublicMethodMap = {},
+	TOutgoing extends PublicMethodMap = {},
+	TPrivateIncoming extends PrivateMethodMap = {},
+	TPrivateOutgoing extends PrivateMethodMap = {},
+	TServerState extends object = {},
+	TState extends object = {}
+> extends AsyncStreamEmitter<ServerEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>> {
 	private readonly _callIdGenerator: CallIdGenerator;
 	private readonly _wss: ws.WebSocketServer;
 	private _isReady: boolean;
 	private _isListening: boolean;
 	private _pingIntervalRef: NodeJS.Timeout;	
-	private _handlers: HandlerMap<SocketMapFromServer<T>>;
+	private _handlers:
+		HandlerMap<
+			TIncoming & TPrivateIncoming & ServerPrivateMap,
+			TOutgoing,
+			TPrivateOutgoing & ClientPrivateMap,
+			TService,
+			TState & ServerSocketState
+		>;
 
 	//| ServerSocket<TIncomingMap, TServiceMap, TOutgoingMap, TPrivateIncomingMap, TPrivateOutgoingMap, TServerState, TSocketState>
 	public ackTimeoutMs: number;
@@ -42,18 +57,18 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 	public strictHandshake: boolean;
 
 	public readonly auth: AuthEngine;
-	public readonly brokerEngine: Broker<T['Channel']>;
-	public readonly clients: { [ id: string ]: ServerSocket<T> };
+	public readonly brokerEngine: Broker<TChannel>;
+	public readonly clients: { [ id: string ]: ServerSocket<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState> };
 	public clientCount: number;
 	public readonly codecEngine: CodecEngine;
-	public readonly pendingClients: { [ id: string ]: ServerSocket<T> };	
+	public readonly pendingClients: { [ id: string ]: ServerSocket<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState> };	
 	public pendingClientCount: number;
 	public readonly socketStreamCleanupMode: StreamCleanupMode;
 	public readonly httpServer: HttpServer;
 
-	public readonly plugins: ServerPlugin<T>[];
+	public readonly plugins: ServerPlugin<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>[];
 
-	constructor(options?: ServerOptions<T>) {
+	constructor(options?: ServerOptions<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>) {
 		super();
 
 		let cid = 1;
@@ -67,7 +82,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 		this.ackTimeoutMs = options.ackTimeoutMs || 10000;
 		this.allowClientPublish = options.allowClientPublish ?? true;
 		this.auth = isAuthEngine(options.authEngine) ? options.authEngine : defaultAuthEngine(options.authEngine);
-		this.brokerEngine = options.brokerEngine || new SimpleBroker<T['Channel']>();
+		this.brokerEngine = options.brokerEngine || new SimpleBroker<TChannel>();
 		this._callIdGenerator = options.callIdGenerator || (() => {
 			return cid++;
 		});
@@ -132,11 +147,11 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 		}
 	}
 
-	public addPlugin(...plugin: ServerPlugin<T>[]): void {
+	public addPlugin(...plugin: ServerPlugin<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>[]): void {
 		this.plugins.push(...plugin);
 	}
 
-	private bind(socket: ServerSocket<T>) {
+	private bind(socket: ServerSocket<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>) {
 /*
 		if (socket.type === 'client') {
 			(async () => {
@@ -211,7 +226,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 		});
 	}
 
-	public get exchange(): Exchange<T['Channel']> {
+	public get exchange(): Exchange<TChannel> {
 		return this.brokerEngine.exchange;
 	}
 
@@ -234,7 +249,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 			wsSocket.upgradeReq = upgradeReq;
 		}
 */
-		const socket = new ServerSocket<T>({
+		const socket = new ServerSocket<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>({
 			ackTimeoutMs: this.ackTimeoutMs,
 			callIdGenerator: this._callIdGenerator,
 			codecEngine: this.codecEngine,
@@ -244,7 +259,7 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 			request: upgradeReq,
 			socket: wsSocket,
 			server: this,
-			state: {},
+			state: {} as any,
 			streamCleanupMode: this.socketStreamCleanupMode
 		});
 
@@ -278,13 +293,19 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 	}
 
 	private onUnhandledRequest(
-		socket: ServerSocket<T> | ClientSocket<ClientMapFromServer<T>>,
-		packet: AnyPacket<SocketMapFromServer<T>>
+		socket:
+			ClientSocket<TChannel, TOutgoing & TPrivateOutgoing, TService, PublicMethodMap, TPrivateIncoming, TState> |
+			ServerSocket<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>,
+		packet: AnyPacket<TIncoming & TPrivateIncoming & ServerPrivateMap, TService>
 	): void {
 
 	}
 
-	private socketDisconnected(socket: ClientSocket<ClientMapFromServer<T>> | ServerSocket<T>): void {
+	private socketDisconnected(
+		socket:
+			ClientSocket<TChannel, TOutgoing & TPrivateOutgoing, TService, PublicMethodMap, TPrivateIncoming, TState> |
+			ServerSocket<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>
+	): void {
 		if (!!this.pendingClients[socket.id]) {
 			delete this.pendingClients[socket.id];
 			this.pendingClientCount--;
@@ -374,69 +395,69 @@ export class Server<T extends ServerMap> extends AsyncStreamEmitter<ServerEvent<
 	}
 
 	emit(event: "close", data: CloseEvent): void;
-	emit(event: "connection", data: ConnectionEvent<T>): void;
+	emit(event: "connection", data: ConnectionEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>): void;
 	emit(event: "error", data: ErrorEvent): void;
 	emit(event: "headers", data: HeadersEvent): void;
-	emit(event: "handshake", data: HandshakeEvent<T>): void;
+	emit(event: "handshake", data: HandshakeEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>): void;
 	emit(event: "listening", data: ListeningEvent): void;
 	emit(event: "ready", data: {}): void;
-	emit(event: 'socketAuthStateChange', data: SocketAuthStateChangeEvent<T>): void;
-	emit(event: 'socketAuthenticate', data: SocketAuthenticateEvent<T>): void;
-	emit(event: 'socketBadAuthToken', data: SocketBadAuthTokenEvent<T>): void;
-	emit(event: 'socketClose', data: SocketCloseEvent<T>): void;
-	emit(event: 'socketConnect', data: SocketConnectEvent<T>): void;
-	emit(event: 'socketConnectAbort', data: SocketDisconnectEvent<T>): void;
-	emit(event: 'socketConnecting', data: SocketConnectingEvent<T>): void;
-	emit(event: 'socketDeauthenticate', data: SocketDeauthenticateEvent<T>): void;
-	emit(event: 'socketDisconnect', data: SocketDisconnectEvent<T>): void;
-	emit(event: 'socketError', data: SocketErrorEvent<T>): void;
-	emit(event: 'socketMessage', data: SocketMessageEvent<T>): void;
-	emit(event: 'socketPing', data: SocketPingEvent<T>): void;
-	emit(event: 'socketPong', data: SocketPongEvent<T>): void;
-	emit(event: 'socketRemoveAuthToken', data: SocketRemoveAuthTokenEvent<T>): void;
-	emit(event: 'socketRequest', data: SocketRequestEvent<T>): void;
-	emit(event: 'socketResponse', data: SocketResponseEvent<T>): void;
-	emit(event: 'socketSubscribe', data: SocketSubscribeEvent<T>): void;
-	emit(event: 'socketSubscribeFail', data: SocketSubscribeFailEvent<T>): void;
-	emit(event: 'socketSubscribeRequest', data: SocketSubscribeEvent<T>): void;
-	emit(event: 'socketSubscribeStateChange', data: SocketSubscribeStateChangeEvent<T>): void;
-	emit(event: 'socketUnsubscribe', data: SocketUnsubscribeEvent<T>): void;
+	emit(event: 'socketAuthStateChange', data: SocketAuthStateChangeEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>): void;
+	emit(event: 'socketAuthenticate', data: SocketAuthenticateEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>): void;
+	emit(event: 'socketBadAuthToken', data: SocketBadAuthTokenEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>): void;
+	emit(event: 'socketClose', data: SocketCloseEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>): void;
+	emit(event: 'socketConnect', data: SocketConnectEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>): void;
+	emit(event: 'socketConnectAbort', data: SocketDisconnectEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>): void;
+	emit(event: 'socketConnecting', data: SocketConnectingEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>): void;
+	emit(event: 'socketDeauthenticate', data: SocketDeauthenticateEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>): void;
+	emit(event: 'socketDisconnect', data: SocketDisconnectEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>): void;
+	emit(event: 'socketError', data: SocketErrorEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>): void;
+	emit(event: 'socketMessage', data: SocketMessageEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>): void;
+	emit(event: 'socketPing', data: SocketPingEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>): void;
+	emit(event: 'socketPong', data: SocketPongEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>): void;
+	emit(event: 'socketRemoveAuthToken', data: SocketRemoveAuthTokenEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>): void;
+	emit(event: 'socketRequest', data: SocketRequestEvent<TService, TIncoming, TPrivateIncoming>): void;
+	emit(event: 'socketResponse', data: SocketResponseEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>): void;
+	emit(event: 'socketSubscribe', data: SocketSubscribeEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>): void;
+	emit(event: 'socketSubscribeFail', data: SocketSubscribeFailEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>): void;
+	emit(event: 'socketSubscribeRequest', data: SocketSubscribeEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>): void;
+	emit(event: 'socketSubscribeStateChange', data: SocketSubscribeStateChangeEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>): void;
+	emit(event: 'socketUnsubscribe', data: SocketUnsubscribeEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>): void;
 	emit(event: "warning", data: WarningEvent): void;
 	emit(event: string, data: any): void {
 		super.emit(event, data);
 	}
 
-	listen(): DemuxedConsumableStream<StreamEvent<ServerEvent<T>>>;
+	listen(): DemuxedConsumableStream<StreamEvent<ServerEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>>>;
 	listen(event: "close"): DemuxedConsumableStream<CloseEvent>;
-	listen(event: "connection"): DemuxedConsumableStream<ConnectionEvent<T>>;
+	listen(event: "connection"): DemuxedConsumableStream<ConnectionEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>>;
 	listen(event: "error"): DemuxedConsumableStream<ErrorEvent>;
-	listen(event: "handshake"): DemuxedConsumableStream<HandshakeEvent<T>>;
+	listen(event: "handshake"): DemuxedConsumableStream<HandshakeEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>>;
 	listen(event: "headers"): DemuxedConsumableStream<HeadersEvent>;
 	listen(event: "listening"): DemuxedConsumableStream<ListeningEvent>;
 	listen(event: "ready"): DemuxedConsumableStream<{}>;
-	listen(event: 'socketAuthStateChange'): DemuxedConsumableStream<SocketAuthStateChangeEvent<T>>;
-	listen(event: 'socketAuthenticate'): DemuxedConsumableStream<SocketAuthenticateEvent<T>>;
-	listen(event: 'socketBadAuthToken'): DemuxedConsumableStream<SocketBadAuthTokenEvent<T>>;
-	listen(event: 'socketClose'): DemuxedConsumableStream<SocketCloseEvent<T>>;
-	listen(event: 'socketConnect'): DemuxedConsumableStream<SocketConnectEvent<T>>;
-	listen(event: 'socketConnectAbort'): DemuxedConsumableStream<SocketDisconnectEvent<T>>;
-	listen(event: 'socketConnecting'): DemuxedConsumableStream<SocketConnectingEvent<T>>;
-	listen(event: 'socketDeauthenticate'): DemuxedConsumableStream<SocketDeauthenticateEvent<T>>;
-	listen(event: 'socketDisconnect'): DemuxedConsumableStream<SocketDisconnectEvent<T>>;
-	listen(event: 'socketError'): DemuxedConsumableStream<SocketErrorEvent<T>>;
-	listen(event: 'socketMessage'): DemuxedConsumableStream<SocketMessageEvent<T>>;
-	listen(event: 'socketPing'): DemuxedConsumableStream<SocketPingEvent<T>>;
-	listen(event: 'socketPong'): DemuxedConsumableStream<SocketPongEvent<T>>;
-	listen(event: 'socketRemoveAuthToken'): DemuxedConsumableStream<SocketRemoveAuthTokenEvent<T>>;
-	listen(event: 'socketRequest'): DemuxedConsumableStream<SocketRequestEvent<T>>;
-	listen(event: 'socketResponse'): DemuxedConsumableStream<SocketResponseEvent<T>>;
-	listen(event: 'socketSubscribe'): DemuxedConsumableStream<SocketSubscribeEvent<T>>;
-	listen(event: 'socketSubscribeFail'): DemuxedConsumableStream<SocketSubscribeFailEvent<T>>;
-	listen(event: 'socketSubscribeRequest'): DemuxedConsumableStream<SocketSubscribeEvent<T>>;
-	listen(event: 'socketSubscribeStateChange'): DemuxedConsumableStream<SocketSubscribeStateChangeEvent<T>>;
-	listen(event: 'socketUnsubscribe'): DemuxedConsumableStream<SocketUnsubscribeEvent<T>>;
+	listen(event: 'socketAuthStateChange'): DemuxedConsumableStream<SocketAuthStateChangeEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>>;
+	listen(event: 'socketAuthenticate'): DemuxedConsumableStream<SocketAuthenticateEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>>;
+	listen(event: 'socketBadAuthToken'): DemuxedConsumableStream<SocketBadAuthTokenEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>>;
+	listen(event: 'socketClose'): DemuxedConsumableStream<SocketCloseEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>>;
+	listen(event: 'socketConnect'): DemuxedConsumableStream<SocketConnectEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>>;
+	listen(event: 'socketConnectAbort'): DemuxedConsumableStream<SocketDisconnectEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>>;
+	listen(event: 'socketConnecting'): DemuxedConsumableStream<SocketConnectingEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>>;
+	listen(event: 'socketDeauthenticate'): DemuxedConsumableStream<SocketDeauthenticateEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>>;
+	listen(event: 'socketDisconnect'): DemuxedConsumableStream<SocketDisconnectEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>>;
+	listen(event: 'socketError'): DemuxedConsumableStream<SocketErrorEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>>;
+	listen(event: 'socketMessage'): DemuxedConsumableStream<SocketMessageEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>>;
+	listen(event: 'socketPing'): DemuxedConsumableStream<SocketPingEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>>;
+	listen(event: 'socketPong'): DemuxedConsumableStream<SocketPongEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>>;
+	listen(event: 'socketRemoveAuthToken'): DemuxedConsumableStream<SocketRemoveAuthTokenEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>>;
+	listen(event: 'socketRequest'): DemuxedConsumableStream<SocketRequestEvent<TService, TIncoming, TPrivateIncoming>>;
+	listen(event: 'socketResponse'): DemuxedConsumableStream<SocketResponseEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>>;
+	listen(event: 'socketSubscribe'): DemuxedConsumableStream<SocketSubscribeEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>>;
+	listen(event: 'socketSubscribeFail'): DemuxedConsumableStream<SocketSubscribeFailEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>>;
+	listen(event: 'socketSubscribeRequest'): DemuxedConsumableStream<SocketSubscribeEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>>;
+	listen(event: 'socketSubscribeStateChange'): DemuxedConsumableStream<SocketSubscribeStateChangeEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>>;
+	listen(event: 'socketUnsubscribe'): DemuxedConsumableStream<SocketUnsubscribeEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>>;
 	listen(event: "warning"): DemuxedConsumableStream<WarningEvent>;
-	listen(event?: string): DemuxedConsumableStream<StreamEvent<any>> | DemuxedConsumableStream<ServerEvent<T>> {
+	listen(event?: string): DemuxedConsumableStream<StreamEvent<any>> | DemuxedConsumableStream<ServerEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>> {
 		return super.listen(event);
 	}
 }

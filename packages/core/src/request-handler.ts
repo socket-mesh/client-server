@@ -23,11 +23,11 @@ export interface RequestHandlerArgsOptions<
 
 export class RequestHandlerArgs<
 	TOptions,
-	TIncoming extends MethodMap,
-	TOutgoing extends PublicMethodMap,
-	TPrivateOutgoing extends PrivateMethodMap,
-	TService extends ServiceMap,
-	TState extends object,
+	TIncoming extends MethodMap = {},
+	TOutgoing extends PublicMethodMap = {},
+	TPrivateOutgoing extends PrivateMethodMap = {},
+	TService extends ServiceMap = {},
+	TState extends object = {},
 	TSocket extends Socket<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> = Socket<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>,
 	TTransport extends SocketTransport<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> = SocketTransport<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>
 > {

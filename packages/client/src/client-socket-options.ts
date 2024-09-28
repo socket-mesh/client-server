@@ -1,8 +1,8 @@
 import ws from "isomorphic-ws";
-import { SocketOptions } from "@socket-mesh/core";
+import { MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap, SocketOptions } from "@socket-mesh/core";
 import { ClientAuthEngine, LocalStorageAuthEngineOptions } from "./client-auth-engine.js";
-import { SocketMapFromClient } from "./maps/socket-map.js";
-import { ClientMap } from "./maps/client-map.js";
+import { ClientPrivateMap } from "./maps/client-map.js";
+import { ServerPrivateMap } from "./maps/server-map.js";
 
 export interface AutoReconnectOptions {
 	initialDelay: number,
@@ -17,7 +17,19 @@ export interface ConnectOptions {
 	wsOptions?: ws.ClientOptions
 }
 
-export interface ClientSocketOptions<T extends ClientMap> extends SocketOptions<SocketMapFromClient<T>>, ConnectOptions {
+export interface ClientSocketOptions<
+	TIncoming extends MethodMap = {},
+	TService extends ServiceMap = {},
+	TOutgoing extends PublicMethodMap = {},
+	TPrivateOutgoing extends PrivateMethodMap = {},
+	TState extends object = {}
+> extends SocketOptions<
+	TIncoming & ClientPrivateMap,
+	TOutgoing,
+	TPrivateOutgoing & ServerPrivateMap,
+	TService,
+	TState
+>, ConnectOptions {
 	// Whether or not to automatically connect the socket as soon as it is created. Default is true.
 	autoConnect?: boolean,
 
@@ -38,10 +50,16 @@ export interface ClientSocketOptions<T extends ClientMap> extends SocketOptions<
 	channelPrefix?: string,
 }
 
-export function parseClientOptions<T extends ClientMap>(options: ClientSocketOptions<T> | string | URL): ClientSocketOptions<T> {
+export function parseClientOptions<
+	TIncoming extends MethodMap,
+	TService extends ServiceMap,
+	TOutgoing extends PublicMethodMap,
+	TPrivateOutgoing extends PrivateMethodMap,
+	TState extends object
+>(options: ClientSocketOptions<TIncoming, TService, TOutgoing, TPrivateOutgoing, TState> | string | URL): ClientSocketOptions<TIncoming, TService, TOutgoing, TPrivateOutgoing, TState> {
 	if (typeof options === 'string' || 'pathname' in options) {
-		options = { address: options } as ClientSocketOptions<T>;
+		options = { address: options } as ClientSocketOptions<TIncoming, TService, TOutgoing, TPrivateOutgoing, TState>;
 	}
 	
-	return Object.assign<ClientSocketOptions<T>, ClientSocketOptions<T>>({}, options);
+	return Object.assign<ClientSocketOptions<TIncoming, TService, TOutgoing, TPrivateOutgoing, TState>, ClientSocketOptions<TIncoming, TService, TOutgoing, TPrivateOutgoing, TState>>({}, options);
 }

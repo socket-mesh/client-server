@@ -1,4 +1,4 @@
-import { EmptySocketMap, SocketMap } from "@socket-mesh/core";
+import { EmptySocketMap, MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap, SocketMap } from "@socket-mesh/core";
 import { AnyResponse, AnyRequest, MethodRequest, Plugin, SendRequestPluginArgs, SendResponsePluginArgs, ServiceRequest } from "@socket-mesh/core";
 
 export interface BatchingPluginOptions {
@@ -11,7 +11,13 @@ export interface BatchingPluginOptions {
 	batchInterval?: number
 }
 
-export abstract class BatchingPlugin<T extends SocketMap = EmptySocketMap> implements Plugin<T> {
+export abstract class BatchingPlugin<
+	TIncoming extends MethodMap,
+	TOutgoing extends PublicMethodMap,
+	TPrivateOutgoing extends PrivateMethodMap,
+	TService extends ServiceMap,
+	TState extends object
+> implements Plugin<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> {
 	public batchOnHandshakeDuration: number | boolean;
 	public batchInterval: number;
 	
@@ -95,9 +101,15 @@ export abstract class BatchingPlugin<T extends SocketMap = EmptySocketMap> imple
 	}
 }
 
-export class RequestBatchingPlugin<T extends SocketMap = EmptySocketMap> extends BatchingPlugin<T> {
-	private _requests: (MethodRequest<T['Outgoing']> | ServiceRequest<T['Service']>)[];
-	private _continue: (requests: AnyRequest<T>[], cb?: (error?: Error) => void) => void | null;
+export class RequestBatchingPlugin<
+	TIncoming extends MethodMap,
+	TOutgoing extends PublicMethodMap,
+	TPrivateOutgoing extends PrivateMethodMap,
+	TService extends ServiceMap,
+	TState extends object
+> extends BatchingPlugin<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> {
+	private _requests: AnyRequest<TOutgoing, TPrivateOutgoing, TService>[];
+	private _continue: (requests: AnyRequest<TOutgoing, TPrivateOutgoing, TService>[], cb?: (error?: Error) => void) => void | null;
 
 	constructor(options?: BatchingPluginOptions) {
 		super(options);
@@ -122,7 +134,7 @@ export class RequestBatchingPlugin<T extends SocketMap = EmptySocketMap> extends
 		}
 	}
 
-	public sendRequest({ requests, cont }: SendRequestPluginArgs<T>): void {
+	public sendRequest({ requests, cont }: SendRequestPluginArgs<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>): void {
 		if (!this.isBatching) {
 			cont(requests);
 			return;
@@ -135,9 +147,15 @@ export class RequestBatchingPlugin<T extends SocketMap = EmptySocketMap> extends
 	type: 'requestBatching'
 }
 
-export class ResponseBatchingPlugin<T extends SocketMap = EmptySocketMap> extends BatchingPlugin<T> {
-	private _responses: AnyResponse<T>[];
-	private _continue: (requests: AnyResponse<T>[], cb?: (error?: Error) => void) => void | null;
+export class ResponseBatchingPlugin<
+	TIncoming extends MethodMap,
+	TOutgoing extends PublicMethodMap,
+	TPrivateOutgoing extends PrivateMethodMap,
+	TService extends ServiceMap,
+	TState extends object
+> extends BatchingPlugin<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> {
+	private _responses: AnyResponse<TOutgoing, TPrivateOutgoing, TService>[];
+	private _continue: (requests: AnyResponse<TOutgoing, TPrivateOutgoing, TService>[], cb?: (error?: Error) => void) => void | null;
 
 	constructor(options?: BatchingPluginOptions) {
 		super(options);
@@ -155,7 +173,7 @@ export class ResponseBatchingPlugin<T extends SocketMap = EmptySocketMap> extend
 		}
 	}
 
-	public sendResponse({ responses, cont }: SendResponsePluginArgs<T>): void {
+	public sendResponse({ responses, cont }: SendResponsePluginArgs<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>): void {
 		if (!this.isBatching) {
 			cont(responses);
 			return;

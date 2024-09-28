@@ -1,18 +1,25 @@
-import { ChannelDetails, ChannelOptions, Channels, ChannelsOptions } from "@socket-mesh/channels";
+import { ChannelDetails, ChannelMap, ChannelOptions, Channels, ChannelsOptions } from "@socket-mesh/channels";
 import { ClientTransport } from "./client-transport.js";
-import { ClientMap } from "./maps/client-map.js";
+import { MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap } from "@socket-mesh/core";
 
 export interface ClientChannelsOptions extends ChannelsOptions {
 	autoSubscribeOnConnect?: boolean
 }
 
-export class ClientChannels<T extends ClientMap> extends Channels<T['Channel']> {
+export class ClientChannels<
+	TChannel extends ChannelMap,
+	TIncoming extends MethodMap,
+	TService extends ServiceMap,
+	TOutgoing extends PublicMethodMap,
+	TPrivateOutgoing extends PrivateMethodMap,
+	TState extends object
+> extends Channels<TChannel> {
 	public autoSubscribeOnConnect: boolean;
 
-	protected readonly _transport: ClientTransport<T>;
+	protected readonly _transport: ClientTransport<TIncoming, TService, TOutgoing, TPrivateOutgoing, TState>;
 	protected _preparingPendingSubscriptions: boolean;
 
-	constructor(transport: ClientTransport<T>, options?: ClientChannelsOptions) {
+	constructor(transport: ClientTransport<TIncoming, TService, TOutgoing, TPrivateOutgoing, TState>, options?: ClientChannelsOptions) {
 		if (!options) {
 			options = {};
 		}
@@ -127,7 +134,7 @@ export class ClientChannels<T extends ClientMap> extends Channels<T['Channel']> 
 		});
 	}
 
-	unsubscribe(channelName: keyof T['Channel'] & string): void {
+	unsubscribe(channelName: keyof TChannel & string): void {
 		const channel = this._channelMap[channelName];
 
 		if (channel) {
@@ -174,7 +181,7 @@ export class ClientChannels<T extends ClientMap> extends Channels<T['Channel']> 
 		}
 	}
 
-	transmitPublish<U extends keyof T['Channel'] & string>(channelName: U, data: T['Channel'][U]): Promise<void> {
+	transmitPublish<U extends keyof TChannel & string>(channelName: U, data: TChannel[U]): Promise<void> {
 		const pubData = {
 			channel: this.decorateChannelName(channelName),
 			data
@@ -182,7 +189,7 @@ export class ClientChannels<T extends ClientMap> extends Channels<T['Channel']> 
 		return this._transport.transmit('#publish', pubData);
 	}
 
-	invokePublish<U extends keyof T['Channel'] & string>(channelName: keyof T['Channel'] & string, data: T['Channel'][U]): Promise<void> {
+	invokePublish<U extends keyof TChannel & string>(channelName: keyof TChannel & string, data: TChannel[U]): Promise<void> {
 		const pubData = {
 			channel: this.decorateChannelName(channelName),
 			data

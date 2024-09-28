@@ -1,12 +1,21 @@
 import ws from "ws";
 import { AuthEngine, AuthOptions } from "@socket-mesh/auth-engine";
-import { CallIdGenerator, HandlerMap, EmptySocketMap, StreamCleanupMode } from "@socket-mesh/core";
+import { CallIdGenerator, HandlerMap, EmptySocketMap, StreamCleanupMode, ServiceMap, PublicMethodMap, PrivateMethodMap } from "@socket-mesh/core";
 import { CodecEngine } from "@socket-mesh/formatter";
 import { ServerPlugin } from "./plugin/server-plugin.js";
-import { ServerMap } from "./maps/server-map.js";
 import { Broker } from "./broker/broker.js";
+import { ChannelMap } from "@socket-mesh/channels";
 
-export interface ServerOptions<T extends ServerMap> extends ws.ServerOptions {
+export interface ServerOptions<
+	TChannel extends ChannelMap = {},
+	TService extends ServiceMap = {},
+	TIncoming extends PublicMethodMap = {},
+	TOutgoing extends PublicMethodMap = {},
+	TPrivateIncoming extends PrivateMethodMap = {},
+	TPrivateOutgoing extends PrivateMethodMap = {},
+	TServerState extends object = {},
+	TState extends object = {}
+> extends ws.ServerOptions {
 	// In milliseconds, the timeout for receiving a response
 	// when using invoke() or invokePublish().
 	ackTimeoutMs?: number,
@@ -16,7 +25,7 @@ export interface ServerOptions<T extends ServerMap> extends ws.ServerOptions {
 
 	authEngine?: AuthEngine | AuthOptions,
 
-	brokerEngine?: Broker<T['Channel']>,
+	brokerEngine?: Broker<TChannel>,
 
 	callIdGenerator?: CallIdGenerator,
 
@@ -26,11 +35,11 @@ export interface ServerOptions<T extends ServerMap> extends ws.ServerOptions {
 	// when using invoke() or invokePublish().	ackTimeout: number
 	handshakeTimeoutMs?: number,
 
-	handlers?: HandlerMap<EmptySocketMap>;
+	handlers?: HandlerMap<{}, {}, {}, {}, {}>;
 
 	isPingTimeoutDisabled?: boolean,
 
-	plugins?: ServerPlugin<T>[],
+	plugins?: ServerPlugin<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>[],
 
 	// Origins which are allowed to connect to the server.
 	origins?: string;

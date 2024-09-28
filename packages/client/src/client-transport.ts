@@ -1,14 +1,25 @@
-import { AnyPacket, AnyResponse, FunctionReturnType, InvokeMethodOptions, InvokeServiceOptions, SocketTransport, SocketStatus } from "@socket-mesh/core";
+import { FunctionReturnType, InvokeMethodOptions, InvokeServiceOptions, SocketTransport, SocketStatus, MethodMap, ServiceMap, PublicMethodMap, PrivateMethodMap } from "@socket-mesh/core";
 import ws from "isomorphic-ws";
 import { ClientAuthEngine, LocalStorageAuthEngine, isAuthEngine } from "./client-auth-engine.js";
 import { hydrateError, socketProtocolErrorStatuses } from "@socket-mesh/errors";
 import { ServerPrivateMap, HandshakeStatus } from "./maps/server-map.js";
 import { AutoReconnectOptions, ClientSocketOptions, ConnectOptions } from "./client-socket-options.js";
 import { AuthToken } from "@socket-mesh/auth";
-import { SocketMapFromClient } from "./maps/socket-map.js";
-import { ClientMap } from "./maps/client-map.js";
+import { ClientPrivateMap } from "./maps/client-map.js";
 
-export class ClientTransport<T extends ClientMap> extends SocketTransport<SocketMapFromClient<T>> {
+export class ClientTransport<
+	TIncoming extends MethodMap,
+	TService extends ServiceMap,
+	TOutgoing extends PublicMethodMap,
+	TPrivateOutgoing extends PrivateMethodMap,
+	TState extends object
+> extends SocketTransport<
+	TIncoming & ClientPrivateMap,
+	TOutgoing,
+	TPrivateOutgoing & ServerPrivateMap,
+	TService,
+	TState
+> {
 	public readonly authEngine: ClientAuthEngine;
 
 	private _uri: URL;
@@ -23,7 +34,7 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 	private _pingTimeoutMs: number;
 	public isPingTimeoutDisabled: boolean;
 
-	constructor(options: ClientSocketOptions<T>) {
+	constructor(options: ClientSocketOptions<TIncoming, TService, TOutgoing, TPrivateOutgoing, TState>) {
 		super(options);
 
 		this.type = 'client';
@@ -327,10 +338,10 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 		}
 	}
 
-	override transmit<TMethod extends keyof SocketMapFromClient<T>['Outgoing']>(method: TMethod, arg?: Parameters<SocketMapFromClient<T>['Outgoing'][TMethod]>[0]): Promise<void>;
-	override transmit<TService extends keyof SocketMapFromClient<T>['Service'], TMethod extends keyof SocketMapFromClient<T>['Service'][TService]>(options: [TService, TMethod], arg?: Parameters<SocketMapFromClient<T>['Service'][TService][TMethod]>[0]): Promise<void>;
-	override transmit<TMethod extends keyof (SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)>(method: TMethod, arg?: Parameters<(SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)[TMethod]>[0]): Promise<void>;
-	override async transmit<TService extends keyof SocketMapFromClient<T>['Service'], TServiceMethod extends keyof SocketMapFromClient<T>['Service'][TService], TMethod extends keyof SocketMapFromClient<T>['Outgoing']>(serviceAndMethod: TMethod | [TService, TServiceMethod], arg?: (Parameters<SocketMapFromClient<T>['Outgoing'][TMethod]> | Parameters<SocketMapFromClient<T>['Service'][TService][TServiceMethod]>)[0]): Promise<void> {
+	override transmit<TMethod extends keyof TOutgoing>(method: TMethod, arg?: Parameters<TOutgoing[TMethod]>[0]): Promise<void>;
+	override transmit<TServiceName extends keyof TService, TMethod extends keyof TService[TServiceName]>(options: [TServiceName, TMethod], arg?: Parameters<TService[TServiceName][TMethod]>[0]): Promise<void>;
+	override transmit<TMethod extends keyof (TPrivateOutgoing & ServerPrivateMap)>(method: TMethod, arg?: Parameters<(TPrivateOutgoing & ServerPrivateMap)[TMethod]>[0]): Promise<void>;
+	override async transmit<TServiceName extends keyof TService, TServiceMethod extends keyof TService[TServiceName], TMethod extends keyof TOutgoing>(serviceAndMethod: TMethod | [TServiceName, TServiceMethod], arg?: (Parameters<TOutgoing[TMethod]> | Parameters<TService[TServiceName][TServiceMethod]>)[0]): Promise<void> {
 		if (this.status === 'closed') {
 			this.connect();
 
@@ -340,16 +351,16 @@ export class ClientTransport<T extends ClientMap> extends SocketTransport<Socket
 		await super.transmit(serviceAndMethod as TMethod, arg);
 	}
 
-	override invoke<TMethod extends keyof SocketMapFromClient<T>['Outgoing']>(method: TMethod, arg?: Parameters<SocketMapFromClient<T>['Outgoing'][TMethod]>[0]): [Promise<FunctionReturnType<SocketMapFromClient<T>['Outgoing'][TMethod]>>, () => void];
-	override invoke<TService extends keyof SocketMapFromClient<T>['Service'], TMethod extends keyof SocketMapFromClient<T>['Service'][TService]>(options: [TService, TMethod, (number | false)?], arg?: Parameters<SocketMapFromClient<T>['Service'][TService][TMethod]>[0]): [Promise<FunctionReturnType<SocketMapFromClient<T>['Service'][TService][TMethod]>>, () => void];
-	override invoke<TService extends keyof SocketMapFromClient<T>['Service'], TMethod extends keyof SocketMapFromClient<T>['Service'][TService]>(options: InvokeServiceOptions<SocketMapFromClient<T>['Service'], TService, TMethod>, arg?: Parameters<SocketMapFromClient<T>['Service'][TService][TMethod]>[0]): [Promise<FunctionReturnType<SocketMapFromClient<T>['Service'][TService][TMethod]>>, () => void];
-	override invoke<TMethod extends keyof SocketMapFromClient<T>['Outgoing']>(options: InvokeMethodOptions<SocketMapFromClient<T>['Outgoing'], TMethod>, arg?: Parameters<SocketMapFromClient<T>['Outgoing'][TMethod]>[0]): [Promise<FunctionReturnType<SocketMapFromClient<T>['Outgoing'][TMethod]>>, () => void];
-	override invoke<TMethod extends keyof (SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)>(method: TMethod, arg: Parameters<(SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)[TMethod]>[0]): [Promise<FunctionReturnType<(SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)[TMethod]>>, () => void];
-	override invoke<TMethod extends keyof (SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)>(options: InvokeMethodOptions<(SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap), TMethod>, arg?: Parameters<(SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)[TMethod]>[0]): [Promise<FunctionReturnType<(SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)[TMethod]>>, () => void];
-	override invoke<TService extends keyof SocketMapFromClient<T>['Service'], TServiceMethod extends keyof SocketMapFromClient<T>['Service'][TService], TMethod extends keyof SocketMapFromClient<T>['Outgoing'], TPrivateMethod extends keyof (SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)>(
-		methodOptions: TMethod | TPrivateMethod | [TService, TServiceMethod, (number | false)?] | InvokeServiceOptions<SocketMapFromClient<T>['Service'], TService, TServiceMethod> | InvokeMethodOptions<SocketMapFromClient<T>['Outgoing'], TMethod> | InvokeMethodOptions<(SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap), TPrivateMethod>,
-		arg?: (Parameters<SocketMapFromClient<T>['Outgoing'][TMethod]> | Parameters<(SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)[TPrivateMethod]> | Parameters<SocketMapFromClient<T>['Service'][TService][TServiceMethod]>)[0]
-	): [Promise<FunctionReturnType<SocketMapFromClient<T>['Outgoing'][TMethod] | (SocketMapFromClient<T>['PrivateOutgoing'] & ServerPrivateMap)[TPrivateMethod] | SocketMapFromClient<T>['Service'][TService][TServiceMethod]>>, () => void] {
+	override invoke<TMethod extends keyof TOutgoing>(method: TMethod, arg?: Parameters<TOutgoing[TMethod]>[0]): [Promise<FunctionReturnType<TOutgoing[TMethod]>>, () => void];
+	override invoke<TServiceName extends keyof TService, TMethod extends keyof TService[TServiceName]>(options: [TServiceName, TMethod, (number | false)?], arg?: Parameters<TService[TServiceName][TMethod]>[0]): [Promise<FunctionReturnType<TService[TServiceName][TMethod]>>, () => void];
+	override invoke<TServiceName extends keyof TService, TMethod extends keyof TService[TServiceName]>(options: InvokeServiceOptions<TService, TServiceName, TMethod>, arg?: Parameters<TService[TServiceName][TMethod]>[0]): [Promise<FunctionReturnType<TService[TServiceName][TMethod]>>, () => void];
+	override invoke<TMethod extends keyof TOutgoing>(options: InvokeMethodOptions<TOutgoing, TMethod>, arg?: Parameters<TOutgoing[TMethod]>[0]): [Promise<FunctionReturnType<TOutgoing[TMethod]>>, () => void];
+	override invoke<TMethod extends keyof (TPrivateOutgoing & ServerPrivateMap)>(method: TMethod, arg: Parameters<(TPrivateOutgoing & ServerPrivateMap)[TMethod]>[0]): [Promise<FunctionReturnType<(TPrivateOutgoing & ServerPrivateMap)[TMethod]>>, () => void];
+	override invoke<TMethod extends keyof (TPrivateOutgoing & ServerPrivateMap)>(options: InvokeMethodOptions<(TPrivateOutgoing & ServerPrivateMap), TMethod>, arg?: Parameters<(TPrivateOutgoing & ServerPrivateMap)[TMethod]>[0]): [Promise<FunctionReturnType<(TPrivateOutgoing & ServerPrivateMap)[TMethod]>>, () => void];
+	override invoke<TServiceName extends keyof TService, TServiceMethod extends keyof TService[TServiceName], TMethod extends keyof TOutgoing, TPrivateMethod extends keyof (TPrivateOutgoing & ServerPrivateMap)>(
+		methodOptions: TMethod | TPrivateMethod | [TServiceName, TServiceMethod, (number | false)?] | InvokeServiceOptions<TService, TServiceName, TServiceMethod> | InvokeMethodOptions<TOutgoing, TMethod> | InvokeMethodOptions<(TPrivateOutgoing & ServerPrivateMap), TPrivateMethod>,
+		arg?: (Parameters<TOutgoing[TMethod]> | Parameters<(TPrivateOutgoing & ServerPrivateMap)[TPrivateMethod]> | Parameters<TService[TServiceName][TServiceMethod]>)[0]
+	): [Promise<FunctionReturnType<TOutgoing[TMethod] | (TPrivateOutgoing & ServerPrivateMap)[TPrivateMethod] | TService[TServiceName][TServiceMethod]>>, () => void] {
 		let abort: () => void;
 
 		return [

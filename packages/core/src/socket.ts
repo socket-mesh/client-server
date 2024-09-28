@@ -26,7 +26,7 @@ export interface SocketOptions<
 	isPingTimeoutDisabled?: boolean;
 	plugins?: Plugin<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>[],
 	onUnhandledRequest?: (socket: TSocket, packet: AnyPacket<TIncoming, TService>) => boolean,
-	state?: TState,
+	state?: Partial<TState>,
 
 	// Lets you specify the default cleanup behaviour for
 	// when a socket becomes disconnected.

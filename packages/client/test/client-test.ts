@@ -1,10 +1,11 @@
 import assert from 'node:assert';
 import { beforeEach, afterEach, describe, it, mock } from "node:test";
-import { ClientSocket, ClientSocketOptions, LocalStorageAuthEngine, OfflinePlugin } from '../src/index.js';
+import { ClientPrivateMap, ClientSocket, ClientSocketOptions, LocalStorageAuthEngine, OfflinePlugin, ServerPrivateMap } from '../src/index.js';
 import { AuthStateChangeEvent, CloseEvent, DisconnectEvent, SocketStatus, RequestHandlerArgs, wait } from '@socket-mesh/core';
-import { BasicServerMap, BasicSocketMapServer, Server, ServerSocket, listen } from '@socket-mesh/server';
+import { Server, ServerSocket, listen } from '@socket-mesh/server';
 import localStorage from '@socket-mesh/local-storage';
 import jwt from "jsonwebtoken";
+import { ServerSocketState } from 'packages/server/src/server-socket-state.js';
 
 // Add to the global scope like in browser.
 global.localStorage = localStorage;
@@ -35,23 +36,14 @@ type ServerIncomingMap = {
 	setAuthKey: (secret: jwt.Secret) => void,
 }
 
-interface MyClientMap {
-	Channel: MyChannels,
-	Incoming: {},
-	Service: {},
-	Outgoing: ServerIncomingMap,
-	PrivateOutgoing: {},
-	State: {}
-}
-
 const allowedUsers: { [name: string]: true } = {
 	bob: true,
 	kate: true,
 	alice: true
 };
 
-let client: ClientSocket<MyClientMap>;
-let server: Server<BasicServerMap<ServerIncomingMap, MyChannels>>;
+let client: ClientSocket<MyChannels, {}, {}, ServerIncomingMap>;
+let server: Server<MyChannels, {}, ServerIncomingMap>;
 
 let performTaskTriggered: boolean;
 
@@ -76,12 +68,12 @@ async function performTaskHandler({ options }: RequestHandlerArgs<number>): Prom
 }
 
 async function setAuthKeyHandler(
-	{ socket, options: secret }: RequestHandlerArgs<jwt.Secret, BasicSocketMapServer, ServerSocket<BasicServerMap>>
+	{ socket, options: secret }: RequestHandlerArgs<jwt.Secret, ServerPrivateMap, {}, ClientPrivateMap, {}, ServerSocketState, ServerSocket>
 ): Promise<void> {
 	socket.server!.auth.authKey = secret;
 }
 
-const clientOptions: ClientSocketOptions<MyClientMap> = {
+const clientOptions: ClientSocketOptions<{}, {}, ServerIncomingMap> = {
 	authEngine: { authTokenName },
 	address: `ws://127.0.0.1:${PORT_NUMBER}`,
 	ackTimeoutMs: 200
@@ -89,7 +81,7 @@ const clientOptions: ClientSocketOptions<MyClientMap> = {
 
 describe('Integration tests', function () {
 	beforeEach(async function () {
-		server = listen<BasicServerMap<ServerIncomingMap, MyChannels>>(
+		server = listen<MyChannels, {}, ServerIncomingMap>(
 			PORT_NUMBER,
 			{
 				authEngine: { authKey: SERVER_AUTH_KEY },
@@ -145,8 +137,8 @@ describe('Integration tests', function () {
 		it('Should not automatically connect socket if autoConnect is set to false', async function () {
 			client = new ClientSocket(
 				Object.assign<
-					ClientSocketOptions<MyClientMap>,
-					ClientSocketOptions<MyClientMap>
+					ClientSocketOptions<{}, {}, ServerIncomingMap>,
+					ClientSocketOptions<{}, {}, ServerIncomingMap>
 				>(
 					{
 						autoConnect: false
@@ -363,9 +355,9 @@ describe('Integration tests', function () {
 
 			client = new ClientSocket(
 				Object.assign<
-					ClientSocketOptions<MyClientMap>,
-					ClientSocketOptions<MyClientMap>,
-					ClientSocketOptions<MyClientMap>
+					ClientSocketOptions<{}, {}, ServerIncomingMap>,
+					ClientSocketOptions<{}, {}, ServerIncomingMap>,
+					ClientSocketOptions<{}, {}, ServerIncomingMap>
 				>({}, clientOptions, { authEngine })
 			);
 
@@ -619,9 +611,9 @@ describe('Integration tests', function () {
 			global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
 			client = new ClientSocket(
 				Object.assign<
-					ClientSocketOptions<MyClientMap>,
-					ClientSocketOptions<MyClientMap>,
-					ClientSocketOptions<MyClientMap>
+					ClientSocketOptions<{}, {}, ServerIncomingMap>,
+					ClientSocketOptions<{}, {}, ServerIncomingMap>,
+					ClientSocketOptions<{}, {}, ServerIncomingMap>
 				>(
 					{},
 					clientOptions,
@@ -805,7 +797,7 @@ describe('Integration tests', function () {
 	});
 
 	describe('Pub/sub', function () {
-		let publisherClient: ClientSocket<MyClientMap>;
+		let publisherClient: ClientSocket<MyChannels, {}, {}, ServerIncomingMap>;
 		let lastServerMessage: string | null = null;
 
 		beforeEach(async function () {
@@ -1043,9 +1035,9 @@ describe('Integration tests', function () {
 		it('Should resolve invoke Promise with BadConnectionError before triggering the disconnect event', async function () {
 			client = new ClientSocket(
 				Object.assign<
-					ClientSocketOptions<MyClientMap>,
-					ClientSocketOptions<MyClientMap>,
-					ClientSocketOptions<MyClientMap>
+					ClientSocketOptions<{}, {}, ServerIncomingMap>,
+					ClientSocketOptions<{}, {}, ServerIncomingMap>,
+					ClientSocketOptions<{}, {}, ServerIncomingMap>
 				>(
 					{},
 					clientOptions,
@@ -1297,8 +1289,8 @@ describe('Integration tests', function () {
 		it('Should close if ping is not received before timeout', async function () {
 			client = new ClientSocket(
 				Object.assign<
-					ClientSocketOptions<MyClientMap>,
-					ClientSocketOptions<MyClientMap>
+					ClientSocketOptions<{}, {}, ServerIncomingMap>,
+					ClientSocketOptions<{}, {}, ServerIncomingMap>
 				>(
 					{
 						connectTimeoutMs: 500
@@ -1352,8 +1344,8 @@ describe('Integration tests', function () {
 		it('Should not close if ping is not received before timeout when pingTimeoutDisabled is true', async function () {
 			client = new ClientSocket(
 				Object.assign<
-					ClientSocketOptions<MyClientMap>,
-					ClientSocketOptions<MyClientMap>
+					ClientSocketOptions<{}, {}, ServerIncomingMap>,
+					ClientSocketOptions<{}, {}, ServerIncomingMap>
 				>(
 					{
 						connectTimeoutMs: 500,
