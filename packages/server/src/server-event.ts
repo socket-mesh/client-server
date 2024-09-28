@@ -100,7 +100,7 @@ export interface ServerSocketEvent<
 	TState extends object
 > {
 	socket:
-		ClientSocket<TChannel, TOutgoing & TPrivateOutgoing, TService, PublicMethodMap, TPrivateIncoming, TState> |
+		ClientSocket<PublicMethodMap, TChannel, TService, TState, TOutgoing & TPrivateOutgoing, TPrivateIncoming> |
 		ServerSocket<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>
 }
 

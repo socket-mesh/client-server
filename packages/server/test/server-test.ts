@@ -184,7 +184,7 @@ const serverOptions: ServerOptions<MyChannels, {}, ServerIncomingMap, ClientInco
 	}
 }
 
-let client: ClientSocket<MyChannels, {}, {}, ServerIncomingMap>;
+let client: ClientSocket<ServerIncomingMap, MyChannels>;
 let server: Server<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>;
 
 describe('Integration tests', function () {
@@ -1154,8 +1154,8 @@ describe('Integration tests', function () {
 
 			await server.listen('ready').once();
 
-			const clientList: ClientSocket<MyChannels, {}, {}, ServerIncomingMap>[] = [];
-			let client: ClientSocket<MyChannels, {}, {}, ServerIncomingMap>;
+			const clientList: ClientSocket<ServerIncomingMap, MyChannels>[] = [];
+			let client: ClientSocket<ServerIncomingMap, MyChannels>;
 
 			for (let i = 0; i < 100; i++) {
 				client = new ClientSocket(clientOptions);
@@ -1207,8 +1207,8 @@ describe('Integration tests', function () {
 
 			await server.listen('ready').once();
 
-			const clientList: ClientSocket<MyChannels, {}, {}, ServerIncomingMap>[] = [];
-			let client: ClientSocket<MyChannels, {}, {}, ServerIncomingMap>;
+			const clientList: ClientSocket<ServerIncomingMap, MyChannels>[] = [];
+			let client: ClientSocket<ServerIncomingMap, MyChannels>;
 
 			for (let i = 0; i < 100; i++) {
 				client = new ClientSocket(

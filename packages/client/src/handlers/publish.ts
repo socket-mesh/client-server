@@ -13,7 +13,7 @@ export async function publishHandler(
 		ServerPrivateMap,
 		{},
 		{},
-		ClientSocket<ChannelMap, {}, {}, {}, {}, {}>,
+		ClientSocket<{}, ChannelMap>,
 		ClientTransport<{}, {}, {}, {}, {}>
 	>
 ): Promise<void> {

@@ -13,12 +13,12 @@ import { ChannelMap } from "@socket-mesh/channels";
 import { ServerPrivateMap } from "./maps/server-map.js";
 
 export class ClientSocket<
-	TChannel extends ChannelMap = ChannelMap,
-	TIncoming extends MethodMap = {},
-	TService extends ServiceMap = {},
 	TOutgoing extends PublicMethodMap = {},
-	TPrivateOutgoing extends PrivateMethodMap = {},
-	TState extends object = {}
+	TChannel extends ChannelMap = ChannelMap,
+	TService extends ServiceMap = {},
+	TState extends object = {},
+	TIncoming extends MethodMap = {},
+	TPrivateOutgoing extends PrivateMethodMap = {}
 > extends Socket<
 	TIncoming & ClientPrivateMap,
 	TOutgoing,
@@ -30,8 +30,8 @@ export class ClientSocket<
 	public readonly channels: ClientChannels<TChannel, TIncoming, TService, TOutgoing, TPrivateOutgoing, TState>;
 
 	constructor(address: string | URL);
-	constructor(options: ClientSocketOptions<TOutgoing, TIncoming, TService, TPrivateOutgoing, TState>);
-	constructor(options: ClientSocketOptions<TOutgoing, TIncoming, TService, TPrivateOutgoing, TState> | string | URL) {
+	constructor(options: ClientSocketOptions<TOutgoing, TService, TIncoming, TPrivateOutgoing, TState>);
+	constructor(options: ClientSocketOptions<TOutgoing, TService, TIncoming, TPrivateOutgoing, TState> | string | URL) {
 		options = parseClientOptions(options);
 
 		options.handlers = 

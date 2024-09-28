@@ -294,7 +294,7 @@ export class Server<
 
 	private onUnhandledRequest(
 		socket:
-			ClientSocket<TChannel, TOutgoing & TPrivateOutgoing, TService, PublicMethodMap, TPrivateIncoming, TState> |
+			ClientSocket<PublicMethodMap, TChannel, TService, TState, TOutgoing & TPrivateOutgoing, TPrivateIncoming> |
 			ServerSocket<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>,
 		packet: AnyPacket<TIncoming & TPrivateIncoming & ServerPrivateMap, TService>
 	): void {
@@ -303,7 +303,7 @@ export class Server<
 
 	private socketDisconnected(
 		socket:
-			ClientSocket<TChannel, TOutgoing & TPrivateOutgoing, TService, PublicMethodMap, TPrivateIncoming, TState> |
+			ClientSocket<PublicMethodMap, TChannel, TService, TState, TOutgoing & TPrivateOutgoing, TPrivateIncoming> |
 			ServerSocket<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>
 	): void {
 		if (!!this.pendingClients[socket.id]) {

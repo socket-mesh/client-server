@@ -42,7 +42,7 @@ const allowedUsers: { [name: string]: true } = {
 	alice: true
 };
 
-let client: ClientSocket<MyChannels, {}, {}, ServerIncomingMap>;
+let client: ClientSocket<ServerIncomingMap, MyChannels>;
 let server: Server<MyChannels, {}, ServerIncomingMap>;
 
 let performTaskTriggered: boolean;
@@ -797,7 +797,7 @@ describe('Integration tests', function () {
 	});
 
 	describe('Pub/sub', function () {
-		let publisherClient: ClientSocket<MyChannels, {}, {}, ServerIncomingMap>;
+		let publisherClient: ClientSocket<ServerIncomingMap, MyChannels>;
 		let lastServerMessage: string | null = null;
 
 		beforeEach(async function () {

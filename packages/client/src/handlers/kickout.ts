@@ -13,7 +13,7 @@ export async function kickOutHandler(
 		ServerPrivateMap,
 		{},
 		{},
-		ClientSocket<ChannelMap, {}, {}, {}, {}, {}>,
+		ClientSocket<{}, ChannelMap>,
 		ClientTransport<{}, {}, {}, {}, {}>
 	>
 ): Promise<void> {
