@@ -66,9 +66,9 @@ export class Server<
 	public readonly socketStreamCleanupMode: StreamCleanupMode;
 	public readonly httpServer: HttpServer;
 
-	public readonly plugins: ServerPlugin<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>[];
+	public readonly plugins: ServerPlugin<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>[];
 
-	constructor(options?: ServerOptions<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>) {
+	constructor(options?: ServerOptions<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>) {
 		super();
 
 		let cid = 1;
@@ -147,7 +147,7 @@ export class Server<
 		}
 	}
 
-	public addPlugin(...plugin: ServerPlugin<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>[]): void {
+	public addPlugin(...plugin: ServerPlugin<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>[]): void {
 		this.plugins.push(...plugin);
 	}
 

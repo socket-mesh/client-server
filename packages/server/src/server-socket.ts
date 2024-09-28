@@ -32,7 +32,7 @@ export interface ServerSocketOptions<
 		TService,
 		TState & ServerSocketState
 	>,
-	plugins?: ServerPlugin<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>[],
+	plugins?: ServerPlugin<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>[],
 	id?: string,
 	service?: string,
 	server: Server<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>,

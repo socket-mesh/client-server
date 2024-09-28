@@ -55,9 +55,9 @@ export interface SubscribePluginArgs<
 }
 
 export interface ServerPlugin<
+	TIncoming extends PublicMethodMap,
 	TChannel extends ChannelMap,
 	TService extends ServiceMap,
-	TIncoming extends PublicMethodMap,
 	TOutgoing extends PublicMethodMap,
 	TPrivateIncoming extends PrivateMethodMap,
 	TPrivateOutgoing extends PrivateMethodMap,

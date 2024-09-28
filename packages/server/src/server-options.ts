@@ -5,11 +5,12 @@ import { CodecEngine } from "@socket-mesh/formatter";
 import { ServerPlugin } from "./plugin/server-plugin.js";
 import { Broker } from "./broker/broker.js";
 import { ChannelMap } from "@socket-mesh/channels";
+import { ClientPrivateMap, ServerPrivateMap } from "@socket-mesh/client";
 
 export interface ServerOptions<
+	TIncoming extends PublicMethodMap = {},
 	TChannel extends ChannelMap = {},
 	TService extends ServiceMap = {},
-	TIncoming extends PublicMethodMap = {},
 	TOutgoing extends PublicMethodMap = {},
 	TPrivateIncoming extends PrivateMethodMap = {},
 	TPrivateOutgoing extends PrivateMethodMap = {},
@@ -35,11 +36,11 @@ export interface ServerOptions<
 	// when using invoke() or invokePublish().	ackTimeout: number
 	handshakeTimeoutMs?: number,
 
-	handlers?: HandlerMap<{}, {}, {}, {}, {}>;
+	handlers?: HandlerMap<TIncoming & TPrivateIncoming & ServerPrivateMap, TOutgoing, TPrivateOutgoing & ClientPrivateMap, TService, TState>;
 
 	isPingTimeoutDisabled?: boolean,
 
-	plugins?: ServerPlugin<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>[],
+	plugins?: ServerPlugin<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>[],
 
 	// Origins which are allowed to connect to the server.
 	origins?: string;

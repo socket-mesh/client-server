@@ -28,7 +28,7 @@ export class ServerTransport<
 	TService,
 	TState & ServerSocketState
 > {
-	public readonly plugins: ServerPlugin<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>[];
+	public readonly plugins: ServerPlugin<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>[];
 	public readonly service?: string;
 	public readonly request: IncomingMessage;
 

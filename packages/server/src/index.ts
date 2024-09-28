@@ -41,7 +41,7 @@ export function listen<
 	TState extends object = {}
 >(
 	port: number,
-	options: ServerOptions<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>
+	options: ServerOptions<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>
 ): Server<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>;
 export function listen<
 	TChannel extends ChannelMap = {},
@@ -54,7 +54,7 @@ export function listen<
 	TState extends object = {}
 >(
 	port: number,
-	options: ServerOptions<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>, fn: () => void
+	options: ServerOptions<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>, fn: () => void
 ): Server<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>;
 export function listen<
 	TChannel extends ChannelMap,
@@ -67,7 +67,7 @@ export function listen<
 	TState extends object
 >(
 	port?: number,
-	options?: ServerOptions<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState> | (() => void), fn?: () => void
+	options?: ServerOptions<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState> | (() => void), fn?: () => void
 ): Server<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState> {
   if (typeof options === 'function') {
     fn = options;
@@ -109,7 +109,7 @@ export function attach<
 	TState extends object = {}
 >(
 	server: http.Server,
-	options?: ServerOptions<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>
+	options?: ServerOptions<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>
 ): Server<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState> {
   if (options == null) {
     options = {};

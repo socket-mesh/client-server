@@ -144,9 +144,7 @@ async function setAuthKeyHandler({ socket, options: secret }: ServerRequestHandl
 	socket.server!.auth.authKey = secret;
 }
 
-async function procHandler(
-	{ options: data }: RequestHandlerArgs<number>
-): Promise<string> {
+async function procHandler({ options: data }: RequestHandlerArgs<number>): Promise<string> {
 	return `success ${data}`;
 }
 
@@ -155,7 +153,7 @@ const clientOptions: ClientSocketOptions<ServerIncomingMap> = {
 	address: `ws://127.0.0.1:${PORT_NUMBER}`
 }
 
-const serverOptions: ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap> = {
+const serverOptions: ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap> = {
 	authEngine: { authKey: SERVER_AUTH_KEY },
 	ackTimeoutMs: 200,
 	handlers: {
@@ -191,8 +189,8 @@ describe('Integration tests', function () {
 			server = listen(
 				PORT_NUMBER,
 				Object.assign<
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
 				>(
 					{
 						plugins: [{
@@ -647,9 +645,9 @@ describe('Integration tests', function () {
 			server = listen(
 				PORT_NUMBER,
 				Object.assign<
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
 				>(
 					{},
 					serverOptions,
@@ -723,9 +721,9 @@ describe('Integration tests', function () {
 			server = listen(
 				PORT_NUMBER,
 				Object.assign<
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
 				>(
 					{},
 					serverOptions,
@@ -796,9 +794,9 @@ describe('Integration tests', function () {
 
 			server = listen(PORT_NUMBER,
 				Object.assign<
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
 				>(
 					{},
 					serverOptions,
@@ -840,9 +838,9 @@ describe('Integration tests', function () {
 		it('Should remove client data from the server when client disconnects before authentication process finished', async function () {
 			server = listen(PORT_NUMBER,
 				Object.assign<
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
 				>(
 					{},
 					serverOptions,
@@ -1021,8 +1019,8 @@ describe('Integration tests', function () {
 		it('Should not close the connection if the client tries to send a message before the handshake and strictHandshake is false', async function () {
 			server = listen(PORT_NUMBER,
 				Object.assign<
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
 				>(
 					{ strictHandshake: false },
 					serverOptions
@@ -1165,9 +1163,9 @@ describe('Integration tests', function () {
 			server = listen(
 				PORT_NUMBER,
 				Object.assign<
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
 				>(
 					{},
 					serverOptions,
@@ -1229,9 +1227,9 @@ describe('Integration tests', function () {
 		it('Server-side socket disconnect event should not trigger if the socket did not complete the handshake; instead, it should trigger connectAbort', async function () {
 			server = listen(PORT_NUMBER,
 				Object.assign<
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
 				>(
 					{},
 					serverOptions,
@@ -1318,9 +1316,9 @@ describe('Integration tests', function () {
 		it('Server-side socket disconnect event should trigger if the socket completed the handshake (not connectAbort)', async function () {
 			server = listen(PORT_NUMBER,
 				Object.assign<
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
 				>(
 					{},
 					serverOptions,
@@ -1406,9 +1404,9 @@ describe('Integration tests', function () {
 		it('The close event should trigger when the socket loses the connection before the handshake', async function () {
 			server = listen(PORT_NUMBER,
 				Object.assign<
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
 				>(
 					{},
 					serverOptions,
@@ -1471,9 +1469,9 @@ describe('Integration tests', function () {
 		it('The close event should trigger when the socket loses the connection after the handshake', async function () {
 			server = listen(PORT_NUMBER,
 				Object.assign<
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
 				>(
 					{},
 					serverOptions,
@@ -1540,9 +1538,9 @@ describe('Integration tests', function () {
 			server = listen(
 				PORT_NUMBER,
 				Object.assign<
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>>(
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>(
 					{},
 					serverOptions,
 					{
@@ -1654,9 +1652,9 @@ describe('Integration tests', function () {
 			server = listen(
 				PORT_NUMBER,
 				Object.assign<
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
 				>(
 					{},
 					serverOptions,
@@ -1665,6 +1663,7 @@ describe('Integration tests', function () {
 							foo: async ({ options: data }: RequestHandlerArgs<number>) => {
 								await wait(30);
 								handledPackets.push(data);	
+								return 'bar';
 							}
 						},
 						plugins: [new InOrderPlugin()]
@@ -1710,9 +1709,9 @@ describe('Integration tests', function () {
 			server = listen(
 				PORT_NUMBER,
 				Object.assign<
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
 				>(
 					{},
 					serverOptions,
@@ -1721,7 +1720,8 @@ describe('Integration tests', function () {
 						handlers: {
 							foo: async ({ options: data }: RequestHandlerArgs<number>) => {
 								await wait(30);
-								handledPackets.push(data);	
+								handledPackets.push(data);
+								return 'bar';
 							}
 						}
 					}
@@ -1766,9 +1766,9 @@ describe('Integration tests', function () {
 			server = listen(
 				PORT_NUMBER,
 				Object.assign<
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
 				>(
 					{},
 					serverOptions,
@@ -1777,7 +1777,8 @@ describe('Integration tests', function () {
 						handlers: {
 							foo: async ({ options: data }: RequestHandlerArgs<number>) => {
 								await wait(30);
-								handledPackets.push(data);	
+								handledPackets.push(data);
+								return 'bar';
 							}
 						}
 					}
@@ -1820,9 +1821,9 @@ describe('Integration tests', function () {
 			server = listen(
 				PORT_NUMBER,
 				Object.assign<
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
 				>(
 					{},
 					serverOptions,
@@ -1878,9 +1879,9 @@ describe('Integration tests', function () {
 			server = listen(
 				PORT_NUMBER,
 				Object.assign<
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
 				>(
 					{},
 					serverOptions,
@@ -1925,8 +1926,8 @@ describe('Integration tests', function () {
 			server = listen(
 				PORT_NUMBER,
 				Object.assign<
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>>(
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>(
 					{
 						plugins: [
 							{
@@ -1991,8 +1992,8 @@ describe('Integration tests', function () {
 			server = listen(
 				PORT_NUMBER,
 				Object.assign<
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>>(
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>(
 					{
 						plugins: [
 							{
@@ -2057,8 +2058,8 @@ describe('Integration tests', function () {
 			server = listen(
 				PORT_NUMBER,
 				Object.assign<
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
 				>(
 					{
 						plugins: [
@@ -2175,8 +2176,8 @@ describe('Integration tests', function () {
 			server = listen(
 				PORT_NUMBER,
 				Object.assign<
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>>(
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>(
 					{
 						authEngine: {
 							async verifyToken() {
@@ -2478,8 +2479,8 @@ describe('Integration tests', function () {
 			server = listen(
 				PORT_NUMBER,
 				Object.assign<
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
 				>(
 					{
 						brokerEngine: new CustomBrokerEngine()
@@ -2592,8 +2593,8 @@ describe('Integration tests', function () {
 			server = listen(
 				PORT_NUMBER,
 				Object.assign<
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
 				>(
 					{
 						brokerEngine: new CustomBrokerEngine()
@@ -2697,8 +2698,8 @@ describe('Integration tests', function () {
 			server = listen(
 				PORT_NUMBER,
 				Object.assign<
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
 				>(
 					{
 						plugins: [
@@ -2820,8 +2821,8 @@ describe('Integration tests', function () {
 			server = listen(
 				PORT_NUMBER,
 				Object.assign<
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-					ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
 				>(
 					{
 						plugins: [
@@ -2878,8 +2879,8 @@ describe('Integration tests', function () {
 				server = listen(
 					PORT_NUMBER,
 					Object.assign<
-						ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-						ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>
+						ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+						ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
 					>(
 						{
 							pingIntervalMs: 5000,
@@ -2945,8 +2946,8 @@ describe('Integration tests', function () {
 				server = listen(
 					PORT_NUMBER,
 					Object.assign<
-						ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-						ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>
+						ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+						ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
 					>(
 						{
 							isPingTimeoutDisabled: true,
@@ -3020,8 +3021,8 @@ describe('Integration tests', function () {
 				server = listen(
 					PORT_NUMBER,
 					Object.assign<
-						ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>,
-						ServerOptions<MyChannels, {}, ServerIncomingMap, ClientIncomingMap>
+						ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
+						ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
 					>(
 						{
 							pingIntervalMs: 400,
