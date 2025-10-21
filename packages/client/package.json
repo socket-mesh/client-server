@@ -52,7 +52,7 @@
 		"buffer": "^6.0.3",
 		"events": "^3.3.0",
 		"isomorphic-ws": "^5.0.0",
-		"ws": "^8.18.0"
+		"ws": "^8.18.3"
 	},
 	"keywords": [
 		"ncom",
