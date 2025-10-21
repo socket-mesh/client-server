@@ -1,4 +1,4 @@
-import ws from "ws";
+import { WebSocket, WebSocketServer } from "ws";
 import { ServerProtocolError } from "@socket-mesh/errors";
 import { ServerSocket } from "./server-socket.js";
 import { IncomingMessage, Server as HttpServer, OutgoingHttpHeaders } from 'http';
@@ -33,7 +33,7 @@ export class Server<
 	TState extends object = {}
 > extends AsyncStreamEmitter<ServerEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>> {
 	private readonly _callIdGenerator: CallIdGenerator;
-	private readonly _wss: ws.WebSocketServer;
+	private readonly _wss: WebSocketServer;
 	private _isReady: boolean;
 	private _isListening: boolean;
 	private _pingIntervalRef: NodeJS.Timeout;	
@@ -118,7 +118,7 @@ export class Server<
 
 		options.verifyClient = this.verifyClient.bind(this);
 
-		this._wss = new ws.WebSocketServer(options);
+		this._wss = new WebSocketServer(options);
 
 		this._wss.on('close', this.onClose.bind(this));
 		this._wss.on('connection', this.onConnection.bind(this));
@@ -242,7 +242,7 @@ export class Server<
 		this.emit('close', {});
 	}
 
-	private onConnection(wsSocket: ws.WebSocket, upgradeReq: IncomingMessage): void {
+	private onConnection(wsSocket: WebSocket, upgradeReq: IncomingMessage): void {
 /*
 		if (!wsSocket.upgradeReq) {
 			// Normalize ws modules to match.

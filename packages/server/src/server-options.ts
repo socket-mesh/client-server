@@ -1,4 +1,4 @@
-import ws from "ws";
+import { ServerOptions as WebSocketServerOptions } from "ws";
 import { AuthEngine, AuthOptions } from "@socket-mesh/auth-engine";
 import { CallIdGenerator, HandlerMap, StreamCleanupMode, ServiceMap, PublicMethodMap, PrivateMethodMap } from "@socket-mesh/core";
 import { CodecEngine } from "@socket-mesh/formatter";
@@ -16,7 +16,7 @@ export interface ServerOptions<
 	TPrivateOutgoing extends PrivateMethodMap = {},
 	TServerState extends object = {},
 	TState extends object = {}
-> extends ws.ServerOptions {
+> extends WebSocketServerOptions {
 	// In milliseconds, the timeout for receiving a response
 	// when using invoke() or invokePublish().
 	ackTimeoutMs?: number,

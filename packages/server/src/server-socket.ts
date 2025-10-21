@@ -1,5 +1,5 @@
 import { HandlerMap, PrivateMethodMap, PublicMethodMap, ServiceMap, Socket, SocketOptions } from "@socket-mesh/core";
-import ws from "ws";
+import { WebSocket } from "ws";
 import { ServerTransport } from "./server-transport.js";
 import { Exchange } from "./broker/exchange.js";
 import { Server } from "./server.js";
@@ -37,7 +37,7 @@ export interface ServerSocketOptions<
 	service?: string,
 	server: Server<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>,
 	request: IncomingMessage,
-	socket: ws.WebSocket
+	socket: WebSocket
 }
 
 export class ServerSocket<

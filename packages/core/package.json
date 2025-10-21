@@ -28,7 +28,7 @@
 	},
 	"devDependencies": {
 		"@types/base64id": "^2.0.2",
-		"@types/ws": "^8.5.11"
+		"@types/ws": "^8.18.1"
 	},
 	"dependencies": {
 		"@socket-mesh/async-stream-emitter": "^7.1.2",
@@ -37,6 +37,6 @@
 		"@socket-mesh/formatter": "^4.1.0",
 		"@socket-mesh/stream-demux": "^10.1.5",
 		"isomorphic-ws": "^5.0.0",
-		"ws": "^8.18.0"
+		"ws": "^8.18.3"
 	}
 }
