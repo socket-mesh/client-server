@@ -23,14 +23,11 @@ catalogs:
     buffer:
       specifier: ^6.0.3
       version: 6.0.3
-    cross-env:
-      specifier: ^7.0.3
-      version: 7.0.3
     events:
       specifier: ^3.3.0
       version: 3.3.0
     tslib:
-      specifier: ^2.7.0
+      specifier: ^2.8.1
       version: 2.8.1
     tsx:
       specifier: ^4.20.6
@@ -47,14 +44,14 @@ catalogs:
       version: 9.0.2
   node:
     '@types/node':
-      specifier: ^24.3.0
+      specifier: ^24.9.1
       version: 24.9.1
   rollup:
     '@kineticcafe/rollup-plugin-delete':
-      specifier: ^3.0.0
+      specifier: ^3.0.2
       version: 3.0.2
     '@rollup/plugin-alias':
-      specifier: ^5.1.0
+      specifier: ^5.1.1
       version: 5.1.1
     '@rollup/plugin-commonjs':
       specifier: ^26.0.1
@@ -111,9 +108,6 @@ importers:
       '@types/node':
         specifier: catalog:node
         version: 24.9.1
-      cross-env:
-        specifier: 'catalog:'
-        version: 7.0.3
       tsx:
         specifier: 'catalog:'
         version: 4.20.6
@@ -827,11 +821,6 @@ packages:
 
   commondir@1.0.1:
     resolution: {integrity: sha512-W9pAhw0ja1Edb5GVdIF1mjZw/ASI0AlShXM83UUGe2DVr5TdAPEA1OA8m/g8zWp9x6On7gqufY+FatDbC3MDQg==}
-
-  cross-env@7.0.3:
-    resolution: {integrity: sha512-+/HKd6EgcQCJGh2PSjZuUitQBQynKor4wrFbRg4DtAgS1aWO+gU52xpH7M9ScGgXSYmAVS9bIJ8EzuaGw0oNAw==}
-    engines: {node: '>=10.14', npm: '>=6', yarn: '>=1'}
-    hasBin: true
 
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
@@ -1599,10 +1588,6 @@ snapshots:
   commander@2.20.3: {}
 
   commondir@1.0.1: {}
-
-  cross-env@7.0.3:
-    dependencies:
-      cross-spawn: 7.0.6
 
   cross-spawn@7.0.6:
     dependencies:
