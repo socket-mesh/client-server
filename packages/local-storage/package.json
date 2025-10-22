@@ -1,0 +1,27 @@
+{
+	"name": "@socket-mesh/local-storage",
+	"author": "AJ ONeal <coolaj86@gmail.com> (http://coolaj86.info)",
+	"description": "W3C localStorage for Node.JS",
+	"version": "1.0.3",
+	"homepage": "https://github.com/socket-mesh/local-storage#readme",
+	"type": "module",
+	"scripts": {
+		"build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
+		"deploy": "npm run build && node ../../scripts/publish.mjs",
+		"test": "tsx --tsconfig ./tsconfig.build.json --test ./src/**/*.{spec,test}.ts ./test/**/*.{spec,test}.ts"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git://github.com/socket-mesh/local-storage.git"
+	},
+	"bugs": {
+		"url": "https://github.com/socket-mesh/local-storage/issues"
+	},
+	"engines": {
+		"node": ">= v0.2.0"
+	},
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"files": ["./dist"],
+	"license": "MIT"
+}

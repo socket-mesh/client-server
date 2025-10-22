@@ -12,7 +12,7 @@
 	"scripts": {
 		"build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
 		"deploy": "npm run build && node ../../scripts/publish.mjs",
-		"test": "tsx --tsconfig ./tsconfig.build.json --test ./src/**/*.spec.ts ./test/**/*.spec.ts"
+		"test": "tsx --tsconfig ./tsconfig.build.json --test ./src/**/*.{spec,test}.ts ./test/**/*.{spec,test}.ts"
 	},
 	"repository": {
 		"type": "git",
@@ -22,7 +22,7 @@
 		"url": "https://github.com/socket-mesh/client-server/labels/server"
 	},	
 	"devDependencies": {
-		"@socket-mesh/local-storage": "catalog:socket-mesh",
+		"@socket-mesh/local-storage": "workspace:^",
 		"@types/base64id": "catalog:base64id",
 		"@types/jsonwebtoken": "catalog:json-web-token",
 		"@types/ws": "catalog:ws"

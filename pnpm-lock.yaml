@@ -78,9 +78,6 @@ catalogs:
     '@socket-mesh/consumable-stream':
       specifier: ^3.2.1
       version: 3.2.1
-    '@socket-mesh/local-storage':
-      specifier: ^1.0.2
-      version: 1.0.2
     '@socket-mesh/stream-demux':
       specifier: ^10.1.5
       version: 10.1.5
@@ -200,8 +197,8 @@ importers:
         specifier: catalog:rollup
         version: 11.1.6(rollup@4.52.5)(tslib@2.8.1)(typescript@5.9.3)
       '@socket-mesh/local-storage':
-        specifier: catalog:socket-mesh
-        version: 1.0.2
+        specifier: workspace:^
+        version: link:../local-storage
       '@socket-mesh/server':
         specifier: workspace:^
         version: link:../server
@@ -265,6 +262,8 @@ importers:
 
   packages/formatter: {}
 
+  packages/local-storage: {}
+
   packages/server:
     dependencies:
       '@socket-mesh/async-stream-emitter':
@@ -311,8 +310,8 @@ importers:
         version: 8.18.3
     devDependencies:
       '@socket-mesh/local-storage':
-        specifier: catalog:socket-mesh
-        version: 1.0.2
+        specifier: workspace:^
+        version: link:../local-storage
       '@types/base64id':
         specifier: catalog:base64id
         version: 2.0.2
@@ -713,10 +712,6 @@ packages:
 
   '@socket-mesh/consumable-stream@3.2.1':
     resolution: {integrity: sha512-gl5fJLrHz9i0C+F9juzxnQ4wAHQyMjggcbV8QUbo+VL0oa/gttGkignmo1HclTUqk52uWAT63Fxnj5BNeNjnsA==}
-
-  '@socket-mesh/local-storage@1.0.2':
-    resolution: {integrity: sha512-RKOG6EAmkv6l9c3Q1rIOWa42+VdFy9i0BncFHGBYN+y+SOiZ7BmvPMAXBUWiyKEMBQL+0I2o3oxPiNhxLIGdXg==}
-    engines: {node: '>= v0.2.0'}
 
   '@socket-mesh/stream-demux@10.1.5':
     resolution: {integrity: sha512-+A3gvj+1JY8s/Q8jN4qp5SdbggrbFPCFJml58FI4BQrWe9IC+xNM0dOutehSfj3yYAehe87FWedZGm/4rZoTWA==}
@@ -1472,8 +1467,6 @@ snapshots:
       '@socket-mesh/stream-demux': 10.1.5
 
   '@socket-mesh/consumable-stream@3.2.1': {}
-
-  '@socket-mesh/local-storage@1.0.2': {}
 
   '@socket-mesh/stream-demux@10.1.5':
     dependencies:
