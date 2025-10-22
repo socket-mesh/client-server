@@ -33,6 +33,6 @@
 	"dependencies": {
 		"clone-deep": "catalog:clone-deep",
 		"jsonwebtoken": "catalog:json-web-token",
-		"@socket-mesh/errors": "catalog:socket-mesh"
+		"@socket-mesh/errors": "workspace:^"
 	}
 }

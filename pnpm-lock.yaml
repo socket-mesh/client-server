@@ -78,9 +78,6 @@ catalogs:
     '@socket-mesh/consumable-stream':
       specifier: ^3.2.1
       version: 3.2.1
-    '@socket-mesh/errors':
-      specifier: ^3.2.0
-      version: 3.2.0
     '@socket-mesh/local-storage':
       specifier: ^1.0.2
       version: 1.0.2
@@ -120,8 +117,8 @@ importers:
   packages/auth-engine:
     dependencies:
       '@socket-mesh/errors':
-        specifier: catalog:socket-mesh
-        version: 3.2.0
+        specifier: workspace:^
+        version: link:../errors
       clone-deep:
         specifier: catalog:clone-deep
         version: 4.0.1
@@ -716,9 +713,6 @@ packages:
 
   '@socket-mesh/consumable-stream@3.2.1':
     resolution: {integrity: sha512-gl5fJLrHz9i0C+F9juzxnQ4wAHQyMjggcbV8QUbo+VL0oa/gttGkignmo1HclTUqk52uWAT63Fxnj5BNeNjnsA==}
-
-  '@socket-mesh/errors@3.2.0':
-    resolution: {integrity: sha512-AN53GApN9GAE4rK1ExyzM3lqL9i527qV+st6olh4h8p62quWDJnRdPkJcEGQyOj4BrdoAr2rs3UJ4yTWpvn2XA==}
 
   '@socket-mesh/local-storage@1.0.2':
     resolution: {integrity: sha512-RKOG6EAmkv6l9c3Q1rIOWa42+VdFy9i0BncFHGBYN+y+SOiZ7BmvPMAXBUWiyKEMBQL+0I2o3oxPiNhxLIGdXg==}
@@ -1478,8 +1472,6 @@ snapshots:
       '@socket-mesh/stream-demux': 10.1.5
 
   '@socket-mesh/consumable-stream@3.2.1': {}
-
-  '@socket-mesh/errors@3.2.0': {}
 
   '@socket-mesh/local-storage@1.0.2': {}
 
