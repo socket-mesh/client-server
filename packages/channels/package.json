@@ -12,7 +12,7 @@
 	"scripts": {
 		"build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
 		"deploy": "npm run build && node ../../scripts/publish.mjs",
-		"test": "cross-env node --test --import=./run-test.js test/server-test.ts"
+		"test": "tsx --tsconfig ./tsconfig.build.json --test ./src/**/*.spec.ts ./test/**/*.spec.ts"
 	},
 	"repository": {
 		"type": "git",
@@ -22,10 +22,10 @@
 		"url": "https://github.com/socket-mesh/client-server/labels/channels"
 	},	
 	"dependencies": {
-		"@socket-mesh/async-stream-emitter": "^7.1.2",
-		"@socket-mesh/consumable-stream": "^3.2.1",
-		"@socket-mesh/stream-demux": "^10.1.5",
-		"@socket-mesh/writable-consumable-stream": "^4.2.9"
+		"@socket-mesh/async-stream-emitter": "catalog:socket-mesh",
+		"@socket-mesh/consumable-stream": "catalog:socket-mesh",
+		"@socket-mesh/stream-demux": "catalog:socket-mesh",
+		"@socket-mesh/writable-consumable-stream": "catalog:socket-mesh"
 	},
 	"keywords": [
 		"ncom",

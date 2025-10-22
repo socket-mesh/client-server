@@ -5,8 +5,8 @@ import { ChannelMap } from "@socket-mesh/channels";
 import { PrivateMethodMap, PublicMethodMap, ServiceMap } from "@socket-mesh/core";
 export { Server } from "./server.js";
 export { ServerSocket } from "./server-socket.js";
-export { PluginType } from "@socket-mesh/core";
-export { ServerRequestHandlerArgs } from './handlers/server-request-handler.js';
+export type { PluginType } from "@socket-mesh/core";
+export type { ServerRequestHandlerArgs } from './handlers/server-request-handler.js';
 
 /**
  * Creates an http.Server exclusively used for WS upgrades.

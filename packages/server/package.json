@@ -12,7 +12,7 @@
 	"scripts": {
 		"build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
 		"deploy": "npm run build && node ../../scripts/publish.mjs",
-		"test": "cross-env node --test --import=./run-test.js test/server-test.ts"
+		"test": "tsx --tsconfig ./tsconfig.build.json --test ./src/**/*.spec.ts ./test/**/*.spec.ts"
 	},
 	"repository": {
 		"type": "git",
@@ -22,22 +22,26 @@
 		"url": "https://github.com/socket-mesh/client-server/labels/server"
 	},	
 	"devDependencies": {
-		"@socket-mesh/local-storage": "^1.0.2",
-		"@types/base64id": "^2.0.2",
-		"@types/jsonwebtoken": "^9.0.10",
-		"@types/ws": "^8.18.1"
+		"@socket-mesh/local-storage": "catalog:socket-mesh",
+		"@types/base64id": "catalog:base64id",
+		"@types/jsonwebtoken": "catalog:json-web-token",
+		"@types/ws": "catalog:ws"
 	},
 	"dependencies": {
-		"@socket-mesh/async-stream-emitter": "^7.1.2",
-		"@socket-mesh/auth": "^2.2.0",
-		"@socket-mesh/auth-engine": "^1.0.0",
-		"@socket-mesh/client": "^18.1.5",
-		"@socket-mesh/errors": "^3.2.0",
-		"@socket-mesh/formatter": "^4.1.0",
-		"base64id": "^2.0.0",
-		"events": "^3.3.0",
-		"jsonwebtoken": "^9.0.2",
-		"ws": "^8.18.3"
+		"@socket-mesh/async-stream-emitter": "catalog:socket-mesh",
+		"@socket-mesh/auth": "workspace:^",
+		"@socket-mesh/auth-engine": "workspace:^",
+		"@socket-mesh/channels": "workspace:^",
+		"@socket-mesh/client": "workspace:^",
+		"@socket-mesh/core": "workspace:^",
+		"@socket-mesh/errors": "workspace:^",
+		"@socket-mesh/formatter": "workspace:^",
+		"@socket-mesh/stream-demux": "catalog:socket-mesh",
+		"@socket-mesh/writable-consumable-stream": "catalog:socket-mesh",
+		"base64id": "catalog:base64id",
+		"events": "catalog:",
+		"jsonwebtoken": "catalog:json-web-token",
+		"ws": "catalog:ws"
 	},
 	"keywords": [
 		"ncom",

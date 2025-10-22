@@ -1,0 +1,53 @@
+packages:
+  - 'packages/*'
+
+catalog:
+  buffer: ^6.0.3
+  cross-env: ^7.0.3
+  events: ^3.3.0
+  "tslib": ^2.7.0
+  tsx: ^4.20.6
+  typescript: ^5.9.3
+
+catalogs:
+  base64id:
+    base64id: ^2.0.0
+    "@types/base64id": ^2.0.2
+
+  clone-deep:
+    clone-deep: ^4.0.1
+    "@types/clone-deep": ^4.0.4
+
+  json-web-token:
+    "@types/jsonwebtoken": ^9.0.10
+    jsonwebtoken: ^9.0.2
+
+  node:
+    "@types/node": ^24.3.0
+
+  rollup:
+    "@kineticcafe/rollup-plugin-delete": ^3.0.0
+    "@rollup/plugin-alias": ^5.1.0
+    "@rollup/plugin-commonjs": ^26.0.1
+    "@rollup/plugin-node-resolve": ^15.2.3
+    "@rollup/plugin-terser": ^0.4.4
+    "@rollup/plugin-typescript": ^11.1.6
+    "rollup": ^4.22.5
+    "rollup-plugin-dts": ^6.1.1
+
+  secure-data-systems:
+    "@secure-data-systems/eslint-config": 1.0.7
+    "@secure-data-systems/tsconfig": 1.0.1
+
+  socket-mesh:
+    "@socket-mesh/async-stream-emitter": ^7.1.2
+    "@socket-mesh/consumable-stream": ^3.2.1
+    "@socket-mesh/errors": ^3.2.0
+    "@socket-mesh/local-storage": ^1.0.2
+    "@socket-mesh/stream-demux": ^10.1.5
+    "@socket-mesh/writable-consumable-stream": ^4.2.9
+
+  ws:
+    isomorphic-ws: ^5.0.0
+    ws: ^8.18.3
+    "@types/ws": ^8.18.1

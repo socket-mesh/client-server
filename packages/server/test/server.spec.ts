@@ -17,6 +17,7 @@ import { ExchangeClient } from "../src/broker/exchange-client.js";
 import { Channel, ChannelOptions, isPublishOptions, JsonValue, UnsubscribeEvent } from "@socket-mesh/channels";
 import { ServerSocketState } from "../src/server-socket-state.js";
 import { ServerRequestHandlerArgs } from "../src/handlers/server-request-handler.js";
+import { RawData } from "ws";
 
 // Add to the global scope like in browser.
 global.localStorage = localStorage;
@@ -2692,7 +2693,7 @@ describe('Integration tests', function () {
 
 	describe('Batching', function () {
 		it('Should batch messages sent through sockets after the handshake when the batchOnHandshake option is true', async function () {
-			const receivedServerMessages: (string | ArrayBuffer | Buffer[])[] = [];
+			const receivedServerMessages: (string | RawData)[] = [];
 			let subscribePluginCounter = 0;
 
 			server = listen(
@@ -2746,7 +2747,7 @@ describe('Integration tests', function () {
 
 			await server.listen('ready').once(100);
 
-			const receivedClientMessages: (string | ArrayBuffer | Buffer[])[] = [];
+			const receivedClientMessages: (string | RawData)[] = [];
 
 			client = new ClientSocket(
 				Object.assign<

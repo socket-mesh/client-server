@@ -9,7 +9,7 @@
 	"scripts": {
 		"build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
 		"deploy": "npm run build && node ../../scripts/publish.mjs",
-		"test": "cross-env node --test --loader ts-node/esm test/index.spec.ts"
+		"test": "tsx --tsconfig ./tsconfig.build.json --test ./src/**/*.spec.ts ./test/**/*.spec.ts"
 	},
 	"keywords": [
 		"auth",
@@ -27,11 +27,12 @@
 		"url": "https://github.com/socket-mesh/client-server/labels/auth-engine"
 	},
 	"devDependencies": {
-		"@types/clone-deep": "^4.0.4"
+		"@types/clone-deep": "catalog:clone-deep",
+		"@types/jsonwebtoken": "catalog:json-web-token"
 	},
 	"dependencies": {
-		"clone-deep": "^4.0.1",
-		"jsonwebtoken": "^9.0.2",
-		"@socket-mesh/errors": "^3.2.0"	
+		"clone-deep": "catalog:clone-deep",
+		"jsonwebtoken": "catalog:json-web-token",
+		"@socket-mesh/errors": "catalog:socket-mesh"
 	}
 }

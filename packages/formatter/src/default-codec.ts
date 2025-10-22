@@ -1,4 +1,4 @@
-import { CodecEngine } from "./codec-engine.js";
+import type { CodecEngine } from "./codec-engine.js";
 
 const base64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
