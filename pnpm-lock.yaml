@@ -71,19 +71,6 @@ catalogs:
     rollup-plugin-dts:
       specifier: ^6.2.3
       version: 6.2.3
-  socket-mesh:
-    '@socket-mesh/async-stream-emitter':
-      specifier: ^7.1.2
-      version: 7.1.2
-    '@socket-mesh/consumable-stream':
-      specifier: ^3.2.1
-      version: 3.2.1
-    '@socket-mesh/stream-demux':
-      specifier: ^10.1.5
-      version: 10.1.5
-    '@socket-mesh/writable-consumable-stream':
-      specifier: ^4.2.9
-      version: 4.2.9
   ws:
     '@types/ws':
       specifier: ^8.18.1
@@ -109,6 +96,12 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
 
+  packages/async-stream-emitter:
+    dependencies:
+      '@socket-mesh/stream-demux':
+        specifier: workspace:^
+        version: link:../stream-demux
+
   packages/auth: {}
 
   packages/auth-engine:
@@ -133,23 +126,23 @@ importers:
   packages/channels:
     dependencies:
       '@socket-mesh/async-stream-emitter':
-        specifier: catalog:socket-mesh
-        version: 7.1.2
+        specifier: workspace:^
+        version: link:../async-stream-emitter
       '@socket-mesh/consumable-stream':
-        specifier: catalog:socket-mesh
-        version: 3.2.1
+        specifier: workspace:^
+        version: link:../consumable-stream
       '@socket-mesh/stream-demux':
-        specifier: catalog:socket-mesh
-        version: 10.1.5
+        specifier: workspace:^
+        version: link:../stream-demux
       '@socket-mesh/writable-consumable-stream':
-        specifier: catalog:socket-mesh
-        version: 4.2.9
+        specifier: workspace:^
+        version: link:../writable-consumable-stream
 
   packages/client:
     dependencies:
       '@socket-mesh/async-stream-emitter':
-        specifier: catalog:socket-mesh
-        version: 7.1.2
+        specifier: workspace:^
+        version: link:../async-stream-emitter
       '@socket-mesh/auth':
         specifier: workspace:^
         version: link:../auth
@@ -203,8 +196,8 @@ importers:
         specifier: workspace:^
         version: link:../server
       '@socket-mesh/writable-consumable-stream':
-        specifier: catalog:socket-mesh
-        version: 4.2.9
+        specifier: workspace:^
+        version: link:../writable-consumable-stream
       '@types/clone-deep':
         specifier: catalog:clone-deep
         version: 4.0.4
@@ -227,11 +220,13 @@ importers:
         specifier: 'catalog:'
         version: 2.8.1
 
+  packages/consumable-stream: {}
+
   packages/core:
     dependencies:
       '@socket-mesh/async-stream-emitter':
-        specifier: catalog:socket-mesh
-        version: 7.1.2
+        specifier: workspace:^
+        version: link:../async-stream-emitter
       '@socket-mesh/auth':
         specifier: workspace:^
         version: link:../auth
@@ -242,8 +237,8 @@ importers:
         specifier: workspace:^
         version: link:../formatter
       '@socket-mesh/stream-demux':
-        specifier: catalog:socket-mesh
-        version: 10.1.5
+        specifier: workspace:^
+        version: link:../stream-demux
       isomorphic-ws:
         specifier: catalog:ws
         version: 5.0.0(ws@8.18.3)
@@ -267,8 +262,8 @@ importers:
   packages/server:
     dependencies:
       '@socket-mesh/async-stream-emitter':
-        specifier: catalog:socket-mesh
-        version: 7.1.2
+        specifier: workspace:^
+        version: link:../async-stream-emitter
       '@socket-mesh/auth':
         specifier: workspace:^
         version: link:../auth
@@ -291,11 +286,11 @@ importers:
         specifier: workspace:^
         version: link:../formatter
       '@socket-mesh/stream-demux':
-        specifier: catalog:socket-mesh
-        version: 10.1.5
+        specifier: workspace:^
+        version: link:../stream-demux
       '@socket-mesh/writable-consumable-stream':
-        specifier: catalog:socket-mesh
-        version: 4.2.9
+        specifier: workspace:^
+        version: link:../writable-consumable-stream
       base64id:
         specifier: catalog:base64id
         version: 2.0.0
@@ -321,6 +316,21 @@ importers:
       '@types/ws':
         specifier: catalog:ws
         version: 8.18.1
+
+  packages/stream-demux:
+    dependencies:
+      '@socket-mesh/consumable-stream':
+        specifier: workspace:^
+        version: link:../consumable-stream
+      '@socket-mesh/writable-consumable-stream':
+        specifier: workspace:^
+        version: link:../writable-consumable-stream
+
+  packages/writable-consumable-stream:
+    dependencies:
+      '@socket-mesh/consumable-stream':
+        specifier: workspace:^
+        version: link:../consumable-stream
 
 packages:
 
@@ -706,18 +716,6 @@ packages:
   '@sindresorhus/merge-streams@2.3.0':
     resolution: {integrity: sha512-LtoMMhxAlorcGhmFYI+LhPgbPZCkgP6ra1YL604EeF6U98pLlQ3iWIGMdWSC+vWmPBWBNgmDBAhnAobLROJmwg==}
     engines: {node: '>=18'}
-
-  '@socket-mesh/async-stream-emitter@7.1.2':
-    resolution: {integrity: sha512-NTznsDXBX/Xa2zWHJGtFp0itnGpFDe/4w6+45ExGn6uMhPKoZoUNOi0zMzXLipJX+0c4inaCRL0tfhiSPVTf7A==}
-
-  '@socket-mesh/consumable-stream@3.2.1':
-    resolution: {integrity: sha512-gl5fJLrHz9i0C+F9juzxnQ4wAHQyMjggcbV8QUbo+VL0oa/gttGkignmo1HclTUqk52uWAT63Fxnj5BNeNjnsA==}
-
-  '@socket-mesh/stream-demux@10.1.5':
-    resolution: {integrity: sha512-+A3gvj+1JY8s/Q8jN4qp5SdbggrbFPCFJml58FI4BQrWe9IC+xNM0dOutehSfj3yYAehe87FWedZGm/4rZoTWA==}
-
-  '@socket-mesh/writable-consumable-stream@4.2.9':
-    resolution: {integrity: sha512-0ajY06j3XOHDxOwnhQDHNhED2YsNj76/ZLLWgzcvD/mGygMf5bD5gKi2HsijzldZsPjZYYv3MELy2UJd1fjpvQ==}
 
   '@types/base64id@2.0.2':
     resolution: {integrity: sha512-L/KwKcOKG3PPFXBsXJnBsvPKn5LxOpL7eO1Fwq4il1iGiMNYbEapPVqOONPMzxB08WUJOLWcLHL7y8kLUgDp2Q==}
@@ -1461,21 +1459,6 @@ snapshots:
     optional: true
 
   '@sindresorhus/merge-streams@2.3.0': {}
-
-  '@socket-mesh/async-stream-emitter@7.1.2':
-    dependencies:
-      '@socket-mesh/stream-demux': 10.1.5
-
-  '@socket-mesh/consumable-stream@3.2.1': {}
-
-  '@socket-mesh/stream-demux@10.1.5':
-    dependencies:
-      '@socket-mesh/consumable-stream': 3.2.1
-      '@socket-mesh/writable-consumable-stream': 4.2.9
-
-  '@socket-mesh/writable-consumable-stream@4.2.9':
-    dependencies:
-      '@socket-mesh/consumable-stream': 3.2.1
 
   '@types/base64id@2.0.2':
     dependencies:

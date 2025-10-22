@@ -31,11 +31,11 @@
 		"@types/ws": "catalog:ws"
 	},
 	"dependencies": {
-		"@socket-mesh/async-stream-emitter": "catalog:socket-mesh",
+		"@socket-mesh/async-stream-emitter": "workspace:^",
 		"@socket-mesh/auth": "workspace:^",
 		"@socket-mesh/errors": "workspace:^",
 		"@socket-mesh/formatter": "workspace:^",
-		"@socket-mesh/stream-demux": "catalog:socket-mesh",
+		"@socket-mesh/stream-demux": "workspace:^",
 		"isomorphic-ws": "catalog:ws",
 		"ws": "catalog:ws"
 	}

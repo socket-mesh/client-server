@@ -1,0 +1,43 @@
+{
+	"name": "@socket-mesh/stream-demux",
+	"version": "10.2.1",
+	"description": "A consumable stream demultiplexer.",
+  "type": "module",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"files": ["./dist"],
+	"scripts": {
+		"build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
+		"deploy": "npm run build && node ../../scripts/publish.mjs",
+		"test": "tsx --tsconfig ./tsconfig.build.json --test ./src/**/*.{spec,test}.ts ./test/**/*.{spec,test}.ts"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/socket-mesh/stream-demux.git"
+	},
+	"keywords": [
+		"iterable",
+		"async",
+		"stream",
+		"demux",
+		"demultiplexer",
+		"for-await-of"
+	],
+	"author": "Jonathan Gros-Dubois",
+	"contributors": [
+		{
+			"name": "Jonathan Gros-Dubois",
+			"email": "grosjona@yahoo.com.au"
+		},
+		"Greg Kimmy"
+	],
+	"license": "MIT",
+	"bugs": {
+		"url": "https://github.com/socket-mesh/stream-demux/issues"
+	},
+	"homepage": "https://github.com/socket-mesh/stream-demux#readme",
+	"dependencies": {
+		"@socket-mesh/consumable-stream": "workspace:^",
+		"@socket-mesh/writable-consumable-stream": "workspace:^"
+	}
+}
