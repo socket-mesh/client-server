@@ -9,7 +9,7 @@ export interface StreamEvent<T> {
 
 export class StreamDemux<T> {
 	private _nextConsumerId: number;
-	private _allEventsStream: WritableConsumableStream<StreamEvent<T>>;
+	private _allEventsStream: WritableConsumableStream<StreamEvent<T>> | null;
 
 	streams: {[name: string] : WritableConsumableStream<T> };
 	generateConsumerId: () => number;
@@ -52,7 +52,7 @@ export class StreamDemux<T> {
 			if (this.streams[streamName]) {
 				this.streams[streamName].close(value);
 			}
-		} else {
+		} else if (this._allEventsStream) {
 			this._allEventsStream.close();
 		}
 	}
@@ -143,8 +143,8 @@ export class StreamDemux<T> {
 				};
 			}
 		}
-		
-		return undefined;		
+
+		return undefined;
 	}
 
 	kill(consumerId?: number, value?: T): void;
@@ -228,11 +228,11 @@ export class StreamDemux<T> {
 		}
 
 		if (streamName && this.streams[streamName]) {
-			return this.streams[streamName].hasConsumer(consumerId);
+			return this.streams[streamName].hasConsumer(consumerId!);
 		}
 
 		if (!streamName && this._allEventsStream) {
-			return this._allEventsStream.hasConsumer(consumerId);
+			return this._allEventsStream.hasConsumer(consumerId!);
 		}
 
 		return false;
