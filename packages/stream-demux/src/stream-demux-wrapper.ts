@@ -16,6 +16,7 @@ export class StreamDemuxWrapper<T> {
 	close(name?: string): void {
 		if (name === undefined) {
 			this._streamDemux.closeAll();
+			return;
 		}
 
 		this._streamDemux.close(name);
@@ -48,7 +49,7 @@ export class StreamDemuxWrapper<T> {
 	hasConsumer(name: string, consumerId: number): boolean;
 	hasConsumer(name: string | number, consumerId?: number): boolean {
 		if (typeof name === "string") {
-			return this._streamDemux.hasConsumer(name, consumerId);
+			return this._streamDemux.hasConsumer(name, consumerId!);
 		}
 
 		return this._streamDemux.hasConsumer(name /* consumerId */);
