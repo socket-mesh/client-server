@@ -12,6 +12,11 @@ export class WritableStreamConsumer<T, TReturn = T> extends Consumer<T, TReturn>
 		this.stream.setConsumer(this.id, this);
 
 		while (true) {
+			if (!this.currentNode) {
+				this._destroy();
+				throw new Error("Consumer has been destroyed");
+			}
+
 			if (!this.currentNode.next) {
 				try {
 					await this._waitForNextItem(this.timeout);
@@ -29,7 +34,7 @@ export class WritableStreamConsumer<T, TReturn = T> extends Consumer<T, TReturn>
 				return killPacket;
 			}
 
-			this.currentNode = this.currentNode.next;
+			this.currentNode = this.currentNode.next!;
 			this.releaseBackpressure(this.currentNode.data);
 
 			if (this.currentNode.consumerId && this.currentNode.consumerId !== this.id) {
