@@ -15,18 +15,14 @@ export class WritableConsumableStream<T, TReturn = T> extends ConsumableStream<T
 	private _consumers: Map<number, Consumer<T, TReturn>>;
 	public tailNode: ConsumerNode<T, TReturn>;
 	public generateConsumerId: () => number;
-	public removeConsumerCallback: (id: number) => void
+	public removeConsumerCallback?: (id: number) => void
 
 	constructor(options?: WritableConsumableStreamOptions) {
 		super();
 
 		options = options || {};
 		this.nextConsumerId = 1;
-		this.generateConsumerId = options.generateConsumerId;
-
-		if (!this.generateConsumerId) {
-			this.generateConsumerId = () => this.nextConsumerId++;
-		}
+		this.generateConsumerId = options.generateConsumerId || (() => this.nextConsumerId++);
 
 		this.removeConsumerCallback = options.removeConsumerCallback;
 
