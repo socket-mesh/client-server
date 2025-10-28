@@ -397,7 +397,7 @@ describe('StreamDemux', () => {
 		})();
 
 		let substream = demux.listen('hello');
-		let receivedPackets: Packet[] = [];
+		let receivedPackets: (Packet | undefined)[] = [];
 
 		(async () => {
 			let packet = await substream.once();
@@ -419,11 +419,11 @@ describe('StreamDemux', () => {
 
 		let substream = demux.listen('hello');
 
-		let packet: (string | number | null) = await substream.once(30);
+		let packet: (string | number | undefined) = await substream.once(30);
 		assert.strictEqual(packet, 'world0');
 
 		let error: Error | null = null;
-		packet = null;
+		packet = undefined;
 		try {
 			packet = await substream.once(10);
 		} catch (err) {
@@ -431,7 +431,7 @@ describe('StreamDemux', () => {
 		}
 		assert.notEqual(error, null);
 		assert.strictEqual(error?.name, 'TimeoutError');
-		assert.strictEqual(packet, null);
+		assert.strictEqual(packet, undefined);
 	});
 
 	it('should prevent stream.once() timeout from being reset when writing to other streams', async () => {
@@ -471,7 +471,7 @@ describe('StreamDemux', () => {
 		let consumer = demux.listen('hello').createConsumer(300);
 		let error: Error | null = null;
 
-		let packet: IteratorResult<Packet, Packet> | null = null;
+		let packet: IteratorResult<Packet, Packet | undefined> | null = null;
 
 		try {
 			while (true) {
@@ -521,7 +521,7 @@ describe('StreamDemux', () => {
 
 		let start = Date.now();
 
-		let packet: Packet;
+		let packet: Packet | undefined;
 		let error: any;
 
 		try {
@@ -577,7 +577,7 @@ describe('StreamDemux', () => {
 	});
 
 	it('should support writeToConsumer method', async () => {
-		const receivedPackets: Packet[] = [];
+		const receivedPackets: (Packet | undefined)[] = [];
 		const consumer = demux.listen('hello').createConsumer();
 
 		(async () => {
@@ -605,7 +605,7 @@ describe('StreamDemux', () => {
 	});
 
 	it('should support closeConsumer method', async () => {
-		let receivedPackets: Packet[] = [];
+		let receivedPackets: (Packet | undefined)[] = [];
 		let consumer = demux.listen('hello').createConsumer();
 
 		(async () => {
@@ -721,7 +721,7 @@ describe('StreamDemux', () => {
 			demux.write('hello', 'world' + i);
 		}
 
-		let receivedPackets: IteratorResult<Packet, Packet>[] = [];
+		let receivedPackets: IteratorResult<Packet, Packet | undefined>[] = [];
 
 		(async () => {
 			while (true) {
@@ -758,8 +758,8 @@ describe('StreamDemux', () => {
 			demux.write('hi', 'world' + i);
 		}
 
-		let receivedPacketsA: IteratorResult<Packet, Packet>[] = [];
-		let receivedPacketsC: IteratorResult<Packet, Packet>[] = [];
+		let receivedPacketsA: IteratorResult<Packet, Packet | undefined>[] = [];
+		let receivedPacketsC: IteratorResult<Packet, Packet | undefined>[] = [];
 
 		(async () => {
 			while (true) {
@@ -806,8 +806,8 @@ describe('StreamDemux', () => {
 			demux.write('hello', 'world' + i);
 		}
 
-		let receivedPacketsA: IteratorResult<Packet, Packet>[] = [];
-		let receivedPacketsB: IteratorResult<Packet, Packet>[] = [];
+		let receivedPacketsA: IteratorResult<Packet, Packet | undefined>[] = [];
+		let receivedPacketsB: IteratorResult<Packet, Packet | undefined>[] = [];
 
 		(async () => {
 			while (true) {

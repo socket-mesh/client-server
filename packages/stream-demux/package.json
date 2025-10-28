@@ -36,6 +36,9 @@
 		"url": "https://github.com/socket-mesh/stream-demux/issues"
 	},
 	"homepage": "https://github.com/socket-mesh/stream-demux#readme",
+	"devDependencies": {
+		"@socket-mesh/typescript-config": "workspace:^"
+	},
 	"dependencies": {
 		"@socket-mesh/consumable-stream": "workspace:^",
 		"@socket-mesh/writable-consumable-stream": "workspace:^"

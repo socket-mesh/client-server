@@ -4,7 +4,7 @@ import { StreamDemuxStats } from "./stream-demux-stats.js";
 
 export interface StreamEvent<T> {
 	stream: string,
-	value: T
+	value: T | undefined
 }
 
 export class StreamDemux<T> {
@@ -81,7 +81,7 @@ export class StreamDemux<T> {
 
 	getConsumerStats(consumerId: number): StreamDemuxStats;
 	getConsumerStats(streamName?: string): StreamDemuxStats[];
-	getConsumerStats(consumerId?: number | string): StreamDemuxStats | StreamDemuxStats[] {
+	getConsumerStats(consumerId?: number | string): StreamDemuxStats | StreamDemuxStats[] | undefined {
 		if (consumerId === undefined) {
 			const allStatsList = [];
 
@@ -253,7 +253,7 @@ export class StreamDemux<T> {
 	createConsumer(streamName: string, timeout?: number): WritableStreamConsumer<T, T>;
 	createConsumer(
 		streamName?: string | number, timeout?: number
-	): WritableStreamConsumer<StreamEvent<T>, StreamEvent<T>> | WritableStreamConsumer<T, T> {
+	): WritableStreamConsumer<StreamEvent<T>, StreamEvent<T> | undefined> | WritableStreamConsumer<T, T | undefined> {
 		if (!streamName) {
 			streamName = '';
 		} else if (typeof streamName === 'number') {
