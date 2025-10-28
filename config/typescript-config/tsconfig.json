@@ -1,0 +1,26 @@
+{
+	"extends": "./tsconfig.build.json",
+	"compilerOptions": {
+		"baseUrl": ".",
+		"noEmit": true,
+		"paths": {
+			"@socket-mesh/async-stream-emitter": ["../../packages/async-stream-emitter/src/index.ts"],
+			"@socket-mesh/auth": ["../../packages/auth/src/index.ts"],
+			"@socket-mesh/auth-engine": ["../../packages/auth-engine/src/index.ts"],
+			"@socket-mesh/channels": ["../../packages/channels/src/index.ts"],
+			"@socket-mesh/client": ["../../packages/client/src/index.ts"],
+			"@socket-mesh/consumable-stream": ["../../packages/consumable-stream/src/index.ts"],
+			"@socket-mesh/core": ["../../packages/core/src/index.ts"],
+			"@socket-mesh/errors": ["../../packages/errors/src/index.ts"],
+			"@socket-mesh/formatter": ["../../packages/formatter/src/index.ts"],
+			"@socket-mesh/local-storage": ["../../packages/local-storage/src/index.ts"],
+			"@socket-mesh/server": ["../../packages/server/src/index.ts"],
+			"@socket-mesh/server/broker": ["../../packages/server/src/broker/index.ts"],
+			"@socket-mesh/server/events": ["../../packages/server/src/events/index.ts"],
+			"@socket-mesh/server/handlers": ["../../packages/server/src/handlers/index.ts"],
+			"@socket-mesh/stream-demux": ["../../packages/stream-demux/src/index.ts"],
+			"@socket-mesh/writable-consumable-stream": ["../../packages/writable-consumable-stream/src/index.ts"]
+		}
+	},
+	"exclude": ["**/dist"]
+}

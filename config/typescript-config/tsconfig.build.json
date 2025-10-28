@@ -1,0 +1,27 @@
+{
+	"extends": "@secure-data-systems/tsconfig/tsconfig.build.json",
+	"compilerOptions": {
+		"baseUrl": ".",
+		"forceConsistentCasingInFileNames": true,
+		"paths": {
+			"@socket-mesh/async-stream-emitter": ["../../packages/async-stream-emitter/dist/index.d.ts"],
+			"@socket-mesh/auth": ["../../packages/auth/dist/index.d.ts"],
+			"@socket-mesh/auth-engine": ["../../packages/auth-engine/dist/index.d.ts"],
+			"@socket-mesh/channels": ["../../packages/channels/dist/index.d.ts"],
+			"@socket-mesh/client": ["../../packages/client/dist/index.d.ts"],
+			"@socket-mesh/consumable-stream": ["../../packages/consumable-stream/dist/index.d.ts"],
+			"@socket-mesh/core": ["../../packages/core/dist/index.d.ts"],
+			"@socket-mesh/errors": ["../../packages/errors/dist/index.d.ts"],
+			"@socket-mesh/formatter": ["../../packages/formatter/dist/index.d.ts"],
+			"@socket-mesh/local-storage": ["../../packages/local-storage/dist/index.d.ts"],
+			"@socket-mesh/server": ["../../packages/server/dist/index.d.ts"],
+			"@socket-mesh/server/broker": ["../../packages/server/dist/broker/index.d.ts"],
+			"@socket-mesh/server/events": ["../../packages/server/dist/events/index.d.ts"],
+			"@socket-mesh/server/handlers": ["../../packages/server/dist/handlers/index.d.ts"],
+			"@socket-mesh/stream-demux": ["../../packages/stream-demux/dist/index.d.ts"],
+			"@socket-mesh/writable-consumable-stream": ["../../packages/writable-consumable-stream/dist/index.d.ts"]
+		},
+		"skipLibCheck": true
+	},
+	"exclude": ["test.js", "dist", "**/*.spec.ts", "test"]
+}
