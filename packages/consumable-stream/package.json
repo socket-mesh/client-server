@@ -34,5 +34,8 @@
 	"bugs": {
 		"url": "https://github.com/socket-mesh/consumable-stream/issues"
 	},
-	"homepage": "https://github.com/socket-mesh/consumable-stream"
+	"homepage": "https://github.com/socket-mesh/consumable-stream",
+	"devDependencies": {
+		"@socket-mesh/typescript-config": "workspace:^"
+	}
 }
