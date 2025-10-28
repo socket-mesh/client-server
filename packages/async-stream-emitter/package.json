@@ -36,6 +36,9 @@
 		"url": "https://github.com/socket-mesh/async-stream-emitter/issues"
 	},
 	"homepage": "https://github.com/socket-mesh/async-stream-emitter#readme",
+	"devDependencies": {
+		"@socket-mesh/typescript-config": "workspace:^"
+	},
 	"dependencies": {
 		"@socket-mesh/stream-demux": "workspace:^"
 	}
