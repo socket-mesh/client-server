@@ -6,12 +6,12 @@ export abstract class Consumer<T, TReturn = T> {
 	id: number;
 	isAlive: boolean;
 	stream: WritableConsumableStream<T, TReturn>;
-	currentNode: ConsumerNode<T, TReturn>;
+	currentNode: ConsumerNode<T, TReturn> | null;
 	timeout?: number;
 
 	private _backpressure: number;
 	private _timeoutId?: NodeJS.Timeout;
-	protected _killPacket?: IteratorReturnResult<TReturn>;
+	protected _killPacket?: IteratorReturnResult<TReturn | undefined>;
 	protected _resolve?: () => void;
 
 	constructor(stream: WritableConsumableStream<T, TReturn>, id: number, startNode: ConsumerNode<T, TReturn>, timeout?: number) {
@@ -24,7 +24,7 @@ export abstract class Consumer<T, TReturn = T> {
 		this.stream.setConsumer(this.id, this);
 	}
 
-	clearActiveTimeout(packet?: IteratorResult<T, TReturn>) {
+	clearActiveTimeout(packet?: IteratorResult<T, TReturn | undefined>) {
 		if (this._timeoutId !== undefined) {
 			clearTimeout(this._timeoutId);
 			delete this._timeoutId;

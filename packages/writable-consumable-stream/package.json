@@ -28,6 +28,9 @@
 		"url": "https://github.com/socket-mesh/writable-consumable-stream/issues"
 	},
 	"homepage": "https://github.com/socket-mesh/writable-consumable-stream#readme",
+	"devDependencies": {
+		"@socket-mesh/typescript-config": "workspace:^"
+	},
 	"dependencies": {
 		"@socket-mesh/consumable-stream": "workspace:^"
 	}

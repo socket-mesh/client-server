@@ -3,12 +3,12 @@ import { ConsumerNode } from "./consumer-node.js";
 import { Consumer } from "./consumer.js";
 import { WritableConsumableStream } from "./writable-consumable-stream.js";
 
-export class WritableStreamConsumer<T, TReturn = T> extends Consumer<T, TReturn> implements StreamConsumer<T, TReturn> {
+export class WritableStreamConsumer<T, TReturn = T> extends Consumer<T, TReturn> implements StreamConsumer<T, TReturn | undefined> {
 	constructor(stream: WritableConsumableStream<T, TReturn>, id: number, startNode: ConsumerNode<T, TReturn>, timeout?: number) {
 		super(stream, id, startNode, timeout);
 	}
 
-	async next(): Promise<IteratorResult<T, TReturn>> {
+	async next(): Promise<IteratorResult<T, TReturn | undefined>> {
 		this.stream.setConsumer(this.id, this);
 
 		while (true) {
@@ -49,7 +49,7 @@ export class WritableStreamConsumer<T, TReturn = T> extends Consumer<T, TReturn>
 		}
 	}
 
-	return(): Promise<IteratorResult<T, TReturn>> {
+	return(): Promise<IteratorResult<T, TReturn | undefined>> {
 		this.currentNode = null;
 		this._destroy();
 		return {} as any;

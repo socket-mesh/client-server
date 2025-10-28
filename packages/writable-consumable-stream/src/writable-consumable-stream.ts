@@ -9,11 +9,11 @@ export interface WritableConsumableStreamOptions {
 	removeConsumerCallback?: (id: number) => void
 }
 
-export class WritableConsumableStream<T, TReturn = T> extends ConsumableStream<T, TReturn> {
+export class WritableConsumableStream<T, TReturn = T> extends ConsumableStream<T, TReturn | undefined> {
 	nextConsumerId: number;
 
-	private _consumers: Map<number, Consumer<T, TReturn>>;
-	public tailNode: ConsumerNode<T, TReturn>;
+	private _consumers: Map<number, Consumer<T, TReturn | undefined>>;
+	public tailNode: ConsumerNode<T, TReturn | undefined>;
 	public generateConsumerId: () => number;
 	public removeConsumerCallback?: (id: number) => void
 
@@ -35,11 +35,11 @@ export class WritableConsumableStream<T, TReturn = T> extends ConsumableStream<T
 				value: undefined,
 				done: false
 			}
-		};
+		} as ConsumerNode<T, TReturn | undefined>;
 	}
 
-	private _write(data: IteratorResult<T, TReturn>, consumerId?: number): void {
-		let dataNode: ConsumerNode<T, TReturn> = {
+	private _write(data: IteratorResult<T, TReturn | undefined>, consumerId?: number): void {
+		let dataNode: ConsumerNode<T, TReturn | undefined> = {
 			data,
 			next: null
 		};
@@ -112,7 +112,7 @@ export class WritableConsumableStream<T, TReturn = T> extends ConsumableStream<T
 		return this._consumers.has(consumerId);
 	}
 
-	setConsumer(consumerId: number, consumer: Consumer<T, TReturn>): void {
+	setConsumer(consumerId: number, consumer: Consumer<T, TReturn | undefined>): void {
 		this._consumers.set(consumerId, consumer);
 		if (!consumer.currentNode) {
 			consumer.currentNode = this.tailNode;
@@ -131,7 +131,7 @@ export class WritableConsumableStream<T, TReturn = T> extends ConsumableStream<T
 
 	getConsumerStats(): ConsumerStats[];
 	getConsumerStats(consumerId: number): ConsumerStats;
-	getConsumerStats(consumerId?: number): ConsumerStats | ConsumerStats[] {
+	getConsumerStats(consumerId?: number): ConsumerStats | ConsumerStats[] | undefined {
 		if (consumerId === undefined) {
 			let consumerStats: ConsumerStats[] = [];
 
@@ -151,11 +151,11 @@ export class WritableConsumableStream<T, TReturn = T> extends ConsumableStream<T
 		return undefined;	
 	}
 
-	createConsumer(timeout?: number): WritableStreamConsumer<T, TReturn> {
+	createConsumer(timeout?: number): WritableStreamConsumer<T, TReturn | undefined> {
 		return new WritableStreamConsumer(this, this.generateConsumerId(), this.tailNode, timeout);
 	}
 
-	getConsumerList(): Consumer<T, TReturn>[] {
+	getConsumerList(): Consumer<T, TReturn | undefined>[] {
 		return [...this._consumers.values()];
 	}
 

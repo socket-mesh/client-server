@@ -410,7 +410,7 @@ describe('WritableConsumableStream', () => {
       })();
 
       let receivedPackets: string[] = [];
-      let receivedEndPacket: string | null = null;
+      let receivedEndPacket: string | undefined;
       let consumer = stream.createConsumer();
 
       while (true) {
@@ -1042,18 +1042,18 @@ describe('WritableConsumableStream', () => {
         }
       })();
 
-      let nextPacket: string | null = await stream.once(30);
+      let nextPacket: string | undefined = await stream.once(30);
       assert.strictEqual(nextPacket, 'a0');
 
       let error;
-      nextPacket = null;
+      nextPacket = undefined;
       try {
         nextPacket = await stream.once(10);
       } catch (err) {
         error = err;
       }
 
-      assert.strictEqual(nextPacket, null);
+      assert.strictEqual(nextPacket, undefined);
       assert.notEqual(error, null);
       assert.strictEqual(error.name, 'TimeoutError');
 
@@ -1066,7 +1066,7 @@ describe('WritableConsumableStream', () => {
         stream.close();
       })();
 
-      let receivedPackets: string[] = [];
+      let receivedPackets: (string | undefined)[] = [];
 
       (async () => {
         let nextPacket = await stream.once();
@@ -1087,7 +1087,7 @@ describe('WritableConsumableStream', () => {
         stream.write('foo');
       })();
 
-      let receivedPackets: string[] = [];
+      let receivedPackets: (string | undefined)[] = [];
 
       (async () => {
         let nextPacket = await stream.once();
@@ -1108,7 +1108,7 @@ describe('WritableConsumableStream', () => {
         stream.write('foo');
       })();
 
-      let receivedPackets: string[] = [];
+      let receivedPackets: (string | undefined)[] = [];
 
       (async () => {
         let nextPacket = await stream.once();
@@ -1568,7 +1568,7 @@ describe('WritableConsumableStream', () => {
     });
 
     it('should return the number of consumers as 1 after a specific consumer is killed', async () => {
-      let consumerA: WritableStreamConsumer<string>;
+      let consumerA: WritableStreamConsumer<string, string | undefined>;
 
       (async () => {
         consumerA = stream.createConsumer();
@@ -1604,7 +1604,7 @@ describe('WritableConsumableStream', () => {
     });
 
     it('should return the number of consumers as 1 after a specific consumer is closed after last message has been consumed', async () => {
-      let consumerA: WritableStreamConsumer<string>;
+      let consumerA: WritableStreamConsumer<string, string | undefined>;
 			
       (async () => {
         consumerA = stream.createConsumer();
