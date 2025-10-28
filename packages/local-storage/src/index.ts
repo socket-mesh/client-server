@@ -24,7 +24,6 @@ export class LocalStorage implements Storage {
 		const self = this;
 
 		Object.keys(self._data).forEach(function (key) {
-			self._data[key] = undefined;
 			delete self._data[key];
 		});
 	}
