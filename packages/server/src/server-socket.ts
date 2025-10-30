@@ -69,7 +69,7 @@ export class ServerSocket<
 	}
 
 	async deauthenticate(rejectOnFailedDelivery?: boolean): Promise<boolean> {
-		await super.deauthenticate();
+		const result = await super.deauthenticate();
 		
 		if (rejectOnFailedDelivery) {
 			try {
@@ -78,7 +78,7 @@ export class ServerSocket<
 				this._serverTransport.onError(error);
 				throw error;
 			}
-			return;
+			return result;
 		}
 
 		try {
@@ -88,14 +88,20 @@ export class ServerSocket<
 				throw err;
 			}
 		}
+
+		return result;
 	}
 
 	public get exchange(): Exchange<TChannel> {
 		return this.server.exchange;
 	}
 
+	public get id(): string {
+		return this._serverTransport.id;
+	}
+
 	kickOut(channel: string, message: string): Promise<void[]> {
-		const channels = channel ? [channel] : Object.keys(this.state.channelSubscriptions);
+		const channels = channel ? [channel] : Object.keys(this.state.channelSubscriptions || {});
 
 		return Promise.all(channels.map((channelName) => {
 			this.transmit('#kickOut', { channel: channelName, message });
@@ -107,7 +113,7 @@ export class ServerSocket<
 		return this._serverTransport.ping();
 	}
 
-	get service(): string {
+	get service(): string | undefined {
 		return this._serverTransport.service;
 	}
 

@@ -17,7 +17,7 @@ export async function kickOutHandler(
 		ClientTransport<{}, {}, {}, {}, {}>
 	>
 ): Promise<void> {
-	if (typeof options.channel !== 'string') return;
+	if (typeof options?.channel !== 'string') return;
 
 	socket.channels.kickOut(options.channel, options.message);
 }

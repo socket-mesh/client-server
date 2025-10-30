@@ -28,6 +28,7 @@ export class ServerTransport<
 	TService,
 	TState & ServerSocketState
 > {
+	public override id: string;
 	public readonly plugins: ServerPlugin<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>[];
 	public readonly service?: string;
 	public readonly request: IncomingMessage;
@@ -37,7 +38,7 @@ export class ServerTransport<
 
 		this.type = 'server';
 		this.request = options.request;
-		this.plugins = options.plugins;
+		this.plugins = options.plugins || [];
 		this.service = options.service;
 		this.webSocket = options.socket;
 		this.id = (options.id || base64id.generateId());		
@@ -66,7 +67,7 @@ export class ServerTransport<
 		return false;
 	}
 
-	protected handleInboudMessage(
+	protected async handleInboudMessage(
 		{ packet, timestamp }: InboundMessage<TIncoming & TPrivateIncoming & ServerPrivateMap, TOutgoing, TPrivateOutgoing & ClientPrivateMap, TService>
 	): Promise<void> {
 		if ((packet === null || typeof packet !== 'object') && this.socket.server.strictHandshake && this.status === 'connecting') {
@@ -74,7 +75,7 @@ export class ServerTransport<
 			return;
 		}
 
-		return super.handleInboudMessage({ packet, timestamp });
+		return await super.handleInboudMessage({ packet, timestamp });
 	}
 
 	protected override onClose(code: number, reason?: string | Buffer): void {
@@ -141,7 +142,7 @@ export class ServerTransport<
 			return;
 		}
 
-		this.onPublish(request.data)
+		this.onPublish(request.data!)
 			.then(() => {
 				super.onInvoke(request);
 			})
@@ -182,7 +183,7 @@ export class ServerTransport<
 		let data = options.data;
 
 		for (const plugin of this.plugins) {
-			if ('onPublishOut' in plugin) {
+			if (plugin.onPublishOut) {
 				data = await plugin.onPublishOut({ socket: this.socket, transport: this, channel: options.channel, data });
 			}
 		}
@@ -225,7 +226,7 @@ export class ServerTransport<
 			super.onTransmit(request);
 			return;
 		}
-		this.onPublish(request.data)
+		this.onPublish(request.data!)
 			.then(() => {
 				super.onTransmit(request);
 			})
@@ -284,7 +285,6 @@ export class ServerTransport<
 			try {
 				await this.invoke('#setAuthToken', signedAuthToken)[0];
 			} catch (err) {
-
 				let error: AuthError;
 
 				if (err && typeof err.message === 'string') {
@@ -298,7 +298,7 @@ export class ServerTransport<
 				this.onError(error);
 				throw error;
 			}
-			return;
+			return changed;
 		}
 
 		try {
@@ -326,6 +326,11 @@ export class ServerTransport<
 	}
 
 	public override triggerAuthenticationEvents(wasSigned: boolean, wasAuthenticated: boolean): void {
+		if (!this.signedAuthToken) {
+			throw new AuthError('Signed auth token should be set to trigger authentication events');
+		}
+
+
 		super.triggerAuthenticationEvents(wasSigned, wasAuthenticated);
 
 		this.socket.server.emit(

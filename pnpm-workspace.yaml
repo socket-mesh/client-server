@@ -1,11 +1,14 @@
 packages:
+  - 'config/*'
   - 'packages/*'
+  - 'tests/*'
 
 catalog:
   buffer: ^6.0.3
   events: ^3.3.0
   "tslib": ^2.8.1
   tsx: ^4.20.6
+  turbo: ^2.5.8
   typescript: ^5.9.3
 
 catalogs:

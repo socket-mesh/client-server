@@ -109,7 +109,7 @@ export class RequestBatchingPlugin<
 	TState extends object
 > extends BatchingPlugin<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> {
 	private _requests: AnyRequest<TOutgoing, TPrivateOutgoing, TService>[];
-	private _continue: (requests: AnyRequest<TOutgoing, TPrivateOutgoing, TService>[], cb?: (error?: Error) => void) => void | null;
+	private _continue: null | ((requests: AnyRequest<TOutgoing, TPrivateOutgoing, TService>[], cb?: (error?: Error) => void) => void);
 
 	constructor(options?: BatchingPluginOptions) {
 		super(options);
@@ -128,9 +128,12 @@ export class RequestBatchingPlugin<
 
 	protected override flush() {
 		if (this._requests.length) {
-			this._continue(this._requests);
+			if (this._continue) {
+				this._continue(this._requests);
+				this._continue = null;
+			}
+
 			this._requests = [];
-			this._continue = null;
 		}
 	}
 
@@ -155,7 +158,7 @@ export class ResponseBatchingPlugin<
 	TState extends object
 > extends BatchingPlugin<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> {
 	private _responses: AnyResponse<TOutgoing, TPrivateOutgoing, TService>[];
-	private _continue: (requests: AnyResponse<TOutgoing, TPrivateOutgoing, TService>[], cb?: (error?: Error) => void) => void | null;
+	private _continue: null | ((requests: AnyResponse<TOutgoing, TPrivateOutgoing, TService>[], cb?: (error?: Error) => void) => void);
 
 	constructor(options?: BatchingPluginOptions) {
 		super(options);
@@ -167,9 +170,12 @@ export class ResponseBatchingPlugin<
 
 	protected override flush() {
 		if (this._responses.length) {
-			this._continue(this._responses);
+			if (this._continue) {
+				this._continue(this._responses);
+				this._continue = null;
+			}
+
 			this._responses = [];
-			this._continue = null;
 		}
 	}
 

@@ -2,7 +2,7 @@ import { ConsumableStream } from "@socket-mesh/consumable-stream";
 import { StreamDemux } from "./stream-demux.js";
 import { WritableStreamConsumer } from "@socket-mesh/writable-consumable-stream";
 
-export class DemuxedConsumableStream<T> extends ConsumableStream<T, T | undefined> {
+export class DemuxedConsumableStream<T> extends ConsumableStream<T, T> {
 	name: string;
 	private _streamDemux: StreamDemux<T>;
 

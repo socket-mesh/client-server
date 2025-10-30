@@ -3,7 +3,7 @@ import ws from "isomorphic-ws";
 import { Plugin } from "./plugins/plugin.js";
 import { AnyRequest, InvokeMethodRequest, InvokeServiceRequest, TransmitMethodRequest, TransmitServiceRequest, abortRequest, isRequestDone } from "./request.js";
 import { AnyPacket, MethodPacket, isRequestPacket } from "./packet.js";
-import { AbortError, BadConnectionError, InvalidActionError, InvalidArgumentsError, PluginBlockedError, SocketProtocolError, TimeoutError, dehydrateError, hydrateError, socketProtocolErrorStatuses, socketProtocolIgnoreStatuses } from "@socket-mesh/errors";
+import { AbortError, AuthError, BadConnectionError, InvalidActionError, InvalidArgumentsError, PluginBlockedError, SocketClosedError, SocketProtocolError, TimeoutError, dehydrateError, hydrateError, socketProtocolErrorStatuses, socketProtocolIgnoreStatuses } from "@socket-mesh/errors";
 import { FunctionReturnType, MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap } from "./maps/method-map.js";
 import { AnyResponse, MethodDataResponse, isResponsePacket } from "./response.js";
 import { HandlerMap } from "./maps/handler-map.js";
@@ -28,7 +28,7 @@ export interface InvokeServiceOptions<TServiceMap extends ServiceMap, TService e
 interface InvokeCallback<T> {
 	method: string,
 	timeoutId?: NodeJS.Timeout,
-	callback: (err: Error, result?: T) => void
+	callback: (err: Error | null, result?: T) => void
 }
 
 export interface InboundMessage<
@@ -40,7 +40,7 @@ export interface InboundMessage<
 	timestamp: Date,
 	packet:
 		(AnyPacket<TIncoming, TService> | AnyResponse<TOutgoing, TPrivateOutgoing, TService>) |
-		(AnyPacket<TIncoming, TService> | AnyResponse<TOutgoing, TPrivateOutgoing, TService>)[]
+		(AnyPacket<TIncoming, TService> | AnyResponse<TOutgoing, TPrivateOutgoing, TService>)[] | null
 }
 
 interface WebSocketError extends Error {
@@ -55,14 +55,14 @@ export class SocketTransport<
 	TState extends object
 > {
 	private _socket: Socket<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>;
-	private _webSocket: ws.WebSocket;
+	private _webSocket: ws.WebSocket | null;
 	private _inboundProcessedMessageCount: number;
 	private _inboundReceivedMessageCount: number;
 	private _outboundPreparedMessageCount: number;
 	private _outboundSentMessageCount: number
 	private _isReady: boolean;
-	private _authToken?: AuthToken;
-	private _signedAuthToken?: SignedAuthToken;
+	private _authToken: AuthToken | null;
+	private _signedAuthToken: SignedAuthToken | null;
 	private readonly _callIdGenerator: CallIdGenerator;
 	private readonly _callbackMap: {[cid: number]: InvokeCallback<unknown>};
 	private readonly _handlers: HandlerMap<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>;
@@ -78,6 +78,9 @@ export class SocketTransport<
 	protected constructor(options?: SocketOptions<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>) {
 		let cid = 1;
 
+		this._authToken = null;
+		this._signedAuthToken = null;
+		
 		this.ackTimeoutMs = options?.ackTimeoutMs ?? 10000;
 
 		this._callIdGenerator = options?.callIdGenerator || (() => {
@@ -108,7 +111,7 @@ export class SocketTransport<
 		}
 	}
 
-	public get authToken(): AuthToken {
+	public get authToken(): AuthToken | null {
 		return this._authToken;
 	}
 
@@ -182,7 +185,7 @@ export class SocketTransport<
 		packet = toArray<AnyPacket<TIncoming, TService> | AnyResponse<TOutgoing, TPrivateOutgoing, TService>>(packet);
 
 		for (let curPacket of packet) {
-			let pluginError: Error;
+			let pluginError: Error | undefined;
 
 			try {
 				for (const plugin of this.plugins) {
@@ -210,9 +213,11 @@ export class SocketTransport<
 		this.webSocket = null;
 		this._isReady = false;
 
-		clearTimeout(this._pingTimeoutRef);
+		if (this._pingTimeoutRef) {
+			clearTimeout(this._pingTimeoutRef);
 
-		this._pingTimeoutRef = null;
+			this._pingTimeoutRef = null;
+		}
 
 		this.abortAllPendingCallbacksDueToBadConnection(prevStatus);
 
@@ -278,7 +283,7 @@ export class SocketTransport<
 
 		const timestamp = new Date();
 		let p = Promise.resolve(data);
-		let resolve: () => void;
+		let resolve: undefined | (() => void);
 		let reject: (err: Error) => void;
 
 		const promise = new Promise<void>((res, rej) => {
@@ -293,7 +298,7 @@ export class SocketTransport<
 
 			if (plugin.onMessageRaw) {
 				p = p.then(message => {
-					return plugin.onMessageRaw({ socket: this.socket, transport: this, message, timestamp, promise })
+					return plugin.onMessageRaw!({ socket: this.socket, transport: this, message, timestamp, promise })
 				});	
 			}
 		}
@@ -304,7 +309,7 @@ export class SocketTransport<
 				(AnyPacket<TIncoming, TService> | AnyResponse<TOutgoing, TPrivateOutgoing, TService>)[] |
 				null = this.decode(data);
 
-			this._socket.emit('message', { data, isBinary });	
+			this._socket.emit('message', { data, isBinary });
 			return this.handleInboudMessage({ packet, timestamp });
 		})
 		.then(resolve)
@@ -332,16 +337,19 @@ export class SocketTransport<
 	protected async onRequest(packet: AnyPacket<TIncoming, TService>, timestamp: Date, pluginError?: Error): Promise<boolean> {
 		this._socket.emit('request', { request: packet });
 		
-		const timeoutAt = typeof packet.ackTimeoutMs === 'number' ? new Date(timestamp.valueOf() + packet.ackTimeoutMs) : null;
+		const timeoutAt = typeof packet.ackTimeoutMs === 'number' ? new Date(timestamp.valueOf() + packet.ackTimeoutMs) : undefined;
 		let wasHandled = false;
 
-		let response: AnyResponse<TOutgoing, TPrivateOutgoing, TService>;
-		let error: Error;
+		let response: AnyResponse<TOutgoing, TPrivateOutgoing, TService> | undefined;
+		let error: Error | undefined;
 
 		if (pluginError) {
 			wasHandled = true;
 			error = pluginError;
-			response = { rid: packet.cid, timeoutAt, error: pluginError };
+
+			if (packet.cid) {
+				response = { rid: packet.cid, timeoutAt, error: pluginError };
+			}
 		} else {
 			const handler = this._handlers[(packet as MethodPacket<TIncoming>).method];
 
@@ -455,13 +463,20 @@ export class SocketTransport<
 			// Delay should be equal to the interval at which your server
 			// sends out pings plus a conservative assumption of the latency.
 			this._pingTimeoutRef = setTimeout(() => {
-				this.webSocket.close(code);
+				if (this._webSocket) {
+					this._webSocket.close(code);
+				}
 			}, timeoutMs);
 		}
 	}
 
 	public send(data: Buffer | string): Promise<void> {
 		return new Promise((resolve, reject) => {
+			if (!this._webSocket) {
+				reject(new SocketClosedError('Web socket is closed.'));
+				return;
+			}
+
 			try {
 				this._webSocket.send(
 					data,
@@ -488,6 +503,10 @@ export class SocketTransport<
 			index = 0;
 		}
 
+		if (!requests) {
+			return; // Shouldn't happen
+		}
+
 		// Filter out any requests that have already timed out.
 		if (requests.some(request => isRequestDone(request))) {
 			requests = requests.filter(req => isRequestDone(req));
@@ -500,7 +519,7 @@ export class SocketTransport<
 		for (; index < this.plugins.length; index++) {
 			const plugin = this.plugins[index];
 
-			if ('sendRequest' in plugin) {
+			if ('sendRequest' in plugin && plugin.sendRequest) {
 				index++;
 
 				try {
@@ -536,7 +555,7 @@ export class SocketTransport<
 		}
 
 		const encode = requests.map(req => {
-			if ('callback' in req) {
+			if ('callback' in req && req.callback) {
 				const { callback, promise, timeoutId, ...rest } = req;
 
 				this._callbackMap[req.cid] = {
@@ -574,7 +593,7 @@ export class SocketTransport<
 					req.sentCallback(sendErr);
 				}
 
-				if (sendErr && 'callback' in req) {
+				if (sendErr && 'callback' in req && req.callback) {
 					req.callback(sendErr);
 				}
 			}
@@ -591,6 +610,10 @@ export class SocketTransport<
 			index = 0;
 		}
 
+		if (!responses) {
+			return; // shouldn't happen
+		}
+
 		// Remove any response that has timed out
 		if (!(responses = responses.filter(item => !item.timeoutAt || item.timeoutAt > new Date())).length) {
 			return;
@@ -599,7 +622,7 @@ export class SocketTransport<
 		for (; index < this.plugins.length; index++) {
 			const plugin = this.plugins[index];
 
-			if ('sendResponse' in plugin) {
+			if ('sendResponse' in plugin && plugin.sendResponse) {
 				index++;
 
 				try {
@@ -644,25 +667,21 @@ export class SocketTransport<
 		});
 	}
 
-	public async setAuthorization(authToken: AuthToken): Promise<boolean>;
-	public async setAuthorization(signedAuthToken: SignedAuthToken, authToken?: AuthToken): Promise<boolean>;
-	public async setAuthorization(signedAuthToken: AuthToken | SignedAuthToken, authToken?: AuthToken): Promise<boolean> {
-		if (typeof signedAuthToken !== 'string') {
-			throw new InvalidArgumentsError('SignedAuthToken must be type string.');
-		}
-
+	public async setAuthorization(signedAuthToken: SignedAuthToken, authToken?: AuthToken): Promise<boolean> {
 		if (signedAuthToken !== this._signedAuthToken) {
-			if (!authToken) {
+			let newAuthToken: AuthToken | null | undefined = authToken;
+
+			if (!newAuthToken) {
 				const extractedAuthToken = extractAuthTokenData(signedAuthToken);
 			
 				if (typeof extractedAuthToken === 'string') {
 					throw new InvalidArgumentsError('Invalid authToken.');
 				}
 	
-				authToken = extractedAuthToken;
+				newAuthToken = extractedAuthToken;
 			}
 
-			this._authToken = authToken;
+			this._authToken = newAuthToken;
 			this._signedAuthToken = signedAuthToken;
 
 			return true;
@@ -687,7 +706,7 @@ export class SocketTransport<
 		this._socket.emit('connect', { id: this.id, pingTimeoutMs, isAuthenticated: !!this.signedAuthToken, authError });
 	}
 
-	public get signedAuthToken(): SignedAuthToken {
+	public get signedAuthToken(): SignedAuthToken | null {
 		return this._signedAuthToken;
 	}
 
@@ -721,6 +740,10 @@ export class SocketTransport<
 	}
 
 	public triggerAuthenticationEvents(wasSigned: boolean, wasAuthenticated: boolean): void {
+		if (!this._signedAuthToken) {
+			throw new AuthError('Signed auth token should be set to trigger authentication events');
+		}
+
 		this._socket.emit(
 			'authStateChange',
 			{ wasAuthenticated, isAuthenticated: true, authToken: this._authToken, signedAuthToken: this._signedAuthToken }
@@ -728,7 +751,7 @@ export class SocketTransport<
 
 		this._socket.emit(
 			'authenticate',
-			{ wasSigned, signedAuthToken: this._signedAuthToken, authToken:this._authToken }
+			{ wasSigned, signedAuthToken: this._signedAuthToken, authToken: this._authToken }
 		);
 
 		for (const plugin of this.plugins) {
@@ -752,48 +775,44 @@ export class SocketTransport<
 		serviceAndMethod: TMethod | [TServiceName, TServiceMethod],
 		arg?: (Parameters<TOutgoing[TMethod] | TService[TServiceName][TServiceMethod]>)[0]
 	 ): Promise<void> {
-		let service: TServiceName;
-		let serviceMethod: TServiceMethod;
-		let method: TMethod;
-	
+		let serviceRequest: Omit<TransmitServiceRequest<TService, TServiceName, TServiceMethod>, 'promise'> | undefined;
+		let methodRequest: Omit<TransmitMethodRequest<TOutgoing, TMethod>, 'promise'> | undefined;
+
 		if (Array.isArray(serviceAndMethod)) {
-			service = serviceAndMethod[0];
-			serviceMethod = serviceAndMethod[1];
+			serviceRequest = {
+				service: serviceAndMethod[0],
+				method: serviceAndMethod[1],
+				data: arg
+			};
 		} else {
-			method = serviceAndMethod;
+			methodRequest = {
+				data: arg,
+				method: serviceAndMethod
+			};
 		}
 
-		const request: TransmitMethodRequest<TOutgoing, TMethod> | TransmitServiceRequest<TService, TServiceName, TServiceMethod> = 
-			service ? {
-				service,
-				method: serviceMethod,
-				promise: null,
-				data: arg as Parameters<TService[TServiceName][TServiceMethod]>[0]
-			} : {
-				data: arg as Parameters<TOutgoing[TMethod]>[0],
-				method,
-				promise: null
-			};
+		const request: TransmitMethodRequest<TOutgoing, TMethod> | TransmitServiceRequest<TService, TServiceName, TServiceMethod> = {
+			...(serviceRequest || methodRequest!),
+			promise: new Promise<void>((resolve, reject) => {
+				request.sentCallback = (err?: Error) => {
+					delete request.sentCallback;
+					this._outboundSentMessageCount++;
 
-		const promise = request.promise = new Promise<void>((resolve, reject) => {
-			request.sentCallback = (err?: Error) => {
-				delete request.sentCallback;
-				this._outboundSentMessageCount++;
+					if (err) {
+						reject(err);
+						return;
+					}
 
-				if (err) {
-					reject(err);
-					return;
-				}
-
-				resolve();
-			};
-		});
+					resolve();
+				};
+			})
+		};
 
 		this._outboundPreparedMessageCount++;
 
-		this.onTransmit(request as TransmitMethodRequest<TOutgoing, TMethod>);
+		this.onTransmit(request);
 
-		return promise;
+		return request.promise;
 	}
 
 	public invoke<TMethod extends keyof TOutgoing>(
@@ -818,138 +837,134 @@ export class SocketTransport<
 		arg?: (Parameters<TOutgoing[TMethod] | TPrivateOutgoing[TPrivateMethod] | TService[TServiceName][TServiceMethod]>)[0]
 	): [Promise<FunctionReturnType<TService[TServiceName][TServiceMethod] | TOutgoing[TMethod] | TPrivateOutgoing[TPrivateMethod]>>, () => void] {
 
-		let service: TServiceName;
-		let serviceMethod: TServiceMethod;
-		let method: TMethod | TPrivateMethod;
-		let ackTimeoutMs: number | false;
+		let methodRequest: Omit<InvokeMethodRequest<TOutgoing, TMethod>, 'promise'> | Omit<InvokeMethodRequest<TPrivateOutgoing, TPrivateMethod>, 'promise'> | undefined;
+		let serviceRequest: Omit<InvokeServiceRequest<TService, TServiceName, TServiceMethod>, 'promise'> | undefined;
+		let service: TServiceName | undefined;
+		let ackTimeoutMs: number | false | undefined;
 
-		if (typeof methodOptions === 'object') {
+		if (typeof methodOptions === 'object' && !Array.isArray(methodOptions)) {
+			ackTimeoutMs = methodOptions.ackTimeoutMs;
+		}
+
+		if (typeof methodOptions === 'object' && (Array.isArray(methodOptions) || 'service' in methodOptions)) {
+			let serviceMethod: TServiceMethod | undefined;
+
 			if (Array.isArray(methodOptions)) {
 				service = methodOptions[0];
 				serviceMethod = methodOptions[1];
 				ackTimeoutMs = methodOptions[2];
 			} else {
-				if ('service' in methodOptions) {
-					service = methodOptions.service;
-					serviceMethod = methodOptions.method;
-				} else {
-					method = methodOptions.method;
-				}
-
-				ackTimeoutMs = methodOptions.ackTimeoutMs;
+				service = methodOptions.service;
+				serviceMethod = methodOptions.method;
 			}
+
+			serviceRequest = {
+				ackTimeoutMs: ackTimeoutMs || this.ackTimeoutMs,
+				callback: null,
+				cid: this._callIdGenerator(),
+				service,
+				method: serviceMethod,
+				data: arg
+			};
 		} else {
-			method = methodOptions;
+			methodRequest = {
+				ackTimeoutMs: ackTimeoutMs || this.ackTimeoutMs,
+				callback: null,
+				cid: this._callIdGenerator(),
+				data: arg,
+				method : ((typeof methodOptions === 'object') ? methodOptions.method : methodOptions) as TMethod
+			};
 		}
 
 		let callbackMap = this._callbackMap;
 
-		const request: InvokeMethodRequest<TOutgoing, TMethod> | InvokeMethodRequest<TPrivateOutgoing, TPrivateMethod> | InvokeServiceRequest<TService, TServiceName, TServiceMethod> = 
-			Object.assign(
-				{
-					cid: this._callIdGenerator(),
-					ackTimeoutMs: ackTimeoutMs ?? this.ackTimeoutMs,
-					callback: null,
-					promise: null
-				},
-				service ? {
-					service,
-					method: serviceMethod,
-					data: arg as Parameters<TService[TServiceName][TServiceMethod]>[0]
-				} : {
-					method: method as TMethod,
-					data: arg as Parameters<TOutgoing[TMethod]>[0]
-				}
-			);
-
 		let abort: () => void;
+		let promise: Promise<FunctionReturnType<TService[TServiceName][TServiceMethod] | TOutgoing[TMethod] | TPrivateOutgoing[TPrivateMethod]>>;
 
-		const promise = request.promise = new Promise<FunctionReturnType<TService[TServiceName][TServiceMethod] | TOutgoing[TMethod] | TPrivateOutgoing[TPrivateMethod]>>((resolve, reject) => {
-			if (request.ackTimeoutMs) {
-				request.timeoutId = setTimeout(
-					() => {
-						delete callbackMap[request.cid];
-						request.callback = null;
+		const request: InvokeMethodRequest<TOutgoing, TMethod> | InvokeMethodRequest<TPrivateOutgoing, TPrivateMethod> | InvokeServiceRequest<TService, TServiceName, TServiceMethod> = {
+			...(serviceRequest || methodRequest!),
+			promise: promise = new Promise<FunctionReturnType<TService[TServiceName][TServiceMethod] | TOutgoing[TMethod] | TPrivateOutgoing[TPrivateMethod]>>((resolve, reject) => {
+				if (request.ackTimeoutMs) {
+					request.timeoutId = setTimeout(
+						() => {
+							delete callbackMap[request.cid];
+							request.callback = null;
+							clearTimeout(request.timeoutId);
+							delete request.timeoutId;
+							reject(new TimeoutError(`Method \'${[service, request.method].filter(Boolean).join('.')}\' timed out.`));
+						},
+						request.ackTimeoutMs
+					);
+				}
+
+				abort = () => {
+					delete callbackMap[request.cid];
+
+					if (request.timeoutId) {
 						clearTimeout(request.timeoutId);
 						delete request.timeoutId;
-						reject(new TimeoutError(`Method \'${[service, request.method].filter(Boolean).join('.')}\' timed out.`));
-					},
-					request.ackTimeoutMs
-				);
-			}
+					}
 
-			abort = () => {
-				delete callbackMap[request.cid];
-
-				if (request.timeoutId) {
-					clearTimeout(request.timeoutId);
-					delete request.timeoutId;
+					if (request.callback) {
+						request.callback = null;
+						reject(new AbortError(`Method \'${[service, request.method].filter(Boolean).join('.')}\' was aborted.`));
+					}
 				}
 
-				if (request.callback) {
+				request.callback = (err: Error, result: FunctionReturnType<TService[TServiceName][TServiceMethod] | TOutgoing[TMethod]>) => {
+					delete callbackMap[request.cid];
 					request.callback = null;
-					reject(new AbortError(`Method \'${[service, request.method].filter(Boolean).join('.')}\' was aborted.`));
-				}
-			}
 
-			request.callback = (err: Error, result: FunctionReturnType<TService[TServiceName][TServiceMethod] | TOutgoing[TMethod]>) => {
-				delete callbackMap[request.cid];
-				request.callback = null;
+					if (request.timeoutId) {
+						clearTimeout(request.timeoutId);
+						delete request.timeoutId;
+					}
 
-				if (request.timeoutId) {
-					clearTimeout(request.timeoutId);
-					delete request.timeoutId;
-				}
+					if (err) {
+						reject(err);
+						return;
+					}
 
-				if (err) {
-					reject(err);
-					return;
-				}
+					resolve(result);
+				};
 
-				resolve(result);
-			};
-
-			request.sentCallback = () => {
-				delete request.sentCallback;
-				this._outboundSentMessageCount++;
-			};
-		});
+				request.sentCallback = () => {
+					delete request.sentCallback;
+					this._outboundSentMessageCount++;
+				};
+			})
+		};
 
 		this._outboundPreparedMessageCount++;
 
-		this.onInvoke(request as InvokeMethodRequest<TOutgoing, TMethod>);
+		this.onInvoke(request);
 
-		return [promise, abort];
+		return [promise, abort!];
 	}
 
 	public get url(): string {
-		return this._webSocket.url;
+		return this._webSocket?.url || '';
 	}
 
-	protected get webSocket(): ws.WebSocket {
+	protected get webSocket(): ws.WebSocket | null {
 		return this._webSocket;
 	}
-	
+
 	protected set webSocket(value: ws.WebSocket | null) {
 		if (this._webSocket) {
 			this._webSocket.onclose = null;
 			this._webSocket.onerror = null;
 			this._webSocket.onmessage = null;
 			this._webSocket.onopen = null;
-
-			delete this.onSocketClose;
-			delete this.onSocketError;
-			delete this.onSocketMessage;
-			delete this.onOpen;
 		}
 
 		this._webSocket = value;
 
-		if (value) {
-			this._webSocket.onclose = this.onSocketClose = this.onSocketClose.bind(this);
-			this._webSocket.onopen = this.onOpen = this.onOpen.bind(this);
-			this._webSocket.onerror = this.onSocketError = this.onSocketError.bind(this);
-			this._webSocket.onmessage = this.onSocketMessage = this.onSocketMessage.bind(this);
+		if (this._webSocket) {
+			this._webSocket.onclose = this.onSocketClose.bind(this);
+			this._webSocket.onopen = this.onOpen.bind(this);
+			this._webSocket.onerror = this.onSocketError.bind(this);
+			this._webSocket.onmessage = this.onSocketMessage.bind(this);
 		}
-	}	
+	}
 }

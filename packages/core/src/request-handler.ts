@@ -18,7 +18,7 @@ export interface RequestHandlerArgsOptions<
 	socket: TSocket,
 	transport: TTransport,
 	timeoutMs?: number | boolean,
-	options?: TOptions
+	options: TOptions
 }
 
 export class RequestHandlerArgs<

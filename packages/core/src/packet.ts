@@ -42,5 +42,9 @@ export function isRequestPacket<
 	TIncoming extends MethodMap,
 	TService extends ServiceMap
 >(packet: unknown): packet is AnyPacket<TIncoming, TService> {
-	return (typeof packet === 'object') && 'method' in packet;
+	return (
+		packet !== null &&
+		typeof packet === 'object' &&
+		'method' in packet
+	);
 }

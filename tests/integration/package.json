@@ -1,0 +1,40 @@
+{
+	"name": "@socket-mesh/integration-tests",
+	"version": "1.0.0",
+	"description": ".",
+  "type": "module",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"files": ["./dist"],
+	"scripts": {
+		"test": "tsx --tsconfig ./tsconfig.build.json --test ./src/**/*.{spec,test}.ts ./test/**/*.{spec,test}.ts"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git://github.com/socket-mesh/formatter.git"
+	},
+	"keywords": [
+		"client",
+		"server",
+		"integration",
+		"test"
+	],
+	"license": "MIT",
+	"bugs": {
+		"url": "https://github.com/socket-mesh/integration-tests/issues"
+	},
+	"homepage": "https://github.com/socket-mesh/integration-tests#readme",
+	"devDependencies": {
+		"@socket-mesh/typescript-config": "workspace:^"
+	},
+	"dependencies": {
+		"@socket-mesh/core": "workspace:^",
+		"@socket-mesh/client": "workspace:^",
+		"@socket-mesh/local-storage": "workspace:^",
+		"@socket-mesh/server": "workspace:^",
+		"@types/jsonwebtoken": "catalog:json-web-token",
+		"@types/ws": "catalog:ws",
+		"jsonwebtoken": "catalog:json-web-token",
+		"ws": "catalog:ws"
+	}
+}

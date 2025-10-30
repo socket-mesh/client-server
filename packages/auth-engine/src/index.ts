@@ -36,8 +36,8 @@ export interface AuthEngine extends AuthOptions {
 	verifyToken(signedToken: string, verifyOptions?: jwt.VerifyOptions): Promise<jwt.JwtPayload>
 }
 
-export function isAuthEngine(auth: AuthEngine | AuthOptions): auth is AuthEngine {
-	return (typeof auth === 'object' && 'verifyToken' in auth && 'signToken' in auth);
+export function isAuthEngine(auth?: AuthEngine | AuthOptions | null): auth is AuthEngine {
+	return (!!auth && typeof auth === 'object' && 'verifyToken' in auth && 'signToken' in auth);
 }
 
 function generateAuthKey(): string {
@@ -45,7 +45,7 @@ function generateAuthKey(): string {
 }
 
 export function defaultAuthEngine(options?: AuthOptions): AuthEngine {
-	return Object.assign<AuthEngine, AuthOptions>(
+	return Object.assign<AuthEngine, AuthOptions | undefined>(
 		{
 			signToken(token: object, signOptions?: jwt.SignOptions): Promise<string> {
 				signOptions = Object.assign({}, signOptions || {});
@@ -99,7 +99,7 @@ export function defaultAuthEngine(options?: AuthOptions): AuthEngine {
 							reject(err);
 							return;
 						}
-						resolve(signedToken);
+						resolve(signedToken!);
 					});
 				});
 			},
@@ -126,7 +126,7 @@ export function defaultAuthEngine(options?: AuthOptions): AuthEngine {
 								reject(err);
 								return;
 							}
-							resolve(token);
+							resolve(token!);
 						};
 
 						jwt.verify(signedToken || '', publicKey, jwtOptions, cb); 

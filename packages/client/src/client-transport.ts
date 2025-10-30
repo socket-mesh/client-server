@@ -1,7 +1,7 @@
 import { FunctionReturnType, InvokeMethodOptions, InvokeServiceOptions, SocketTransport, SocketStatus, MethodMap, ServiceMap, PublicMethodMap, PrivateMethodMap } from "@socket-mesh/core";
 import ws from "isomorphic-ws";
 import { ClientAuthEngine, LocalStorageAuthEngine, isAuthEngine } from "./client-auth-engine.js";
-import { hydrateError, socketProtocolErrorStatuses } from "@socket-mesh/errors";
+import { hydrateError, SocketClosedError, socketProtocolErrorStatuses } from "@socket-mesh/errors";
 import { ServerPrivateMap, HandshakeStatus } from "./maps/server-map.js";
 import { AutoReconnectOptions, ClientSocketOptions, ConnectOptions } from "./client-socket-options.js";
 import { AuthToken } from "@socket-mesh/auth";
@@ -58,7 +58,7 @@ export class ClientTransport<
 
 		this._connectAttempts = 0;
 		this._pendingReconnectTimeout = null;
-		this.autoReconnect = options.autoReconnect;
+		this.autoReconnect = options.autoReconnect ?? true;
 		this.isPingTimeoutDisabled = (options.isPingTimeoutDisabled === true);
 	}
 
@@ -68,15 +68,13 @@ export class ClientTransport<
 	
 	public set autoReconnect(value: Partial<AutoReconnectOptions> | boolean) {
 		if (value) {
-			this._autoReconnect = Object.assign<AutoReconnectOptions, Partial<AutoReconnectOptions>>(
-				{
-					initialDelay: 10000,
-					randomness: 10000,
-					multiplier: 1.5,
-					maxDelayMs: 60000
-				},
-				value === true ? {} : value
-			);
+			this._autoReconnect = {
+				initialDelay: 10000,
+				randomness: 10000,
+				multiplier: 1.5,
+				maxDelayMs: 60000,
+				...(value === true ? {} : value)
+			};
 		} else {
 			this._autoReconnect = false;
 		}
@@ -189,8 +187,11 @@ export class ClientTransport<
 	protected override onOpen() {
 		super.onOpen();
 
-		clearTimeout(this._connectTimeoutRef);
-		this._connectTimeoutRef = null;
+		if (this._connectTimeoutRef) {
+			clearTimeout(this._connectTimeoutRef);
+			this._connectTimeoutRef = null;
+		}
+
 		this.resetReconnect();
 		this.resetPingTimeout(this.isPingTimeoutDisabled ? false : this.pingTimeoutMs, 4000);
 
@@ -248,19 +249,21 @@ export class ClientTransport<
 	}
 
 	public async send(data: Buffer | string): Promise<void> {
+		if (!this.webSocket) {
+			throw new SocketClosedError('Web socket is closed.')
+		}
+
 		this.webSocket.send(data);
 	}
 
-	override async setAuthorization(authToken: AuthToken): Promise<boolean>;
-	override async setAuthorization(signedAuthToken: string, authToken?: AuthToken): Promise<boolean>;
-	override async setAuthorization(signedAuthToken: string | AuthToken, authToken?: AuthToken): Promise<boolean> {
+	override async setAuthorization(signedAuthToken: string, authToken?: AuthToken): Promise<boolean> {
 		const wasAuthenticated = !!this.signedAuthToken;
-		const changed = await super.setAuthorization(signedAuthToken as string, authToken);
+		const changed = await super.setAuthorization(signedAuthToken, authToken);
 
 		if (changed) {
 			this.triggerAuthenticationEvents(false, wasAuthenticated);
 			// Even if saving the auth token failes we do NOT want to throw an exception.
-			this.authEngine.saveToken(this.signedAuthToken)
+			this.authEngine.saveToken(signedAuthToken)
 				.catch(err => {
 					this.onError(err);
 				});
@@ -361,24 +364,27 @@ export class ClientTransport<
 		methodOptions: TMethod | TPrivateMethod | [TServiceName, TServiceMethod, (number | false)?] | InvokeServiceOptions<TService, TServiceName, TServiceMethod> | InvokeMethodOptions<TOutgoing, TMethod> | InvokeMethodOptions<(TPrivateOutgoing & ServerPrivateMap), TPrivateMethod>,
 		arg?: (Parameters<TOutgoing[TMethod]> | Parameters<(TPrivateOutgoing & ServerPrivateMap)[TPrivateMethod]> | Parameters<TService[TServiceName][TServiceMethod]>)[0]
 	): [Promise<FunctionReturnType<TOutgoing[TMethod] | (TPrivateOutgoing & ServerPrivateMap)[TPrivateMethod] | TService[TServiceName][TServiceMethod]>>, () => void] {
-		let abort: () => void;
+	let wasAborted = false;
+	let abort: () => void = () => { wasAborted = true; };
 
-		return [
-			Promise.resolve()
-				.then(() => {
-					if (this.status === 'closed') {
-						this.connect();
-			
-						return this.socket.listen('connect').once();
-					}
-				})
-				.then(() => {
-					const result = super.invoke(methodOptions as TMethod, arg);
-					abort = result[1];
+	const promise = Promise.resolve()
+		.then(() => {
+			if (this.status === 'closed') {
+				this.connect();
+				return this.socket.listen('connect').once();
+			}
+		})
+		.then(() => {
+			const result = super.invoke(methodOptions as TMethod, arg);
+			abort = result[1];
 
-					return result[0];
-				}),
-			abort
-		];
+			if (wasAborted) {
+				abort();
+			}
+
+			return result[0];
+		});
+
+		return [promise, () => abort()];
 	}
 }

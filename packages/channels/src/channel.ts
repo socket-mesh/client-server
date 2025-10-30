@@ -53,7 +53,7 @@ export class Channel<TChannelMap extends ChannelMap, TChannelName extends keyof 
 		return this._eventDemux.listen(`${this.name}/${event}`);
 	}
 
-	createConsumer(timeout?: number): WritableStreamConsumer<TChannelMap[TChannelName]> {
+	createConsumer(timeout?: number): WritableStreamConsumer<TChannelMap[TChannelName], TChannelMap[TChannelName] | undefined> {
 		return this._dataStream.createConsumer(timeout);
 	}
 

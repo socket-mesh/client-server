@@ -6,6 +6,28 @@
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
 	"files": ["./dist"],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"default": "./dist/index.js"
+		},
+		"./broker": {
+			"types": "./dist/broker/index.d.ts",
+			"import": "./dist/broker/index.js",
+			"default": "./dist/broker/index.js"
+		},
+		"./events": {
+			"types": "./dist/events/index.d.ts",
+			"import": "./dist/events/index.js",
+			"default": "./dist/events/index.js"
+		},
+		"./handlers": {
+			"types": "./dist/handlers/index.d.ts",
+			"import": "./dist/handlers/index.js",
+			"default": "./dist/handlers/index.js"
+		}
+	},
 	"author": {
 		"name": "Greg Kimmy"
 	},
@@ -23,6 +45,7 @@
 	},	
 	"devDependencies": {
 		"@socket-mesh/local-storage": "workspace:^",
+		"@socket-mesh/typescript-config": "workspace:^",
 		"@types/base64id": "catalog:base64id",
 		"@types/jsonwebtoken": "catalog:json-web-token",
 		"@types/ws": "catalog:ws"

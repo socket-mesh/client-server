@@ -47,7 +47,7 @@ export class Socket<
 	TPrivateOutgoing extends PrivateMethodMap,
 	TService extends ServiceMap,
 	TState extends object
-> extends AsyncStreamEmitter<SocketEvent<TIncoming, TOutgoing, TPrivateOutgoing, TService>> {
+> extends AsyncStreamEmitter<SocketEvent<TIncoming, TOutgoing, TPrivateOutgoing, TService> | undefined> {
 	private readonly _transport: SocketTransport<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>;
 	public readonly state: Partial<TState>;
 
@@ -62,15 +62,15 @@ export class Socket<
 		this._transport = transport;
 	}
 
-	public get id(): string {
+	public get id(): string | null {
 		return this._transport.id;
 	}
 
-	public get authToken(): AuthToken {
+	public get authToken(): AuthToken | null {
 		return this._transport.authToken;
 	}
 
-	public get signedAuthToken(): SignedAuthToken {
+	public get signedAuthToken(): SignedAuthToken | null {
 		return this._transport.signedAuthToken;
 	}
 
@@ -140,7 +140,7 @@ export class Socket<
 	listen(event: 'response'): DemuxedConsumableStream<ResponseEvent<TOutgoing, TPrivateOutgoing, TService>>;
 	listen<U extends SocketEvent<TIncoming, TOutgoing, TPrivateOutgoing, TService>, V = U>(event: string): DemuxedConsumableStream<V>;
 	listen<U extends SocketEvent<TIncoming, TOutgoing, TPrivateOutgoing, TService>, V = U>(event?: string): DemuxedConsumableStream<V> {
-		return super.listen(event);
+		return super.listen(event ?? '');
 	}
 
 	public get status(): SocketStatus {

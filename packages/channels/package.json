@@ -25,6 +25,7 @@
 		"@socket-mesh/async-stream-emitter": "workspace:^",
 		"@socket-mesh/consumable-stream": "workspace:^",
 		"@socket-mesh/stream-demux": "workspace:^",
+		"@socket-mesh/typescript-config": "workspace:^",
 		"@socket-mesh/writable-consumable-stream": "workspace:^"
 	},
 	"keywords": [

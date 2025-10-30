@@ -32,5 +32,8 @@
 	"bugs": {
 		"url": "https://github.com/socket-mesh/client-server/labels/formatter"
 	},
-	"homepage": "https://github.com/socket-mesh/main/tree/main/packages/formatter#README.md"
+	"homepage": "https://github.com/socket-mesh/main/tree/main/packages/formatter#README.md",
+	"devDependencies": {
+		"@socket-mesh/typescript-config": "workspace:^"
+	}
 }

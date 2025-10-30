@@ -1,22 +1,18 @@
 import { afterEach, beforeEach, describe, it } from "node:test";
 import { ClientPrivateMap, ClientSocket, ClientSocketOptions } from "@socket-mesh/client";
-import { Server, ServerSocket, listen } from "../src/index.js";
-import { ServerOptions } from "../src/server-options.js";
+import { listen, Server, ServerOptions, ServerSocket, ServerSocketState } from "@socket-mesh/server";
 import { AuthToken } from "@socket-mesh/auth";
 import jwt from "jsonwebtoken";
-import { AuthInfo } from "../src/handlers/authenticate.js";
+import { AuthInfo, ServerRequestHandlerArgs } from "@socket-mesh/server/handlers";
 import assert from "node:assert";
 import localStorage from "@socket-mesh/local-storage";
 import { AnyPacket, AuthStateChangeEvent, AuthenticatedChangeEvent, CloseEvent, ConnectEvent, DisconnectEvent, PluginArgs, MethodRequestPacket, RequestHandlerArgs, SendRequestPluginArgs, isRequestPacket, wait } from "@socket-mesh/core";
-import { ConnectionEvent, SocketAuthStateChangeEvent } from "../src/server-event.js";
+import { ConnectionEvent, SocketAuthStateChangeEvent } from "@socket-mesh/server/events";
 import { PluginBlockedError } from "@socket-mesh/errors";
 import { InOrderPlugin, OfflinePlugin, RequestBatchingPlugin, ResponseBatchingPlugin, ServerPrivateMap } from "@socket-mesh/client";
 import { WritableConsumableStream } from "@socket-mesh/writable-consumable-stream";
-import { SimpleBroker } from "../src/broker/simple-broker.js";
-import { ExchangeClient } from "../src/broker/exchange-client.js";
+import { ExchangeClient, SimpleBroker } from "@socket-mesh/server/broker";
 import { Channel, ChannelOptions, isPublishOptions, JsonValue, UnsubscribeEvent } from "@socket-mesh/channels";
-import { ServerSocketState } from "../src/server-socket-state.js";
-import { ServerRequestHandlerArgs } from "../src/handlers/server-request-handler.js";
 import { RawData } from "ws";
 
 // Add to the global scope like in browser.
@@ -85,7 +81,7 @@ const allowedUsers: {[user: string]: true } = {
 	alice: true
 };
 
-async function loginHandler({ transport, options: authToken }: RequestHandlerArgs<AuthToken>): Promise<void> {
+async function loginHandler({ transport, options: authToken }: ServerRequestHandlerArgs<AuthToken>): Promise<void> {
 	if (!allowedUsers[authToken.username]) {
 		const err = new Error('Failed to login');
 		err.name = 'FailedLoginError';
@@ -171,7 +167,7 @@ const serverOptions: ServerOptions<ServerIncomingMap, MyChannels, {}, ClientInco
 let client: ClientSocket<ServerIncomingMap, MyChannels>;
 let server: Server<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>;
 
-describe('Integration tests', function () {
+describe('Server Tests', function () {
 	afterEach(async function () {
 		if (client) {
 			client.closeListeners();
@@ -189,22 +185,17 @@ describe('Integration tests', function () {
 		beforeEach(async function () {
 			server = listen(
 				PORT_NUMBER,
-				Object.assign<
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
-				>(
-					{
-						plugins: [{
-							type: 'Authenticate Plugin',
-							onAuthenticate: (authInfo: AuthInfo) => {
-								if (!('authToken' in authInfo) || authInfo.authToken.username === 'alice') {
-									throw new PluginBlockedError('Blocked by onAuthenticate', 'AuthenticatePluginError');
-								}
+				{
+					plugins: [{
+						type: 'Authenticate Plugin',
+						onAuthenticate: (authInfo: AuthInfo) => {
+							if (!('authToken' in authInfo) || authInfo.authToken.username === 'alice') {
+								throw new PluginBlockedError('Blocked by onAuthenticate', 'AuthenticatePluginError');
 							}
-						}]
-					},
-					serverOptions
-				)
+						}
+					}],
+					...serverOptions
+				}
 			);
 			bindFailureHandlers(server);
 
@@ -251,8 +242,8 @@ describe('Integration tests', function () {
 		it('Should allow switching between users', async function () {
 			global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
 
-			const authenticateEvents: AuthToken[] = [];
-			const deauthenticateEvents: AuthToken[] = [];
+			const authenticateEvents: (AuthToken | null)[] = [];
+			const deauthenticateEvents: (AuthToken | null)[] = [];
 			const authenticationStateChangeEvents: SocketAuthStateChangeEvent<MyChannels, {}, ServerIncomingMap, ClientIncomingMap, {}, {}, {}, {}>[] = [];
 			const authStateChangeEvents: AuthStateChangeEvent[] = [];
 
@@ -293,8 +284,8 @@ describe('Integration tests', function () {
 
 			assert.strictEqual(deauthenticateEvents.length, 0);
 			assert.strictEqual(authenticateEvents.length, 2);
-			assert.strictEqual(authenticateEvents[0].username, 'bob');
-			assert.strictEqual(authenticateEvents[1].username, 'alice');
+			assert.strictEqual(authenticateEvents[0]!.username, 'bob');
+			assert.strictEqual(authenticateEvents[1]!.username, 'alice');
 
 			assert.strictEqual(authenticationStateChangeEvents.length, 2);
 			assert.notEqual(authenticationStateChangeEvents[0].socket, null);
@@ -645,53 +636,46 @@ describe('Integration tests', function () {
 
 			server = listen(
 				PORT_NUMBER,
-				Object.assign<
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
-				>(
-					{},
-					serverOptions,
-					{
-						handlers: {
-							login: async ({ socket, transport, options: authToken }: ServerRequestHandlerArgs<AuthToken>) => {
-								if (!allowedUsers[authToken.username]) {
-									const err = new Error('Failed to login');
-									err.name = 'FailedLoginError';
-									throw err;
+				{
+					...serverOptions,
+					handlers: {
+						login: async ({ socket, transport, options: authToken }: ServerRequestHandlerArgs<AuthToken>) => {
+							if (!allowedUsers[authToken.username]) {
+								const err = new Error('Failed to login');
+								err.name = 'FailedLoginError';
+								throw err;
+							}
+
+							(async () => {
+								await wait(0);
+
+								let error: Error | null = null;
+
+								try {
+									socket.disconnect();
+									await transport.setAuthorization(authToken, { rejectOnFailedDelivery: true });
+								} catch (err) {
+									error = err;
 								}
 
-								(async () => {
+								try {
+									assert.notEqual(error, null);
+									assert.strictEqual(error!.name, 'AuthError');
+
 									await wait(0);
-
-									let error: Error | null = null;
-	
-									try {
-										socket.disconnect();
-										await transport.setAuthorization(authToken, { rejectOnFailedDelivery: true });
-									} catch (err) {
-										error = err;
-									}
-	
-									try {
-										assert.notEqual(error, null);
-										assert.strictEqual(error!.name, 'AuthError');
-
-										await wait(0);
-										
-										assert.notEqual(serverWarnings[0], null);
-										assert.strictEqual(serverWarnings[0].name, 'BadConnectionError');
-										assert.notEqual(serverWarnings[1], null);
-										assert.strictEqual(serverWarnings[1].name, 'AuthError');
-										resolve();
-									} catch (err) {
-										reject(err);
-									}	
-								})();								
-							}
+									
+									assert.notEqual(serverWarnings[0], null);
+									assert.strictEqual(serverWarnings[0].name, 'BadConnectionError');
+									assert.notEqual(serverWarnings[1], null);
+									assert.strictEqual(serverWarnings[1].name, 'AuthError');
+									resolve();
+								} catch (err) {
+									reject(err);
+								}	
+							})();
 						}
 					}
-				)
+				}
 			);
 
 			bindFailureHandlers(server);
@@ -721,49 +705,42 @@ describe('Integration tests', function () {
 
 			server = listen(
 				PORT_NUMBER,
-				Object.assign<
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
-				>(
-					{},
-					serverOptions,
-					{
-						handlers: {
-							login: async ({ socket, transport, options: authToken }: ServerRequestHandlerArgs<AuthToken>) => {
-								if (!allowedUsers[authToken.username]) {
-									const err = new Error('Failed to login');
-									err.name = 'FailedLoginError';
-									throw err;
+				{
+					...serverOptions,
+					handlers: {
+						login: async ({ socket, transport, options: authToken }: ServerRequestHandlerArgs<AuthToken>) => {
+							if (!allowedUsers[authToken.username]) {
+								const err = new Error('Failed to login');
+								err.name = 'FailedLoginError';
+								throw err;
+							}
+
+							(async () => {
+								await wait(0);
+
+								let error: Error | null = null;
+
+								try {
+									socket.disconnect();
+									await transport.setAuthorization(authToken);
+								} catch (err) {
+									error = err;
 								}
 
-								(async () => {
+								try {
+									assert.strictEqual(error, null);
 									await wait(0);
+									assert.notEqual(serverWarnings[0], null);
+									assert.strictEqual(serverWarnings[0].name, 'BadConnectionError');
 
-									let error: Error | null = null;
-	
-									try {
-										socket.disconnect();
-										await transport.setAuthorization(authToken);
-									} catch (err) {
-										error = err;
-									}
-	
-									try {
-										assert.strictEqual(error, null);
-										await wait(0);
-										assert.notEqual(serverWarnings[0], null);
-										assert.strictEqual(serverWarnings[0].name, 'BadConnectionError');
-
-										resolve();
-									} catch (err) {
-										reject(err);
-									}	
-								})();								
-							}
+									resolve();
+								} catch (err) {
+									reject(err);
+								}	
+							})();
 						}
 					}
-				)
+				}
 			);
 
 			bindFailureHandlers(server);
@@ -794,34 +771,27 @@ describe('Integration tests', function () {
 			global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
 
 			server = listen(PORT_NUMBER,
-				Object.assign<
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
-				>(
-					{},
-					serverOptions,
-					{
-						authEngine: {
-							signToken: async() => {
-								return '';
-							},
-							verifyToken: async (signedToken: string, verifyOptions?: jwt.VerifyOptions) => {
-								try {
-									await wait(10);
-									assert.strictEqual(signedToken, validSignedAuthTokenBob);
-									//assert.strictEqual(authOptions.authKey, SERVER_AUTH_KEY);
-									//assert.notEqual(verifyOptions, null);
-									//assert.notEqual(options.socket, null);
-								} catch (err) {
-									reject(err);
-								}
-								resolve();
-								return {};
+				{
+					...serverOptions,
+					authEngine: {
+						signToken: async() => {
+							return '';
+						},
+						verifyToken: async (signedToken: string, verifyOptions?: jwt.VerifyOptions) => {
+							try {
+								await wait(10);
+								assert.strictEqual(signedToken, validSignedAuthTokenBob);
+								//assert.strictEqual(authOptions.authKey, SERVER_AUTH_KEY);
+								//assert.notEqual(verifyOptions, null);
+								//assert.notEqual(options.socket, null);
+							} catch (err) {
+								reject(err);
 							}
+							resolve();
+							return {};
 						}
 					}
-				)
+				}
 			);
 			bindFailureHandlers(server);
 
@@ -838,26 +808,19 @@ describe('Integration tests', function () {
 
 		it('Should remove client data from the server when client disconnects before authentication process finished', async function () {
 			server = listen(PORT_NUMBER,
-				Object.assign<
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
-				>(
-					{},
-					serverOptions,
-					{
-						authEngine: {
-							authKey: SERVER_AUTH_KEY,
-							signToken: async() => {
-								return '';
-							},
-							verifyToken: async () => {
-								await wait(500);
-								return {};
-							}
+				{
+					...serverOptions,
+					authEngine: {
+						authKey: SERVER_AUTH_KEY,
+						signToken: async() => {
+							return '';
+						},
+						verifyToken: async () => {
+							await wait(500);
+							return {};
 						}
 					}
-				)
+				}
 			);
 
 			bindFailureHandlers(server);
@@ -894,36 +857,29 @@ describe('Integration tests', function () {
 			await server.listen('ready').once();
 
 			client = new ClientSocket(
-				Object.assign<
-					ClientSocketOptions<ServerIncomingMap>,
-					ClientSocketOptions<ServerIncomingMap>,
-					ClientSocketOptions<ServerIncomingMap>
-				>(
-					{},
-					clientOptions,
-					{
-						autoConnect: false,
-						plugins: [
-							new OfflinePlugin(),
-							{
-								type: 'Authenticate Interceptor',
-								sendRequest: ({ requests, cont }: SendRequestPluginArgs<ClientPrivateMap, {}, ServerPrivateMap, {}, {}>) => {
-									cont(
-										requests.map(
-											req => {
-												if (req.method === '#authenticate' && 'cid' in req) {
-													delete (req as any).cid;
-												}
-
-												return req;
+				{
+					...clientOptions,
+					autoConnect: false,
+					plugins: [
+						new OfflinePlugin(),
+						{
+							type: 'Authenticate Interceptor',
+							sendRequest: ({ requests, cont }: SendRequestPluginArgs<ClientPrivateMap, {}, ServerPrivateMap, {}, {}>) => {
+								cont(
+									requests.map(
+										req => {
+											if (req.method === '#authenticate' && 'cid' in req) {
+												delete (req as any).cid;
 											}
-										)
-									);
-								}
+
+											return req;
+										}
+									)
+								);
 							}
-						]
-					}
-				)
+						}
+					]
+				}
 			);
 
 			const results = await Promise.allSettled([
@@ -963,20 +919,15 @@ describe('Integration tests', function () {
 			await server.listen('ready').once(100);
 
 			client = new ClientSocket(
-				Object.assign<
-					ClientSocketOptions<ServerIncomingMap>,
-					ClientSocketOptions<ServerIncomingMap>
-				>(
-					{
-						plugins: [{
-							type: 'onOpen',
-							onOpen({ transport }: PluginArgs<ClientPrivateMap, {}, ServerPrivateMap, {}, {}>) {
-								transport.send(Buffer.alloc(0));
-							}
-						}]
-					},
-					clientOptions
-				)
+				{
+					plugins: [{
+						type: 'onOpen',
+						onOpen({ transport }: PluginArgs<ClientPrivateMap, {}, ServerPrivateMap, {}, {}>) {
+							transport.send(Buffer.alloc(0));
+						}
+					}],
+					...clientOptions
+				}
 			);
 
 			const results = await Promise.all([
@@ -996,20 +947,15 @@ describe('Integration tests', function () {
 			await server.listen('ready').once(100);
 
 			client = new ClientSocket(
-				Object.assign<
-					ClientSocketOptions<ServerIncomingMap>,
-					ClientSocketOptions<ServerIncomingMap>
-				>(
-					{
-						plugins: [{
-							type: 'onOpen',
-							onOpen({ transport }: PluginArgs<ClientPrivateMap, {}, ServerPrivateMap, {}, {}>) {
-								transport.send('');
-							}
-						}]
-					},
-					clientOptions
-				)
+				{
+					plugins: [{
+						type: 'onOpen',
+						onOpen({ transport }: PluginArgs<ClientPrivateMap, {}, ServerPrivateMap, {}, {}>) {
+							transport.send('');
+						}
+					}],
+					...clientOptions
+				}
 			);
 
 			const { code: closeCode } = await client.listen('close').once(100);
@@ -1019,32 +965,24 @@ describe('Integration tests', function () {
 
 		it('Should not close the connection if the client tries to send a message before the handshake and strictHandshake is false', async function () {
 			server = listen(PORT_NUMBER,
-				Object.assign<
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
-				>(
-					{ strictHandshake: false },
-					serverOptions
-				)
+				{
+					strictHandshake: false,
+					...serverOptions
+				}
 			);
 
 			await server.listen('ready').once(100);
 
 			client = new ClientSocket(
-				Object.assign<
-					ClientSocketOptions<ServerIncomingMap>,
-					ClientSocketOptions<ServerIncomingMap>
-				>(
-					{
-						plugins: [{
-							type: 'onOpen',
-							onOpen({ transport }: PluginArgs<ClientPrivateMap, {}, ServerPrivateMap, {}, {}>) {
-								transport.send(Buffer.alloc(0));
-							}
-						}]
-					},
-					clientOptions
-				)
+				{
+					plugins: [{
+						type: 'onOpen',
+						onOpen({ transport }: PluginArgs<ClientPrivateMap, {}, ServerPrivateMap, {}, {}>) {
+							transport.send(Buffer.alloc(0));
+						}
+					}],
+					...clientOptions
+				}
 			);
 
 			const packet = await client.listen('connect').once(100);
@@ -1163,22 +1101,15 @@ describe('Integration tests', function () {
 
 			server = listen(
 				PORT_NUMBER,
-				Object.assign<
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
-				>(
-					{},
-					serverOptions,
-					{
-						handlers: {
-							greeting: async function (): Promise<void> {
-								requestCount++;
-								await wait(1);
-							}
+				{
+					...serverOptions,
+					handlers: {
+						greeting: async function (): Promise<void> {
+							requestCount++;
+							await wait(1);
 						}
 					}
-				)
+				}
 			);
 
 			bindFailureHandlers(server);
@@ -1195,19 +1126,10 @@ describe('Integration tests', function () {
 			let client: ClientSocket<ServerIncomingMap, MyChannels>;
 
 			for (let i = 0; i < 100; i++) {
-				client = new ClientSocket(
-					Object.assign<
-						ClientSocketOptions<ServerIncomingMap>,
-						ClientSocketOptions<ServerIncomingMap>,
-						ClientSocketOptions<ServerIncomingMap>
-					>(
-						{},
-						clientOptions,
-						{
-							plugins: [new OfflinePlugin()]
-						}
-					)
-				);
+				client = new ClientSocket({
+					...clientOptions,
+					plugins: [new OfflinePlugin()]
+				});
 				clientList.push(client);
 				await client.invoke('greeting');
 			}
@@ -1227,26 +1149,19 @@ describe('Integration tests', function () {
 	describe('Socket disconnection', function () {
 		it('Server-side socket disconnect event should not trigger if the socket did not complete the handshake; instead, it should trigger connectAbort', async function () {
 			server = listen(PORT_NUMBER,
-				Object.assign<
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
-				>(
-					{},
-					serverOptions,
-					{
-						authEngine: {
-							authKey: SERVER_AUTH_KEY,
-							signToken: async() => {
-								return '';
-							},
-							verifyToken: async () => {
-								await wait(100);
-								return {};
-							}
+				{
+					...serverOptions,
+					authEngine: {
+						authKey: SERVER_AUTH_KEY,
+						signToken: async() => {
+							return '';
+						},
+						verifyToken: async () => {
+							await wait(100);
+							return {};
 						}
 					}
-				)
+				}
 			);
 
 			bindFailureHandlers(server);
@@ -1316,26 +1231,19 @@ describe('Integration tests', function () {
 
 		it('Server-side socket disconnect event should trigger if the socket completed the handshake (not connectAbort)', async function () {
 			server = listen(PORT_NUMBER,
-				Object.assign<
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
-				>(
-					{},
-					serverOptions,
-					{
-						authEngine: {
-							authKey: SERVER_AUTH_KEY,
-							signToken: async() => {
-								return '';
-							},
-							verifyToken: async () => {
-								await wait(10);
-								return {};
-							}
+				{
+					...serverOptions,
+					authEngine: {
+						authKey: SERVER_AUTH_KEY,
+						signToken: async() => {
+							return '';
+						},
+						verifyToken: async () => {
+							await wait(10);
+							return {};
 						}
 					}
-				)
+				}
 			);
 
 			bindFailureHandlers(server);
@@ -1404,26 +1312,19 @@ describe('Integration tests', function () {
 
 		it('The close event should trigger when the socket loses the connection before the handshake', async function () {
 			server = listen(PORT_NUMBER,
-				Object.assign<
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
-				>(
-					{},
-					serverOptions,
-					{
-						authEngine: {
-							authKey: SERVER_AUTH_KEY,
-							signToken: async() => {
-								return '';
-							},
-							verifyToken: async () => {
-								await wait(100);
-								return {};
-							}
+				{
+					...serverOptions,
+					authEngine: {
+						authKey: SERVER_AUTH_KEY,
+						signToken: async() => {
+							return '';
+						},
+						verifyToken: async () => {
+							await wait(100);
+							return {};
 						}
 					}
-				)
+				}
 			);
 			
 			bindFailureHandlers(server);
@@ -1469,26 +1370,19 @@ describe('Integration tests', function () {
 
 		it('The close event should trigger when the socket loses the connection after the handshake', async function () {
 			server = listen(PORT_NUMBER,
-				Object.assign<
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
-				>(
-					{},
-					serverOptions,
-					{
-						authEngine: {
-							authKey: SERVER_AUTH_KEY,
-							signToken: async() => {
-								return '';
-							},
-							verifyToken: async () => {
-								await wait(0);
-								return {};
-							}
+				{
+					...serverOptions,
+					authEngine: {
+						authKey: SERVER_AUTH_KEY,
+						signToken: async() => {
+							return '';
+						},
+						verifyToken: async () => {
+							await wait(0);
+							return {};
 						}
 					}
-				)
+				}
 			);
 
 			bindFailureHandlers(server);
@@ -1538,61 +1432,48 @@ describe('Integration tests', function () {
 
 			server = listen(
 				PORT_NUMBER,
-				Object.assign<
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>(
-					{},
-					serverOptions,
-					{
-						handlers: {
-							foo: async ({ socket, options: data }: RequestHandlerArgs<number, {}, ClientIncomingMap>) => {
-								currentRequestData = data;
-								await wait(10);
-								(async () => {
-									try {
-										await socket.invoke('bla', data);
-									} catch (err) {}
-								})();
-
+				{
+					plugins: [new InOrderPlugin()],
+					...serverOptions,
+					handlers: {
+						foo: async ({ socket, options: data }: RequestHandlerArgs<number, {}, ClientIncomingMap>) => {
+							currentRequestData = data;
+							await wait(10);
+							(async () => {
 								try {
-									await socket.transmit('hi', data);	
+									await socket.invoke('bla', data);
 								} catch (err) {}
+							})();
 
-								if (data === 10) {
-									client.disconnect();
-								}
+							try {
+								await socket.transmit('hi', data);	
+							} catch (err) {}
 
-								return 'bar';
+							if (data === 10) {
+								client.disconnect();
 							}
-						},
-						plugins: [new InOrderPlugin()]
+
+							return 'bar';
+						}
 					}
-				)
+				}
 			);
 
 			bindFailureHandlers(server);
 
 			const serverWarnings: Error[] = [];
 			(async () => {
-				for await (let {error} of server.listen('socketError')) {
+				for await (let { error } of server.listen('socketError')) {
 					serverWarnings.push(error);
 				}
 			})();
 
 			await server.listen('ready').once(100);
 			client = new ClientSocket(
-				Object.assign<
-					ClientSocketOptions<ServerIncomingMap>,
-					ClientSocketOptions<ServerIncomingMap>,
-					ClientSocketOptions<ServerIncomingMap>
-				>(
-				{},
-					clientOptions,
-					{
-						plugins: [new OfflinePlugin()]
-					}
-				)
+				{
+					...clientOptions,
+					plugins: [new OfflinePlugin()]
+				}
 			);
 
 			(async () => {
@@ -1652,24 +1533,17 @@ describe('Integration tests', function () {
 
 			server = listen(
 				PORT_NUMBER,
-				Object.assign<
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
-				>(
-					{},
-					serverOptions,
-					{
-						handlers: {
-							foo: async ({ options: data }: RequestHandlerArgs<number>) => {
-								await wait(30);
-								handledPackets.push(data);	
-								return 'bar';
-							}
-						},
-						plugins: [new InOrderPlugin()]
+				{
+					plugins: [new InOrderPlugin()],
+					...serverOptions,
+					handlers: {
+						foo: async ({ options: data }: RequestHandlerArgs<number>) => {
+							await wait(30);
+							handledPackets.push(data);	
+							return 'bar';
+						}
 					}
-				)
+				}
 			);
 			
 			bindFailureHandlers(server);
@@ -1709,24 +1583,17 @@ describe('Integration tests', function () {
 
 			server = listen(
 				PORT_NUMBER,
-				Object.assign<
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
-				>(
-					{},
-					serverOptions,
-					{
-						socketStreamCleanupMode: 'close',
-						handlers: {
-							foo: async ({ options: data }: RequestHandlerArgs<number>) => {
-								await wait(30);
-								handledPackets.push(data);
-								return 'bar';
-							}
+				{
+					...serverOptions,
+					socketStreamCleanupMode: 'close',
+					handlers: {
+						foo: async ({ options: data }: RequestHandlerArgs<number>) => {
+							await wait(30);
+							handledPackets.push(data);
+							return 'bar';
 						}
 					}
-				)
+				}
 			);
 
 			bindFailureHandlers(server);
@@ -1766,24 +1633,17 @@ describe('Integration tests', function () {
 
 			server = listen(
 				PORT_NUMBER,
-				Object.assign<
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
-				>(
-					{},
-					serverOptions,
-					{
-						socketStreamCleanupMode: 'none',
-						handlers: {
-							foo: async ({ options: data }: RequestHandlerArgs<number>) => {
-								await wait(30);
-								handledPackets.push(data);
-								return 'bar';
-							}
+				{
+					...serverOptions,
+					socketStreamCleanupMode: 'none',
+					handlers: {
+						foo: async ({ options: data }: RequestHandlerArgs<number>) => {
+							await wait(30);
+							handledPackets.push(data);
+							return 'bar';
 						}
 					}
-				)
+				}
 			);
 
 			bindFailureHandlers(server);
@@ -1821,44 +1681,28 @@ describe('Integration tests', function () {
 		it ('Should support invoking a remote procedure on the server', async function () {
 			server = listen(
 				PORT_NUMBER,
-				Object.assign<
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
-				>(
-					{},
-					serverOptions,
-					{
-						handlers: {
-							customProc: async ({ options }: RequestHandlerArgs<CustomProcArgs>) => {
-								if ('bad' in options) {
-									const err = new Error('Server failed to execute the procedure');
-									err.name = 'BadCustomError';
-									throw err;
-								}
-
-								return 'Success';
+				{
+					...serverOptions,
+					handlers: {
+						customProc: async ({ options }: RequestHandlerArgs<CustomProcArgs>) => {
+							if ('bad' in options) {
+								const err = new Error('Server failed to execute the procedure');
+								err.name = 'BadCustomError';
+								throw err;
 							}
+
+							return 'Success';
 						}
 					}
-				)
+				}
 			);
 
 			bindFailureHandlers(server);
 
-			client = new ClientSocket(
-				Object.assign<
-					ClientSocketOptions<ServerIncomingMap>,
-					ClientSocketOptions<ServerIncomingMap>,
-					ClientSocketOptions<ServerIncomingMap>
-				>(
-					{},
-					clientOptions,
-					{
-						plugins: [new OfflinePlugin()]
-					}
-				)
-			);
+			client = new ClientSocket({
+				...clientOptions,
+				plugins: [new OfflinePlugin()]
+			});
 
 			let result = await client.invoke('customProc', {good: true});
 
@@ -1879,22 +1723,15 @@ describe('Integration tests', function () {
 		it ('Should support receiving remote transmitted data on the server', function (context, done) {
 			server = listen(
 				PORT_NUMBER,
-				Object.assign<
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
-				>(
-					{},
-					serverOptions,
-					{
-						handlers: {
-							customRemoteEvent: async ({ options: data }: RequestHandlerArgs<string>) => {
-								assert.strictEqual(data, 'This is data');
-								done();
-							}
+				{
+					...serverOptions,
+					handlers: {
+						customRemoteEvent: async ({ options: data }: RequestHandlerArgs<string>) => {
+							assert.strictEqual(data, 'This is data');
+							done();
 						}
 					}
-				)
+				}
 			);
 
 			bindFailureHandlers(server);
@@ -1902,19 +1739,10 @@ describe('Integration tests', function () {
 			(async () => {
 				await wait(10);
 
-				client = new ClientSocket(
-					Object.assign<
-						ClientSocketOptions<ServerIncomingMap>,
-						ClientSocketOptions<ServerIncomingMap>,
-						ClientSocketOptions<ServerIncomingMap>
-					>(
-						{},
-						clientOptions,
-						{
-							plugins: [new OfflinePlugin()]
-						}
-					)
-				);
+				client = new ClientSocket({
+					...clientOptions,
+					plugins: [new OfflinePlugin()]
+				});
 				await client.transmit('customRemoteEvent', 'This is data');
 			})();
 		});
@@ -1926,31 +1754,27 @@ describe('Integration tests', function () {
 			
 			server = listen(
 				PORT_NUMBER,
-				Object.assign<
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>(
-					{
-						plugins: [
-							{
-								type: 'Message Interceptor',
-								async onMessageRaw({ socket, message }) {
-									backpressureHistory.push(socket.getInboundBackpressure());
-	
-									return message;
-								},
-								async onMessage({ packet }) {
-									if (isRequestPacket(packet) && isPublishOptions(packet.data) && packet.data.data === 5) {
-										await wait(140);
-									}
-	
-									return packet;
-								}
+				{
+					plugins: [
+						{
+							type: 'Message Interceptor',
+							async onMessageRaw({ socket, message }) {
+								backpressureHistory.push(socket.getInboundBackpressure());
+
+								return message;
 							},
-							new InOrderPlugin()
-						]
-					},
-					serverOptions
-				)
+							async onMessage({ packet }) {
+								if (isRequestPacket(packet) && isPublishOptions(packet.data) && packet.data.data === 5) {
+									await wait(140);
+								}
+
+								return packet;
+							}
+						},
+						new InOrderPlugin()
+					],
+					...serverOptions
+				}
 			);
 			bindFailureHandlers(server);
 
@@ -1992,21 +1816,17 @@ describe('Integration tests', function () {
 
 			server = listen(
 				PORT_NUMBER,
-				Object.assign<
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>(
-					{
-						plugins: [
-							{
-								type: 'Send Request Interceptor',
-								sendRequest(options) {
-									requestStream.write(options);
-								}
+				{
+					plugins: [
+						{
+							type: 'Send Request Interceptor',
+							sendRequest(options) {
+								requestStream.write(options);
 							}
-						]
-					},
-					serverOptions
-				)
+						}
+					],
+					...serverOptions
+				}
 			);
 
 			bindFailureHandlers(server);
@@ -2027,19 +1847,12 @@ describe('Integration tests', function () {
 
 			await server.listen('ready').once(100);
 
-			client = new ClientSocket(
-				Object.assign<
-					ClientSocketOptions<ServerIncomingMap>,
-					ClientSocketOptions<ServerIncomingMap>
-				>(
-					{
-						plugins: [
-							new OfflinePlugin()
-						]
-					},
-					clientOptions
-				)
-			);
+			client = new ClientSocket({
+				plugins: [
+					new OfflinePlugin()
+				],
+				...clientOptions
+			});
 
 			await client.channels.subscribe('foo').listen('subscribe').once(100);
 
@@ -2058,32 +1871,27 @@ describe('Integration tests', function () {
 			
 			server = listen(
 				PORT_NUMBER,
-				Object.assign<
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
-				>(
-					{
-						plugins: [
-							{
-								type: 'Message Interceptor',
-								async onMessageRaw({ socket, message }) {
-									backpressureHistory.push(socket.getBackpressure());
-	
-									return message;
-								},
-								async onMessage({ packet }) {
-									if (isRequestPacket(packet) && isPublishOptions(packet.data) && packet.data.data === 5) {
-										await wait(140);
-									}
-	
-									return packet;
-								}
+				{
+					plugins: [
+						{
+							type: 'Message Interceptor',
+							async onMessageRaw({ socket, message }) {
+								backpressureHistory.push(socket.getBackpressure());
+
+								return message;
 							},
-							new InOrderPlugin()
-						]
-					},
-					serverOptions
-				)
+							async onMessage({ packet }) {
+								if (isRequestPacket(packet) && isPublishOptions(packet.data) && packet.data.data === 5) {
+									await wait(140);
+								}
+
+								return packet;
+							}
+						},
+						new InOrderPlugin()
+					],
+					...serverOptions
+				}
 			);
 			bindFailureHandlers(server);
 
@@ -2141,17 +1949,10 @@ describe('Integration tests', function () {
 
 			await server.listen('ready').once();
 
-			client = new ClientSocket(
-				Object.assign<
-					ClientSocketOptions<ServerIncomingMap>,
-					ClientSocketOptions<ServerIncomingMap>
-				>(
-					{
-						autoConnect: false
-					},
-					clientOptions
-				)
-			);
+			client = new ClientSocket({
+				autoConnect: false,
+				...clientOptions
+			});
 
 			assert.strictEqual(client.status, 'closed');
 
@@ -2176,54 +1977,43 @@ describe('Integration tests', function () {
 
 			server = listen(
 				PORT_NUMBER,
-				Object.assign<
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>>(
-					{
-						authEngine: {
-							async verifyToken() {
-								await wait(500);
-								return {};
-							},
-							signToken: async function() {
-								return '';
-							}
+				{
+					authEngine: {
+						async verifyToken() {
+							await wait(500);
+							return {};
+						},
+						signToken: async function() {
+							return '';
 						}
 					},
-					serverOptions
-				)
+					...serverOptions
+				}
 			);
 
 			bindFailureHandlers(server);
 
 			await server.listen('ready').once(100);
 
-			client = new ClientSocket(
-				Object.assign<
-					ClientSocketOptions<ServerIncomingMap>,
-					ClientSocketOptions<ServerIncomingMap>
-				>(
+			client = new ClientSocket({
+				plugins: [
 					{
-						plugins: [
-							{
-								type: 'Subscribe handshake test',
-								onOpen({ transport }) {
-									// Hack to capture the error without relying on the standard client flow.
-									(transport as any)._callbackMap[2] = {
-										method: '#subscribe',
-										callback: (err: Error) => {
-											error = err;
-										}
-									};
-
-									transport.send('{"cid":2,"method":"#subscribe","data":{"channel":"someChannel"}}');
+						type: 'Subscribe handshake test',
+						onOpen({ transport }) {
+							// Hack to capture the error without relying on the standard client flow.
+							(transport as any)._callbackMap[2] = {
+								method: '#subscribe',
+								callback: (err: Error) => {
+									error = err;
 								}
-							}
-						]
-					},
-					clientOptions
-				)
-			);
+							};
+
+							transport.send('{"cid":2,"method":"#subscribe","data":{"channel":"someChannel"}}');
+						}
+					}
+				],
+				...clientOptions
+			});
 
 			(async () => {
 				for await (let event of server.exchange.listen('subscription')) {
@@ -2252,82 +2042,75 @@ describe('Integration tests', function () {
 
 			await server.listen('ready').once(100);
 
-			client = new ClientSocket(
-				Object.assign<
-					ClientSocketOptions<ServerIncomingMap>,
-					ClientSocketOptions<ServerIncomingMap>
-				>(
+			client = new ClientSocket({
+				plugins: [
 					{
-						plugins: [
-							{
-								type: 'Subscribe handshake test',
-								onOpen({ transport }) {
-									// Hacks to capture the errors without relying on the standard client flow.
-									(transport as any)._callbackMap[2] = {
-										method: '#subscribe',
-										data: [null],
-										callback: function (err: Error) {
-											nullInChannelArrayError = err;
-										}
-									};
-									(transport as any)._callbackMap[3] = {
-										method: '#subscribe',
-										data: {"channel": {"hello": 123}},
-										callback: function (err: Error) {
-											objectAsChannelNameError = err;
-										}
-									};
-									(transport as any)._callbackMap[4] = {
-										method: '#subscribe',
-										data: null,
-										callback: function (err: Error) {
-											nullChannelNameError = err;
-										}
-									};
-									(transport as any)._callbackMap[5] = {
-										method: '#unsubscribe',
-										data: [null],
-										callback: function (err: Error) {
-											nullUnsubscribeError = err;
-										}
-									};
-									(transport as any)._callbackMap[6] = {
-										method: '#publish',
-										data: null,
-										callback: function (err: Error) {
-											undefinedPublishError = err;
-										}
-									};
-									(transport as any)._callbackMap[7] = {
-										method: '#publish',
-										data: {"channel": {"hello": 123}},
-										callback: function (err: Error) {
-											objectAsChannelNamePublishError = err;
-										}
-									};
-									(transport as any)._callbackMap[8] = {
-										method: '#publish',
-										data: {"channel": null},
-										callback: function (err: Error) {
-											nullPublishError = err;
-										}
-									};
-
-									// Trick the server by sending a fake subscribe before the handshake is done.
-									transport.send('{"method":"#subscribe","data":[null],"cid":2}');
-									transport.send('{"method":"#subscribe","data":{"channel":{"hello":123}},"cid":3}');
-									transport.send('{"method":"#subscribe","data":null,"cid":4}');
-									transport.send('{"method":"#unsubscribe","data":[null],"cid":5}');
-									transport.send('{"method":"#publish","data":null,"cid":6}');
-									transport.send('{"method":"#publish","data":{"channel":{"hello":123}},"cid":7}');
-									transport.send('{"method":"#publish","data":{"channel":null},"cid":8}');									
+						type: 'Subscribe handshake test',
+						onOpen({ transport }) {
+							// Hacks to capture the errors without relying on the standard client flow.
+							(transport as any)._callbackMap[2] = {
+								method: '#subscribe',
+								data: [null],
+								callback: function (err: Error) {
+									nullInChannelArrayError = err;
 								}
-							}
-						]
-					},
-					clientOptions
-				)
-			);
+							};
+							(transport as any)._callbackMap[3] = {
+								method: '#subscribe',
+								data: {"channel": {"hello": 123}},
+								callback: function (err: Error) {
+									objectAsChannelNameError = err;
+								}
+							};
+							(transport as any)._callbackMap[4] = {
+								method: '#subscribe',
+								data: null,
+								callback: function (err: Error) {
+									nullChannelNameError = err;
+								}
+							};
+							(transport as any)._callbackMap[5] = {
+								method: '#unsubscribe',
+								data: [null],
+								callback: function (err: Error) {
+									nullUnsubscribeError = err;
+								}
+							};
+							(transport as any)._callbackMap[6] = {
+								method: '#publish',
+								data: null,
+								callback: function (err: Error) {
+									undefinedPublishError = err;
+								}
+							};
+							(transport as any)._callbackMap[7] = {
+								method: '#publish',
+								data: {"channel": {"hello": 123}},
+								callback: function (err: Error) {
+									objectAsChannelNamePublishError = err;
+								}
+							};
+							(transport as any)._callbackMap[8] = {
+								method: '#publish',
+								data: {"channel": null},
+								callback: function (err: Error) {
+									nullPublishError = err;
+								}
+							};
+
+							// Trick the server by sending a fake subscribe before the handshake is done.
+							transport.send('{"method":"#subscribe","data":[null],"cid":2}');
+							transport.send('{"method":"#subscribe","data":{"channel":{"hello":123}},"cid":3}');
+							transport.send('{"method":"#subscribe","data":null,"cid":4}');
+							transport.send('{"method":"#unsubscribe","data":[null],"cid":5}');
+							transport.send('{"method":"#publish","data":null,"cid":6}');
+							transport.send('{"method":"#publish","data":{"channel":{"hello":123}},"cid":7}');
+							transport.send('{"method":"#publish","data":{"channel":null},"cid":8}');									
+						}
+					}
+				],
+				...clientOptions
+			});
 
 			await wait(300);
 
@@ -2479,15 +2262,10 @@ describe('Integration tests', function () {
 
 			server = listen(
 				PORT_NUMBER,
-				Object.assign<
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
-				>(
-					{
-						brokerEngine: new CustomBrokerEngine()
-					},
-					serverOptions
-				)
+				{
+					brokerEngine: new CustomBrokerEngine(),
+					...serverOptions
+				}
 			);
 
 			bindFailureHandlers(server);
@@ -2593,15 +2371,10 @@ describe('Integration tests', function () {
 
 			server = listen(
 				PORT_NUMBER,
-				Object.assign<
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
-				>(
-					{
-						brokerEngine: new CustomBrokerEngine()
-					},
-					serverOptions
-				)
+				{
+					brokerEngine: new CustomBrokerEngine(),
+					...serverOptions
+				}
 			);
 
 			bindFailureHandlers(server);
@@ -2698,49 +2471,44 @@ describe('Integration tests', function () {
 
 			server = listen(
 				PORT_NUMBER,
-				Object.assign<
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
-				>(
-					{
-						plugins: [
-							{
-								type: 'Received Server Messages',
-								async onMessageRaw({ message }) {
-									receivedServerMessages.push(message);
-									return message;
-								}
-							},
-							{
-								type: 'Inbound Packets',
-								// Each subscription should pass through the plugin individually, even
-								// though they were sent as a batch/array.
-								async onMessage({ packet }) {
-									if (isRequestPacket(packet) && packet.method === '#subscribe') {
-										subscribePluginCounter++;
-										assert.strictEqual(packet.data.channel.indexOf('my-channel-'), 0);
-										if (packet.data.channel === 'my-channel-10') {
-											assert.strictEqual(JSON.stringify(packet.data.data), JSON.stringify({foo: 123}));
-										} else if (packet.data.channel === 'my-channel-12') {
+				{
+					plugins: [
+						{
+							type: 'Received Server Messages',
+							async onMessageRaw({ message }) {
+								receivedServerMessages.push(message);
+								return message;
+							}
+						},
+						{
+							type: 'Inbound Packets',
+							// Each subscription should pass through the plugin individually, even
+							// though they were sent as a batch/array.
+							async onMessage({ packet }) {
+								if (isRequestPacket(packet) && packet.method === '#subscribe') {
+									subscribePluginCounter++;
+									assert.strictEqual(packet.data.channel.indexOf('my-channel-'), 0);
+									if (packet.data.channel === 'my-channel-10') {
+										assert.strictEqual(JSON.stringify(packet.data.data), JSON.stringify({foo: 123}));
+									} else if (packet.data.channel === 'my-channel-12') {
 
-											// Block my-channel-12
-											const err = new Error('You cannot subscribe to channel 12');
-											err.name = 'UnauthorizedSubscribeError';
-											throw err;
-										}
+										// Block my-channel-12
+										const err = new Error('You cannot subscribe to channel 12');
+										err.name = 'UnauthorizedSubscribeError';
+										throw err;
 									}
-
-									return packet;
 								}
-							},
-							new ResponseBatchingPlugin({
-								batchOnHandshakeDuration: 400,
-								batchInterval: 50
-							})
-						]
-					},
-					serverOptions
-				)
+
+								return packet;
+							}
+						},
+						new ResponseBatchingPlugin({
+							batchOnHandshakeDuration: 400,
+							batchInterval: 50
+						})
+					],
+					...serverOptions
+				}
 			);
 
 			bindFailureHandlers(server);
@@ -2749,29 +2517,22 @@ describe('Integration tests', function () {
 
 			const receivedClientMessages: (string | RawData)[] = [];
 
-			client = new ClientSocket(
-				Object.assign<
-					ClientSocketOptions<ServerIncomingMap>,
-					ClientSocketOptions<ServerIncomingMap>
-				>(
+			client = new ClientSocket({
+				plugins: [
 					{
-						plugins: [
-							{
-								type: 'Received Client Messages',
-								async onMessageRaw({ message }) {
-									receivedClientMessages.push(message);
-									return message;
-								}
-							},
-							new RequestBatchingPlugin({
-								batchOnHandshakeDuration: 100,
-								batchInterval: 50
-							})
-						]
+						type: 'Received Client Messages',
+						async onMessageRaw({ message }) {
+							receivedClientMessages.push(message);
+							return message;
+						}
 					},
-					clientOptions
-				)
-			);
+					new RequestBatchingPlugin({
+						batchOnHandshakeDuration: 100,
+						batchInterval: 50
+					})
+				],
+				...clientOptions
+			});
 
 			const channelList: Channel<MyChannels, string>[] = [];
 
@@ -2821,43 +2582,31 @@ describe('Integration tests', function () {
 		it('The batchOnHandshake option should not break the order of subscribe and publish', async function () {
 			server = listen(
 				PORT_NUMBER,
-				Object.assign<
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-					ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
-				>(
-					{
-						plugins: [
-							new ResponseBatchingPlugin({
-								batchOnHandshakeDuration: 400,
-								batchInterval: 50
-							})
-						]
-					},
-					serverOptions
-				)
+				{
+					plugins: [
+						new ResponseBatchingPlugin({
+							batchOnHandshakeDuration: 400,
+							batchInterval: 50
+						})
+					],
+					...serverOptions
+				}
 			);
 
 			bindFailureHandlers(server);
 
 			await server.listen('ready').once(100);
 
-			client = new ClientSocket(
-				Object.assign<
-					ClientSocketOptions<ServerIncomingMap>,
-					ClientSocketOptions<ServerIncomingMap>
-				>(
-					{
-						autoConnect: false,
-						plugins: [
-							new RequestBatchingPlugin({
-								batchOnHandshakeDuration: 100,
-								batchInterval: 50
-							})
-						]
-					},
-					clientOptions
-				)
-			);
+			client = new ClientSocket({
+				autoConnect: false,
+				plugins: [
+					new RequestBatchingPlugin({
+						batchOnHandshakeDuration: 100,
+						batchInterval: 50
+					})
+				],
+				...clientOptions
+			});
 
 			let receivedMessage: string | number;
 
@@ -2879,16 +2628,11 @@ describe('Integration tests', function () {
 				// way the client will never receive a ping or send back a pong.
 				server = listen(
 					PORT_NUMBER,
-					Object.assign<
-						ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-						ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
-					>(
-						{
-							pingIntervalMs: 5000,
-							pingTimeoutMs: 500
-						},
-						serverOptions
-					)
+					{
+						pingIntervalMs: 5000,
+						pingTimeoutMs: 500,
+						...serverOptions
+					}
 				);
 
 				bindFailureHandlers(server);
@@ -2946,17 +2690,12 @@ describe('Integration tests', function () {
 				// way the client will never receive a ping or send back a pong.
 				server = listen(
 					PORT_NUMBER,
-					Object.assign<
-						ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-						ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
-					>(
-						{
-							isPingTimeoutDisabled: true,
-							pingIntervalMs: 1000,
-							pingTimeoutMs: 500
-						},
-						serverOptions
-					)
+					{
+						isPingTimeoutDisabled: true,
+						pingIntervalMs: 1000,
+						pingTimeoutMs: 500,
+						...serverOptions
+					}
 				);
 				bindFailureHandlers(server);
 
@@ -2964,17 +2703,10 @@ describe('Integration tests', function () {
 			});
 
 			it('Should not disconnect socket if server does not receive a pong from client before timeout', async function () {
-				client = new ClientSocket(
-					Object.assign<
-						ClientSocketOptions<ServerIncomingMap>,
-						ClientSocketOptions<ServerIncomingMap>
-					>(
-						{
-							isPingTimeoutDisabled: true
-						},
-						clientOptions
-					)
-				);
+				client = new ClientSocket({
+					isPingTimeoutDisabled: true,
+					...clientOptions
+				});
 
 				let serverWarning: Error | null = null;
 				(async () => {
@@ -3021,16 +2753,11 @@ describe('Integration tests', function () {
 				// way the client will never receive a ping or send back a pong.
 				server = listen(
 					PORT_NUMBER,
-					Object.assign<
-						ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>,
-						ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>
-					>(
-						{
-							pingIntervalMs: 400,
-							pingTimeoutMs: 1000
-						},
-						serverOptions
-					)
+					{
+						pingIntervalMs: 400,
+						pingTimeoutMs: 1000,
+						...serverOptions
+					}
 				);
 
 				bindFailureHandlers(server);
@@ -3103,17 +2830,10 @@ describe('Integration tests', function () {
 				});
 
 				const clientA = new ClientSocket(clientOptions);
-				const clientB = new ClientSocket(
-					Object.assign<
-						ClientSocketOptions<ServerIncomingMap>,
-						ClientSocketOptions<ServerIncomingMap>,
-						ClientSocketOptions<ServerIncomingMap>
-					>(
-						{},
-						clientOptions,
-						{ address: `ws://127.0.0.1:${PORT_NUMBER}?delayMe=true` }
-					)
-				);
+				const clientB = new ClientSocket({
+					...clientOptions,
+					address: `ws://127.0.0.1:${PORT_NUMBER}?delayMe=true`
+				});
 
 				let clientAIsConnected = false;
 				let clientBIsConnected = false;
@@ -3326,17 +3046,10 @@ describe('Integration tests', function () {
 				});
 
 				const clientA = new ClientSocket(clientOptions);
-				const clientB = new ClientSocket(
-					Object.assign<
-						ClientSocketOptions<ServerIncomingMap>,
-						ClientSocketOptions<ServerIncomingMap>,
-						ClientSocketOptions<ServerIncomingMap>
-					>(
-						{},
-						clientOptions,
-						{ address: `ws://127.0.0.1:${PORT_NUMBER}?delayMe=true` }
-					)
-				);
+				const clientB = new ClientSocket({
+					...clientOptions,
+					address: `ws://127.0.0.1:${PORT_NUMBER}?delayMe=true`
+				});
 
 				let clientAIsConnected = false;
 				let clientBIsConnected = false;
@@ -3568,17 +3281,10 @@ describe('Integration tests', function () {
 				})();
 
 				const clientA = new ClientSocket(clientOptions);
-				const clientB = new ClientSocket(
-					Object.assign<
-						ClientSocketOptions<ServerIncomingMap>,
-						ClientSocketOptions<ServerIncomingMap>,
-						ClientSocketOptions<ServerIncomingMap>
-					>(
-						{},
-						clientOptions,
-						{ address: `ws://127.0.0.1:${PORT_NUMBER}?delayMe=true` }
-					)
-				);
+				const clientB = new ClientSocket({
+					...clientOptions,
+					address: `ws://127.0.0.1:${PORT_NUMBER}?delayMe=true`
+				});
 
 				await Promise.all([
 					clientA.listen('connect').once(100),
@@ -3716,14 +3422,10 @@ describe('Integration tests', function () {
 					}
 				);
 
-				const client = new ClientSocket(
-					Object.assign<
-						ClientSocketOptions<ServerIncomingMap>,
-						ClientSocketOptions<ServerIncomingMap>>(
-							{ autoConnect: false },
-							clientOptions
-						)
-				);
+				const client = new ClientSocket({
+					autoConnect: false,
+					...clientOptions
+				});
 
 				let receivedMessage: JsonValue;
 

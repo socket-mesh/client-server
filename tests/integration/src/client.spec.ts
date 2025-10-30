@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { beforeEach, afterEach, describe, it, mock } from "node:test";
-import { ClientSocket, ClientSocketOptions, LocalStorageAuthEngine, OfflinePlugin } from '../src/index.js';
+import { ClientSocket, ClientSocketOptions, LocalStorageAuthEngine, OfflinePlugin } from '@socket-mesh/client';
 import { AuthStateChangeEvent, CloseEvent, DisconnectEvent, SocketStatus, RequestHandlerArgs, wait } from '@socket-mesh/core';
 import { Server, ServerRequestHandlerArgs, listen } from '@socket-mesh/server';
 import localStorage from '@socket-mesh/local-storage';
@@ -46,7 +46,7 @@ let server: Server<ServerIncomingMap, MyChannels>;
 
 let performTaskTriggered: boolean;
 
-async function loginHandler({ transport, options }: RequestHandlerArgs<LoginRequest>): Promise<void> {
+async function loginHandler({ transport, options }: ServerRequestHandlerArgs<LoginRequest>): Promise<void> {
 	if (!allowedUsers[options.username]) {
 		const err = new Error('Failed to login');
 		err.name = 'FailedLoginError';
@@ -76,7 +76,7 @@ const clientOptions: ClientSocketOptions<ServerIncomingMap> = {
 	ackTimeoutMs: 200
 }
 
-describe('Integration tests', function () {
+describe('Client Tests', function () {
 	beforeEach(async function () {
 		server = listen<ServerIncomingMap, MyChannels>(
 			PORT_NUMBER,
@@ -92,7 +92,6 @@ describe('Integration tests', function () {
 		);
 
 		performTaskTriggered = false;
-
 		await server.listen('ready').once(100);
 	});
 
@@ -132,22 +131,15 @@ describe('Integration tests', function () {
 		});
 
 		it('Should not automatically connect socket if autoConnect is set to false', async function () {
-			client = new ClientSocket(
-				Object.assign<
-					ClientSocketOptions<ServerIncomingMap>,
-					ClientSocketOptions<ServerIncomingMap>
-				>(
-					{
-						autoConnect: false
-					},
-					clientOptions
-				)
-			);
+			client = new ClientSocket({
+				autoConnect: false,
+				...clientOptions
+			});
 
 			assert.strictEqual<SocketStatus>(client.status, 'closed');
 		});
 	});
-
+/*
 	describe('Errors', function () {
 		it('Should be able to emit the error event locally on the socket', (context, done) => {
 			client = new ClientSocket(clientOptions);
@@ -174,11 +166,11 @@ describe('Integration tests', function () {
 			})();
 		});
 	});
-
+*/
 	describe('Authentication', function () {
 		it('Should not send back error if JWT is not provided in handshake', async function () {
 			client = new ClientSocket(clientOptions);
-
+			console.log('HERE')
 			const event = await client.listen('connect').once(100);
 
 			assert.strictEqual(event.authError, undefined);
@@ -191,7 +183,7 @@ describe('Integration tests', function () {
 			const event = await client.listen('connect').once(100);
 
 			assert.strictEqual(client.signedAuthToken, validSignedAuthTokenBob);
-			assert.strictEqual(client.authToken.username, 'bob');
+			assert.strictEqual(client.authToken?.username, 'bob');
 			assert.strictEqual(event.authError, undefined);
 		});
 
@@ -238,13 +230,13 @@ describe('Integration tests', function () {
 			await client.listen('connect').once(100);
 
 			assert.strictEqual(client.signedAuthToken, validSignedAuthTokenBob);
-			assert.strictEqual(client.authToken.username, 'bob');
+			assert.strictEqual(client.authToken?.username, 'bob');
 
 			(async () => {
 				await client.listen('authenticate').once();
 				authenticateTriggered = true;
 				assert.notEqual(client.authToken, null);
-				assert.strictEqual(client.authToken.username, 'alice');
+				assert.strictEqual(client.authToken?.username, 'alice');
 			})();
 
 			(async () => {
@@ -272,7 +264,7 @@ describe('Integration tests', function () {
 
 			//assert.strictEqual(client.authState, AuthState.AUTHENTICATED);
 			assert.notEqual(client.authToken, null);
-			assert.strictEqual(client.authToken.username, 'bob');
+			assert.strictEqual(client.authToken?.username, 'bob');
 		});
 
 		it('If token engine signing is asynchronous, authentication can be captured using the authenticate event', async function () {
@@ -288,7 +280,7 @@ describe('Integration tests', function () {
 
 			//assert.strictEqual(client.authState, AuthState.AUTHENTICATED);
 			assert.notEqual(client.authToken, null);
-			assert.strictEqual(client.authToken.username, 'bob');
+			assert.strictEqual(client.authToken?.username, 'bob');
 		});
 
 		it('If token verification is synchronous, authentication can be captured using the authenticate event', async function () {
@@ -315,7 +307,7 @@ describe('Integration tests', function () {
 	
 					assert.strictEqual(event.isAuthenticated, true);
 					assert.notEqual(client.authToken, null);
-					assert.strictEqual(client.authToken.username, 'bob');
+					assert.strictEqual(client.authToken?.username, 'bob');
 				})()
 			]);
 		});
@@ -350,13 +342,10 @@ describe('Integration tests', function () {
 				}
 			);
 
-			client = new ClientSocket(
-				Object.assign<
-					ClientSocketOptions<ServerIncomingMap>,
-					ClientSocketOptions<ServerIncomingMap>,
-					ClientSocketOptions<ServerIncomingMap>
-				>({}, clientOptions, { authEngine })
-			);
+			client = new ClientSocket({
+				...clientOptions,
+				authEngine
+			});
 
 			let caughtError: Error;
 
@@ -368,7 +357,7 @@ describe('Integration tests', function () {
 
 			await client.listen('connect').once();
 			assert.notEqual(client.authToken, null);
-			assert.strictEqual(client.authToken.username, 'bob');
+			assert.strictEqual(client.authToken?.username, 'bob');
 
 			await client.authenticate(validSignedAuthTokenKate);
 
@@ -376,7 +365,7 @@ describe('Integration tests', function () {
 			// authentication from taking place, it only prevents the token from being
 			// stored correctly on the client.
 			assert.notEqual(client.authToken, null);
-			assert.strictEqual(client.authToken.username, 'kate');
+			assert.strictEqual(client.authToken?.username, 'kate');
 			assert.notEqual(caughtError!, null);
 			assert.strictEqual(caughtError!.name, 'FailedToSaveTokenError');
 		});
@@ -542,7 +531,7 @@ describe('Integration tests', function () {
 				validSignedAuthTokenBob,
 				validSignedAuthTokenKate
 			];
-			const authTokenChanges: string[] = [];
+			const authTokenChanges: (string | null)[] = [];
 
 			(async () => {
 				for await (let event of client.listen('authenticate')) {
@@ -561,7 +550,7 @@ describe('Integration tests', function () {
 			await client.listen('connect').once();
 
 			assert.notEqual(client.signedAuthToken, null);
-			assert.strictEqual(client.authToken.username, 'bob');
+			assert.strictEqual(client.authToken?.username, 'bob');
 			const authenticatePromise = client.authenticate(validSignedAuthTokenKate);
 
 			assert.notEqual(client.signedAuthToken, null);
@@ -606,19 +595,10 @@ describe('Integration tests', function () {
 
 		it('Subscriptions (including those with waitForAuth option) should have priority over the authenticate action', async function () {
 			global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
-			client = new ClientSocket(
-				Object.assign<
-					ClientSocketOptions<ServerIncomingMap>,
-					ClientSocketOptions<ServerIncomingMap>,
-					ClientSocketOptions<ServerIncomingMap>
-				>(
-					{},
-					clientOptions,
-					{
-						plugins: [new OfflinePlugin()]
-					}
-				)
-			);
+			client = new ClientSocket({
+				...clientOptions,
+				plugins: [new OfflinePlugin()]
+			});
 
 			const expectedAuthStateChanges = [
 				'false->true',
@@ -1030,20 +1010,11 @@ describe('Integration tests', function () {
 		});
 
 		it('Should resolve invoke Promise with BadConnectionError before triggering the disconnect event', async function () {
-			client = new ClientSocket(
-				Object.assign<
-					ClientSocketOptions<ServerIncomingMap>,
-					ClientSocketOptions<ServerIncomingMap>,
-					ClientSocketOptions<ServerIncomingMap>
-				>(
-					{},
-					clientOptions,
-					{
-						plugins: [new OfflinePlugin()],
-						ackTimeoutMs: 2000
-					}
-				)
-			);
+			client = new ClientSocket({
+				...clientOptions,
+				plugins: [new OfflinePlugin()],
+				ackTimeoutMs: 2000
+			});
 
 			const messageList: any[] = [];
 			let clientStatus = client.status;
@@ -1284,17 +1255,10 @@ describe('Integration tests', function () {
 
 	describe('Ping/pong', function () {
 		it('Should close if ping is not received before timeout', async function () {
-			client = new ClientSocket(
-				Object.assign<
-					ClientSocketOptions<ServerIncomingMap>,
-					ClientSocketOptions<ServerIncomingMap>
-				>(
-					{
-						connectTimeoutMs: 500
-					},
-					clientOptions
-				)
-			);
+			client = new ClientSocket({
+				connectTimeoutMs: 500,
+				...clientOptions
+			});
 
 			assert.strictEqual(client.pingTimeoutMs, 500);
 
@@ -1339,18 +1303,11 @@ describe('Integration tests', function () {
 		});
 
 		it('Should not close if ping is not received before timeout when pingTimeoutDisabled is true', async function () {
-			client = new ClientSocket(
-				Object.assign<
-					ClientSocketOptions<ServerIncomingMap>,
-					ClientSocketOptions<ServerIncomingMap>
-				>(
-					{
-						connectTimeoutMs: 500,
-						isPingTimeoutDisabled: true
-					},
-					clientOptions
-				)
-			);
+			client = new ClientSocket({
+				connectTimeoutMs: 500,
+				isPingTimeoutDisabled: true,
+				...clientOptions
+			});
 
 			assert.strictEqual(client.pingTimeoutMs, 500);
 

@@ -93,7 +93,7 @@ export class InOrderPlugin<
 			}
 		});
 
-		this._inboundMessageStream.write({ callback, ...options });
+		this._inboundMessageStream.write({ callback: callback!, ...options });
 
 		return promise;
 	}

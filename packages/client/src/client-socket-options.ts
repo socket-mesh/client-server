@@ -29,7 +29,9 @@ export interface ClientSocketOptions<
 	TPrivateOutgoing & ServerPrivateMap,
 	TService,
 	TState
->, ConnectOptions {
+> {
+	address: string | URL,
+
 	// Whether or not to automatically connect the socket as soon as it is created. Default is true.
 	autoConnect?: boolean,
 
@@ -48,6 +50,10 @@ export interface ClientSocketOptions<
 
 	// A prefix to add to the channel names.
 	channelPrefix?: string,
+
+	connectTimeoutMs?: number
+
+	wsOptions?: ws.ClientOptions
 }
 
 export function parseClientOptions<
@@ -58,8 +64,8 @@ export function parseClientOptions<
 	TState extends object
 >(options: ClientSocketOptions<TOutgoing, TService, TIncoming, TPrivateOutgoing, TState> | string | URL): ClientSocketOptions<TOutgoing, TService, TIncoming, TPrivateOutgoing, TState> {
 	if (typeof options === 'string' || 'pathname' in options) {
-		options = { address: options } as ClientSocketOptions<TOutgoing, TService, TIncoming, TPrivateOutgoing, TState>;
+		options = { address: options };
 	}
 	
-	return Object.assign<ClientSocketOptions<TOutgoing, TService, TIncoming, TPrivateOutgoing, TState>, ClientSocketOptions<TOutgoing, TService, TIncoming, TPrivateOutgoing, TState>>({}, options);
+	return { ...options };
 }

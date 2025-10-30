@@ -109,14 +109,14 @@ export interface InvokeServiceRequest<TServiceMap extends ServiceMap, TService e
 	cid: number,
 	ackTimeoutMs: number | false,
 	timeoutId?: NodeJS.Timeout;
-	callback: (err: Error, result?: TServiceMap[TService][TMethod]) => void | null
+	callback: null | ((err: Error | null, result?: TServiceMap[TService][TMethod]) => void)
 }
 
 export interface InvokeMethodRequest<TMethodMap extends MethodMap, TMethod extends keyof TMethodMap> extends TransmitMethodRequest<TMethodMap, TMethod> {
 	cid: number,
 	ackTimeoutMs: number | false,
 	timeoutId?: NodeJS.Timeout;
-	callback: (err: Error, result?: TMethodMap[TMethod]) => void | null
+	callback: null | ((err: Error | null, result?: TMethodMap[TMethod]) => void)
 }
 
 export function isRequestDone<

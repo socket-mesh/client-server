@@ -3,13 +3,13 @@ import { SignedAuthToken } from "@socket-mesh/auth";
 export interface ClientAuthEngine {
 	saveToken(token: SignedAuthToken, options?: { [key: string]: any } ): Promise<SignedAuthToken>;
 	
-	removeToken(): Promise<SignedAuthToken>;
+	removeToken(): Promise<SignedAuthToken | null>;
 	
 	loadToken(): Promise<SignedAuthToken | null>;
 }
 
-export function isAuthEngine(auth: ClientAuthEngine | LocalStorageAuthEngineOptions): auth is ClientAuthEngine {
-	return (typeof auth === 'object' && 'saveToken' in auth && 'removeToken' in auth && 'loadToken' in auth);
+export function isAuthEngine(auth?: ClientAuthEngine | LocalStorageAuthEngineOptions | null): auth is ClientAuthEngine {
+	return (!!auth && typeof auth === 'object' && 'saveToken' in auth && 'removeToken' in auth && 'loadToken' in auth);
 }
 
 export interface LocalStorageAuthEngineOptions {
@@ -53,7 +53,7 @@ export class LocalStorageAuthEngine implements ClientAuthEngine {
 		return token;
 	}
 	
-	async removeToken(): Promise<SignedAuthToken> {
+	async removeToken(): Promise<SignedAuthToken | null> {
 		let loadPromise = this.loadToken();
 	
 		if (this.isLocalStorageEnabled) {
@@ -65,7 +65,7 @@ export class LocalStorageAuthEngine implements ClientAuthEngine {
 		return loadPromise;
 	}
 	
-	async loadToken(): Promise<SignedAuthToken> {
+	async loadToken(): Promise<SignedAuthToken | null> {
 		let token;
 	
 		if (this.isLocalStorageEnabled) {

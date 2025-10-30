@@ -6,7 +6,9 @@ import { PrivateMethodMap, PublicMethodMap, ServiceMap } from "@socket-mesh/core
 export { Server } from "./server.js";
 export { ServerSocket } from "./server-socket.js";
 export type { PluginType } from "@socket-mesh/core";
+export type { ServerOptions } from "./server-options.js";
 export type { ServerRequestHandlerArgs } from './handlers/server-request-handler.js';
+export type { ServerSocketState } from "./server-socket-state.js"
 
 /**
  * Creates an http.Server exclusively used for WS upgrades.

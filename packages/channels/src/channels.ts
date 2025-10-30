@@ -266,7 +266,7 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 	listen(eventName: 'unsubscribe'): DemuxedConsumableStream<UnsubscribeEvent>;
 	listen<U extends ChannelEvent, V = U>(eventName: string): DemuxedConsumableStream<V>;	
 	listen<U extends ChannelEvent, V = U>(eventName?: string): DemuxedConsumableStream<StreamEvent<ChannelEvent>> | DemuxedConsumableStream<V> {
-		return super.listen<U, V>(eventName);
+		return super.listen<U, V>(eventName ?? '');
 	}
 
 	abstract transmitPublish<U extends keyof T & string>(channelName: U, data: T[U]): Promise<void>;

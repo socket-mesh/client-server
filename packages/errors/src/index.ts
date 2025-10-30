@@ -171,6 +171,16 @@ export class ServerProtocolError extends Error {
 	}
 }
 
+export class SocketClosedError extends Error {
+	constructor(message: string) {
+		super(message);
+
+		this.name = 'SocketClosedError';
+
+		Object.setPrototypeOf(this, ServerProtocolError.prototype);
+	}
+}
+
 export class HTTPServerError extends Error {
 	constructor(message: string) {
 		super(message);

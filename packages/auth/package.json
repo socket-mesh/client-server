@@ -25,5 +25,8 @@
 	},
 	"bugs": {
 		"url": "https://github.com/socket-mesh/client-server/labels/auth"
+	},
+	"devDependencies": {
+		"@socket-mesh/typescript-config": "workspace:^"
 	}
 }

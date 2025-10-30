@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { beforeEach, afterEach, describe, it } from "node:test";
-import { ConsumableStream } from "../src";
+import { ConsumableStream } from "../src/index.js";
 
 let pendingTimeoutSet = new Set<NodeJS.Timeout>();
 

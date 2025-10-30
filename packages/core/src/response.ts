@@ -12,7 +12,11 @@ export function isResponsePacket<
 	TPrivateOutgoing extends PrivateMethodMap,
 	TService extends ServiceMap
 >(packet?: unknown): packet is AnyResponse<TOutgoing, TPrivateOutgoing, TService> {
-	return (typeof packet === 'object') && 'rid' in packet;
+	return (
+		packet !== null &&
+		typeof packet === 'object' &&
+		'rid' in packet
+	);
 }
 
 export type ServiceDataResponse<TServiceMap extends ServiceMap> =

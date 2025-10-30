@@ -101,14 +101,18 @@ export class ClientSocket<
 
 	async deauthenticate(): Promise<boolean> {
 		(async () => {
-			let oldAuthToken: SignedAuthToken;
+			let oldAuthToken: SignedAuthToken | null;
+
 			try {
 				oldAuthToken = await this._clientTransport.authEngine.removeToken();
 			} catch (err) {
 				this._clientTransport.onError(err);
 				return;
 			}
-			this.emit('removeAuthToken', { oldAuthToken });
+
+			if (oldAuthToken) {
+				this.emit('removeAuthToken', { oldAuthToken });
+			}
 		})();
 
 		if (this.status !== 'closed') {

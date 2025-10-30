@@ -28,7 +28,8 @@
 	},
 	"devDependencies": {
 		"@types/clone-deep": "catalog:clone-deep",
-		"@types/jsonwebtoken": "catalog:json-web-token"
+		"@types/jsonwebtoken": "catalog:json-web-token",
+		"@socket-mesh/typescript-config": "workspace:^"
 	},
 	"dependencies": {
 		"clone-deep": "catalog:clone-deep",

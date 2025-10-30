@@ -14,7 +14,7 @@ export async function subscribeHandler(
 	const state = socket.state;
 	const server = socket.server;
 
-	if (server.socketChannelLimit && state.channelSubscriptionsCount >= server.socketChannelLimit) {
+	if (server.socketChannelLimit && (state.channelSubscriptionsCount || 0) >= server.socketChannelLimit) {
 		throw new InvalidActionError(
 			`Socket ${socket.id} tried to exceed the channel subscription limit of ${server.socketChannelLimit}`
 		);

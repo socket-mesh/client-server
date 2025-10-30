@@ -27,6 +27,7 @@
 		"url": "https://github.com/socket-mesh/client-server/labels/core"
 	},
 	"devDependencies": {
+		"@socket-mesh/typescript-config": "workspace:^",
 		"@types/base64id": "catalog:base64id",
 		"@types/ws": "catalog:ws"
 	},

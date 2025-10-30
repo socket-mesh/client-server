@@ -1,5 +1,5 @@
-export abstract class ConsumableStream<T, TReturn = any> implements AsyncIterator<T, TReturn>, AsyncIterable<T> {
-	async next(timeout?: number): Promise<IteratorResult<T, TReturn>> {
+export abstract class ConsumableStream<T, TReturn = any> implements AsyncIterator<T, TReturn | undefined>, AsyncIterable<T> {
+	async next(timeout?: number): Promise<IteratorResult<T, TReturn | undefined>> {
 		let asyncIterator = this.createConsumer(timeout);
 		let result = await asyncIterator.next();
 		asyncIterator.return();
@@ -13,9 +13,10 @@ export abstract class ConsumableStream<T, TReturn = any> implements AsyncIterato
 			// If stream was ended, this function should never resolve unless
 			// there is a timeout; in that case, it should reject early.
 			if (timeout == null) {
-				const error = new Error('Stream ended before yielding a value');
-				error.name = 'StreamEndedError';
-				throw error;
+				return await new Promise(() => {});
+				//const error = new Error('Stream ended before yielding a value');
+				//error.name = 'StreamEndedError';
+				//throw error;
 			} else {
 				const error = new Error(
 					'Stream consumer operation timed out early because stream ended'
@@ -28,9 +29,9 @@ export abstract class ConsumableStream<T, TReturn = any> implements AsyncIterato
 		return result.value;
 	}
 
-	abstract createConsumer(timeout?: number): Consumer<T, TReturn>
+	abstract createConsumer(timeout?: number): Consumer<T, TReturn | undefined>
 
-	[Symbol.asyncIterator](): AsyncIterator<T, TReturn> {
+	[Symbol.asyncIterator](): AsyncIterator<T, TReturn | undefined> {
 		return this.createConsumer();
 	}
 }

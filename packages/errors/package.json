@@ -24,5 +24,8 @@
 	"bugs": {
 		"url": "https://github.com/socket-mesh/client-server/labels/errors"
 	},
-	"homepage": "https://github.com/socket-mesh/main/tree/main/packages/errors#README.md"
+	"homepage": "https://github.com/socket-mesh/main/tree/main/packages/errors#README.md",
+	"devDependencies": {
+		"@socket-mesh/typescript-config": "workspace:^"
+	}
 }

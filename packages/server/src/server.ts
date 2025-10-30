@@ -9,7 +9,7 @@ import { AuthEngine, defaultAuthEngine, isAuthEngine } from "@socket-mesh/auth-e
 import { handshakeHandler } from "./handlers/handshake.js";
 import { ServerPlugin } from "./plugin/server-plugin.js";
 import { authenticateHandler } from "./handlers/authenticate.js";
-import { CloseEvent, ConnectionEvent, ErrorEvent, HandshakeEvent, HeadersEvent, ListeningEvent, ServerEvent, SocketAuthenticateEvent, SocketAuthStateChangeEvent, SocketBadAuthTokenEvent, SocketCloseEvent, SocketConnectEvent, SocketConnectingEvent, SocketDeauthenticateEvent, SocketDisconnectEvent, SocketErrorEvent, SocketMessageEvent, SocketPingEvent, SocketPongEvent, SocketRemoveAuthTokenEvent, SocketRequestEvent, SocketResponseEvent, SocketSubscribeEvent, SocketSubscribeFailEvent, SocketSubscribeStateChangeEvent, SocketUnsubscribeEvent, WarningEvent } from "./server-event.js";
+import { CloseEvent, ConnectionEvent, ErrorEvent, HandshakeEvent, HeadersEvent, ListeningEvent, ServerEvent, SocketAuthenticateEvent, SocketAuthStateChangeEvent, SocketBadAuthTokenEvent, SocketCloseEvent, SocketConnectEvent, SocketConnectingEvent, SocketDeauthenticateEvent, SocketDisconnectEvent, SocketErrorEvent, SocketMessageEvent, SocketPingEvent, SocketPongEvent, SocketRemoveAuthTokenEvent, SocketRequestEvent, SocketResponseEvent, SocketSubscribeEvent, SocketSubscribeFailEvent, SocketSubscribeStateChangeEvent, SocketUnsubscribeEvent, WarningEvent } from "./events/index.js";
 import { AsyncStreamEmitter } from "@socket-mesh/async-stream-emitter";
 import { DemuxedConsumableStream, StreamEvent } from "@socket-mesh/stream-demux";
 import { ServerOptions } from "./server-options.js";
@@ -36,7 +36,7 @@ export class Server<
 	private readonly _wss: WebSocketServer;
 	private _isReady: boolean;
 	private _isListening: boolean;
-	private _pingIntervalRef: NodeJS.Timeout;	
+	private _pingIntervalRef: NodeJS.Timeout | null;	
 	private _handlers:
 		HandlerMap<
 			TIncoming & TPrivateIncoming & ServerPrivateMap,
@@ -102,7 +102,7 @@ export class Server<
 			},
 			options.handlers
 		);
-		this.httpServer = options.server;
+		this.httpServer = options.server!;
 
 		this.plugins = options.plugins || [];
 		this.origins = options.origins || '*:*';
@@ -303,7 +303,7 @@ export class Server<
 
 	private socketDisconnected(
 		socket:
-			ClientSocket<PublicMethodMap, TChannel, TService, TState, TOutgoing & TPrivateOutgoing, TPrivateIncoming> |
+			// ClientSocket<PublicMethodMap, TChannel, TService, TState, TOutgoing & TPrivateOutgoing, TPrivateIncoming> |
 			ServerSocket<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>
 	): void {
 		if (!!this.pendingClients[socket.id]) {
@@ -458,6 +458,6 @@ export class Server<
 	listen(event: 'socketUnsubscribe'): DemuxedConsumableStream<SocketUnsubscribeEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>>;
 	listen(event: "warning"): DemuxedConsumableStream<WarningEvent>;
 	listen(event?: string): DemuxedConsumableStream<StreamEvent<any>> | DemuxedConsumableStream<ServerEvent<TChannel, TService, TIncoming, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>> {
-		return super.listen(event);
+		return event ? super.listen(event) : super.listen();
 	}
 }

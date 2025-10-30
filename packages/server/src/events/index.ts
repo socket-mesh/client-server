@@ -1,6 +1,6 @@
 import { IncomingMessage } from "http";
 import { ClientSocket, ServerPrivateMap } from "@socket-mesh/client";
-import { ServerSocket } from "./server-socket.js";
+import { ServerSocket } from "../server-socket.js";
 import {
 	AuthenticateEvent, BadAuthTokenEvent, ConnectEvent, CloseEvent as SCloseEvent, DisconnectEvent, ErrorEvent as SErrorEvent,
 	MessageEvent, PingEvent, PongEvent, RequestEvent, ResponseEvent, ConnectingEvent, RemoveAuthTokenEvent, DeauthenticateEvent,

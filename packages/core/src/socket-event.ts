@@ -32,13 +32,13 @@ export interface AuthenticatedChangeEvent {
 	isAuthenticated: true,
 	wasAuthenticated: boolean,
 	signedAuthToken: SignedAuthToken,
-	authToken: AuthToken
+	authToken: AuthToken | null
 }
 
 export interface AuthenticateEvent {
 	wasSigned: boolean,
 	signedAuthToken: SignedAuthToken,
-	authToken: AuthToken
+	authToken: AuthToken | null
 }
 
 export interface BadAuthTokenEvent {
@@ -52,7 +52,7 @@ export interface CloseEvent {
 }
 
 export interface ConnectEvent {
-	id: string,
+	id: string | null,
 	isAuthenticated: boolean,
 	pingTimeoutMs: number,
 	authError?: Error
@@ -63,7 +63,7 @@ export interface ConnectingEvent {
 
 export interface DeauthenticateEvent {
 	signedAuthToken: SignedAuthToken,
-	authToken: AuthToken
+	authToken: AuthToken | null
 }
 
 export interface DeauthenticatedChangeEvent {

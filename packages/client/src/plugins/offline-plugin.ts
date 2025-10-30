@@ -11,7 +11,7 @@ export class OfflinePlugin<
 > implements Plugin<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> {
 	private _isReady: boolean;
 	private _requests: AnyRequest<TOutgoing, TPrivateOutgoing, TService>[][];
-	private _continue: (requests: AnyRequest<TOutgoing, TPrivateOutgoing, TService>[], cb?: (error?: Error) => void) => void| null;
+	private _continue: null | ((requests: AnyRequest<TOutgoing, TPrivateOutgoing, TService>[], cb?: (error?: Error) => void) => void);
 
 	constructor() {
 		this.type = 'offline';
@@ -61,11 +61,15 @@ export class OfflinePlugin<
 
 	private flush() {
 		if (this._requests.length) {
-			for (const reqs of this._requests) {
-				this._continue(reqs);
+			if (this._continue) {
+				for (const reqs of this._requests) {
+					this._continue(reqs);
+				}
+
+				this._continue = null;
 			}
+
 			this._requests = [];
-			this._continue = null;
 		}
 	}
 }

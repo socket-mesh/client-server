@@ -1,0 +1,29 @@
+{
+	"$schema": "https://turbo.build/schema.json",
+	"ui": "tui",
+	"globalDependencies": ["./config/typescript-config/tsconfig.build.json"],
+	"tasks": {
+		"build": {
+			"dependsOn": ["lint", "^build"],
+			"inputs": ["$TURBO_DEFAULT$", ".env*"],
+			"outputs": ["dist/**"]
+		},
+		"deploy": {
+			"dependsOn": ["build"]
+		},
+    "lint": {
+      "dependsOn": [],
+      "outputs": []
+    },
+    "lint:fix": {
+      "dependsOn": [],
+      "outputs": []
+    },
+		"start": {
+			"dependsOn": ["build"],
+			"cache": false,
+			"persistent": true
+		},
+    "test": {}
+	}
+}

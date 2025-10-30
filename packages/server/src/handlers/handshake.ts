@@ -34,13 +34,17 @@ export async function handshakeHandler(
 	}
 
 	let authError: Error | undefined = undefined;
-	let changed: boolean;
+	let changed = false;
 
 	try {
 		changed = await processAuthentication(socket, transport, authInfo);
 
 		if (socket.status === 'closed') {
-			return;
+			return {
+				id: socket.id,
+				pingTimeoutMs: server.pingTimeoutMs,
+				authToken: options.authToken
+			};
 		}
 	} catch (err) {
 		if (options.authToken) {
