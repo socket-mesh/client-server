@@ -3027,10 +3027,10 @@ describe('Server Tests', function () {
 				const event = await client.listen('connect').once(100);
 
 				assert.strictEqual(event.isAuthenticated, false);
-				assert.strictEqual(client.signedAuthToken, undefined);
-				assert.strictEqual(client.authToken, undefined);
+				assert.strictEqual(client.signedAuthToken, null);
+				assert.strictEqual(client.authToken, null);
 				assert.strictEqual(didAuthenticationEventTrigger, false);
-				assert.notEqual(setAuthTokenError, undefined);
+				assert.notEqual(setAuthTokenError, null);
 				assert.strictEqual(setAuthTokenError!.name, 'InvalidActionError');
 			});
 

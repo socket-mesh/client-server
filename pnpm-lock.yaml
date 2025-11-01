@@ -396,18 +396,27 @@ importers:
 
   tests/integration:
     dependencies:
+      '@socket-mesh/channels':
+        specifier: workspace:^
+        version: link:../../packages/channels
       '@socket-mesh/client':
         specifier: workspace:^
         version: link:../../packages/client
       '@socket-mesh/core':
         specifier: workspace:^
         version: link:../../packages/core
+      '@socket-mesh/errors':
+        specifier: workspace:^
+        version: link:../../packages/errors
       '@socket-mesh/local-storage':
         specifier: workspace:^
         version: link:../../packages/local-storage
       '@socket-mesh/server':
         specifier: workspace:^
         version: link:../../packages/server
+      '@socket-mesh/writable-consumable-stream':
+        specifier: workspace:^
+        version: link:../../packages/writable-consumable-stream
       '@types/jsonwebtoken':
         specifier: catalog:json-web-token
         version: 9.0.10

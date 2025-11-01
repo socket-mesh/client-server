@@ -28,10 +28,13 @@
 		"@socket-mesh/typescript-config": "workspace:^"
 	},
 	"dependencies": {
+		"@socket-mesh/channels": "workspace:^",
 		"@socket-mesh/core": "workspace:^",
 		"@socket-mesh/client": "workspace:^",
+		"@socket-mesh/errors": "workspace:^",
 		"@socket-mesh/local-storage": "workspace:^",
 		"@socket-mesh/server": "workspace:^",
+		"@socket-mesh/writable-consumable-stream": "workspace:^",
 		"@types/jsonwebtoken": "catalog:json-web-token",
 		"@types/ws": "catalog:ws",
 		"jsonwebtoken": "catalog:json-web-token",
