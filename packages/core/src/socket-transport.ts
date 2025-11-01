@@ -791,24 +791,25 @@ export class SocketTransport<
 			};
 		}
 
-		const request: TransmitMethodRequest<TOutgoing, TMethod> | TransmitServiceRequest<TService, TServiceName, TServiceMethod> = {
-			...(serviceRequest || methodRequest!),
-			promise: new Promise<void>((resolve, reject) => {
-				request.sentCallback = (err?: Error) => {
-					delete request.sentCallback;
-					this._outboundSentMessageCount++;
+		const baseRequest = (serviceRequest || methodRequest!);
 
-					if (err) {
-						reject(err);
-						return;
-					}
+		const promise = new Promise<void>((resolve, reject) => {
+			baseRequest.sentCallback = (err?: Error) => {
+				delete baseRequest.sentCallback;
+				this._outboundSentMessageCount++;
 
-					resolve();
-				};
-			})
-		};
+				if (err) {
+					reject(err);
+					return;
+				}
+
+				resolve();
+			};
+		});
 
 		this._outboundPreparedMessageCount++;
+
+		const request = Object.assign(baseRequest, { promise });
 
 		this.onTransmit(request);
 
@@ -879,63 +880,62 @@ export class SocketTransport<
 		let callbackMap = this._callbackMap;
 
 		let abort: () => void;
-		let promise: Promise<FunctionReturnType<TService[TServiceName][TServiceMethod] | TOutgoing[TMethod] | TPrivateOutgoing[TPrivateMethod]>>;
+		const baseRequest = (serviceRequest || methodRequest!);
 
-		const request: InvokeMethodRequest<TOutgoing, TMethod> | InvokeMethodRequest<TPrivateOutgoing, TPrivateMethod> | InvokeServiceRequest<TService, TServiceName, TServiceMethod> = {
-			...(serviceRequest || methodRequest!),
-			promise: promise = new Promise<FunctionReturnType<TService[TServiceName][TServiceMethod] | TOutgoing[TMethod] | TPrivateOutgoing[TPrivateMethod]>>((resolve, reject) => {
-				if (request.ackTimeoutMs) {
-					request.timeoutId = setTimeout(
-						() => {
-							delete callbackMap[request.cid];
-							request.callback = null;
-							clearTimeout(request.timeoutId);
-							delete request.timeoutId;
-							reject(new TimeoutError(`Method \'${[service, request.method].filter(Boolean).join('.')}\' timed out.`));
-						},
-						request.ackTimeoutMs
-					);
+		const promise = new Promise<FunctionReturnType<TService[TServiceName][TServiceMethod] | TOutgoing[TMethod] | TPrivateOutgoing[TPrivateMethod]>>((resolve, reject) => {
+			if (baseRequest.ackTimeoutMs) {
+				baseRequest.timeoutId = setTimeout(
+					() => {
+						delete callbackMap[baseRequest.cid];
+						baseRequest.callback = null;
+						clearTimeout(baseRequest.timeoutId);
+						delete baseRequest.timeoutId;
+						reject(new TimeoutError(`Method \'${[service, baseRequest.method].filter(Boolean).join('.')}\' timed out.`));
+					},
+					baseRequest.ackTimeoutMs
+				);
+			}
+
+			abort = () => {
+				delete callbackMap[baseRequest.cid];
+
+				if (baseRequest.timeoutId) {
+					clearTimeout(baseRequest.timeoutId);
+					delete baseRequest.timeoutId;
 				}
 
-				abort = () => {
-					delete callbackMap[request.cid];
+				if (baseRequest.callback) {
+					baseRequest.callback = null;
+					reject(new AbortError(`Method \'${[service, baseRequest.method].filter(Boolean).join('.')}\' was aborted.`));
+				}
+			}
 
-					if (request.timeoutId) {
-						clearTimeout(request.timeoutId);
-						delete request.timeoutId;
-					}
+			baseRequest.callback = (err: Error, result: FunctionReturnType<TService[TServiceName][TServiceMethod] | TOutgoing[TMethod]>) => {
+				delete callbackMap[baseRequest.cid];
+				baseRequest.callback = null;
 
-					if (request.callback) {
-						request.callback = null;
-						reject(new AbortError(`Method \'${[service, request.method].filter(Boolean).join('.')}\' was aborted.`));
-					}
+				if (baseRequest.timeoutId) {
+					clearTimeout(baseRequest.timeoutId);
+					delete baseRequest.timeoutId;
 				}
 
-				request.callback = (err: Error, result: FunctionReturnType<TService[TServiceName][TServiceMethod] | TOutgoing[TMethod]>) => {
-					delete callbackMap[request.cid];
-					request.callback = null;
+				if (err) {
+					reject(err);
+					return;
+				}
 
-					if (request.timeoutId) {
-						clearTimeout(request.timeoutId);
-						delete request.timeoutId;
-					}
+				resolve(result);
+			};
 
-					if (err) {
-						reject(err);
-						return;
-					}
-
-					resolve(result);
-				};
-
-				request.sentCallback = () => {
-					delete request.sentCallback;
-					this._outboundSentMessageCount++;
-				};
-			})
-		};
+			baseRequest.sentCallback = () => {
+				delete baseRequest.sentCallback;
+				this._outboundSentMessageCount++;
+			};
+		});
 
 		this._outboundPreparedMessageCount++;
+
+		const request = Object.assign(baseRequest, { promise } );
 
 		this.onInvoke(request);
 

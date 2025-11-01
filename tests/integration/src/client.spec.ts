@@ -139,7 +139,7 @@ describe('Client Tests', function () {
 			assert.strictEqual<SocketStatus>(client.status, 'closed');
 		});
 	});
-/*
+
 	describe('Errors', function () {
 		it('Should be able to emit the error event locally on the socket', (context, done) => {
 			client = new ClientSocket(clientOptions);
@@ -166,11 +166,11 @@ describe('Client Tests', function () {
 			})();
 		});
 	});
-*/
+
 	describe('Authentication', function () {
 		it('Should not send back error if JWT is not provided in handshake', async function () {
 			client = new ClientSocket(clientOptions);
-			console.log('HERE')
+
 			const event = await client.listen('connect').once(100);
 
 			assert.strictEqual(event.authError, undefined);
