@@ -4,6 +4,6 @@ export enum AuthState {
 }
 
 export interface AuthStateChange {
-	oldAuthState : AuthState,
-	newAuthState : AuthState
+	newAuthState: AuthState,
+	oldAuthState: AuthState
 }
