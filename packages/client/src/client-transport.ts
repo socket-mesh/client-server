@@ -58,7 +58,7 @@ export class ClientTransport<
 
 		this._connectAttempts = 0;
 		this._pendingReconnectTimeout = null;
-		this.autoReconnect = options.autoReconnect ?? true;
+		this.autoReconnect = options.autoReconnect ?? false;
 		this.isPingTimeoutDisabled = (options.isPingTimeoutDisabled === true);
 	}
 
