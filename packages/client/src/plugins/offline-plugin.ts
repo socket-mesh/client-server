@@ -1,4 +1,4 @@
-import { AnyRequest, MethodMap, Plugin, PrivateMethodMap, PublicMethodMap, SendRequestPluginArgs, ServiceMap } from "@socket-mesh/core";
+import { AnyRequest, MethodMap, Plugin, PrivateMethodMap, PublicMethodMap, SendRequestPluginArgs, ServiceMap } from '@socket-mesh/core';
 
 const SYSTEM_METHODS = ['#handshake', '#removeAuthToken'];
 
@@ -9,52 +9,15 @@ export class OfflinePlugin<
 	TService extends ServiceMap,
 	TState extends object
 > implements Plugin<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> {
+	private _continue: ((requests: AnyRequest<TOutgoing, TPrivateOutgoing, TService>[], cb?: (error?: Error) => void) => void) | null;
 	private _isReady: boolean;
 	private _requests: AnyRequest<TOutgoing, TPrivateOutgoing, TService>[][];
-	private _continue: null | ((requests: AnyRequest<TOutgoing, TPrivateOutgoing, TService>[], cb?: (error?: Error) => void) => void);
+
+	type: 'offline';
 
 	constructor() {
 		this.type = 'offline';
 		this._isReady = false;
-		this._requests = [];
-		this._continue = null;
-	}
-
-	type: "offline";
-
-	public sendRequest({ requests, cont }: SendRequestPluginArgs<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>): void {
-		if (this._isReady) {
-			cont(requests);
-			return;
-		}
-
-		const systemRequests = requests.filter(item => SYSTEM_METHODS.indexOf(String(item.method)) > -1);
-		let otherRequests: AnyRequest<TOutgoing, TPrivateOutgoing, TService>[] = requests;
-
-		if (systemRequests.length) {
-			otherRequests = (systemRequests.length === requests.length) ? [] : requests.filter(item => SYSTEM_METHODS.indexOf(String(item.method)) < 0);
-		}
-
-		if (otherRequests.length) {
-			this._continue = cont;
-			this._requests.push(otherRequests);	
-		}
-
-		if (systemRequests.length) {
-			cont(systemRequests);
-		}
-	}
-
-	public onReady(): void {
-		this._isReady = true;
-		this.flush();
-	}
-
-	public onClose(): void {
-		this._isReady = false;
-	}
-
-	public onDisconnected(): void {
 		this._requests = [];
 		this._continue = null;
 	}
@@ -70,6 +33,43 @@ export class OfflinePlugin<
 			}
 
 			this._requests = [];
+		}
+	}
+
+	public onClose(): void {
+		this._isReady = false;
+	}
+
+	public onDisconnected(): void {
+		this._requests = [];
+		this._continue = null;
+	}
+
+	public onReady(): void {
+		this._isReady = true;
+		this.flush();
+	}
+
+	public sendRequest({ cont, requests }: SendRequestPluginArgs<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>): void {
+		if (this._isReady) {
+			cont(requests);
+			return;
+		}
+
+		const systemRequests = requests.filter(item => SYSTEM_METHODS.indexOf(String(item.method)) > -1);
+		let otherRequests: AnyRequest<TOutgoing, TPrivateOutgoing, TService>[] = requests;
+
+		if (systemRequests.length) {
+			otherRequests = (systemRequests.length === requests.length) ? [] : requests.filter(item => SYSTEM_METHODS.indexOf(String(item.method)) < 0);
+		}
+
+		if (otherRequests.length) {
+			this._continue = cont;
+			this._requests.push(otherRequests);
+		}
+
+		if (systemRequests.length) {
+			cont(systemRequests);
 		}
 	}
 }

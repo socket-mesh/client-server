@@ -1,14 +1,14 @@
-import { MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap } from "@socket-mesh/core";
-import { AnyResponse, AnyRequest, MethodRequest, Plugin, SendRequestPluginArgs, SendResponsePluginArgs } from "@socket-mesh/core";
+import { MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap } from '@socket-mesh/core';
+import { AnyRequest, AnyResponse, Plugin, SendRequestPluginArgs, SendResponsePluginArgs } from '@socket-mesh/core';
 
 export interface BatchingPluginOptions {
+	// This lets you specify the size of each batch in milliseconds.
+	batchInterval?: number,
+
 	// Whether or not to start batching messages immediately after the connection handshake completes. This is useful for handling
 	// connection recovery when the client tries to resubscribe to a large number of channels in a very short amount of time. Defaults to false.
 	// This lets you specify how long to enable batching (in milliseconds) following a successful socket handshake.
-	batchOnHandshakeDuration?: number | false,
-
-	// This lets you specify the size of each batch in milliseconds.
-	batchInterval?: number
+	batchOnHandshakeDuration?: false | number
 }
 
 export abstract class BatchingPlugin<
@@ -18,12 +18,14 @@ export abstract class BatchingPlugin<
 	TService extends ServiceMap,
 	TState extends object
 > implements Plugin<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> {
-	public batchOnHandshakeDuration: number | boolean;
-	public batchInterval: number;
-	
 	private _batchingIntervalId: NodeJS.Timeout | null;
 	private _handshakeTimeoutId: NodeJS.Timeout | null;
+
 	private _isBatching: boolean;
+	public batchInterval: number;
+	public batchOnHandshakeDuration: boolean | number;
+
+	type: string;
 
 	constructor(options?: BatchingPluginOptions) {
 		this._isBatching = false;
@@ -32,8 +34,6 @@ export abstract class BatchingPlugin<
 		this._batchingIntervalId = null;
 		this._handshakeTimeoutId = null;
 	}
-
-	type: string
 
 	public cancelBatching(): void {
 		if (this._batchingIntervalId !== null) {
@@ -50,6 +50,10 @@ export abstract class BatchingPlugin<
 		return this._isBatching || this._batchingIntervalId !== null;
 	}
 
+	public onDisconnected(): void {
+		this.cancelBatching();
+	}
+
 	public onReady(): void {
 		if (this._isBatching) {
 			this.start();
@@ -59,15 +63,6 @@ export abstract class BatchingPlugin<
 				this.stop();
 			}, this.batchOnHandshakeDuration);
 		}
-	}
-
-	public onDisconnected(): void {
-		this.cancelBatching();
-	}
-	
-	public startBatching(): void {
-		this._isBatching = true;
-		this.start();
 	}
 
 	private start(): void {
@@ -80,9 +75,9 @@ export abstract class BatchingPlugin<
 		}, this.batchInterval);
 	}
 
-	public stopBatching(): void {
-		this._isBatching = false;
-		this.stop();
+	public startBatching(): void {
+		this._isBatching = true;
+		this.start();
 	}
 
 	private stop(): void {
@@ -99,6 +94,11 @@ export abstract class BatchingPlugin<
 
 		this.flush();
 	}
+
+	public stopBatching(): void {
+		this._isBatching = false;
+		this.stop();
+	}
 }
 
 export class RequestBatchingPlugin<
@@ -108,8 +108,10 @@ export class RequestBatchingPlugin<
 	TService extends ServiceMap,
 	TState extends object
 > extends BatchingPlugin<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> {
+	private _continue: ((requests: AnyRequest<TOutgoing, TPrivateOutgoing, TService>[], cb?: (error?: Error) => void) => void) | null;
 	private _requests: AnyRequest<TOutgoing, TPrivateOutgoing, TService>[];
-	private _continue: null | ((requests: AnyRequest<TOutgoing, TPrivateOutgoing, TService>[], cb?: (error?: Error) => void) => void);
+
+	type: 'requestBatching';
 
 	constructor(options?: BatchingPluginOptions) {
 		super(options);
@@ -137,7 +139,7 @@ export class RequestBatchingPlugin<
 		}
 	}
 
-	public sendRequest({ requests, cont }: SendRequestPluginArgs<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>): void {
+	public sendRequest({ cont, requests }: SendRequestPluginArgs<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>): void {
 		if (!this.isBatching) {
 			cont(requests);
 			return;
@@ -146,8 +148,6 @@ export class RequestBatchingPlugin<
 		this._continue = cont;
 		this._requests.push(...requests);
 	}
-
-	type: 'requestBatching'
 }
 
 export class ResponseBatchingPlugin<
@@ -157,8 +157,10 @@ export class ResponseBatchingPlugin<
 	TService extends ServiceMap,
 	TState extends object
 > extends BatchingPlugin<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> {
+	private _continue: ((requests: AnyResponse<TOutgoing, TPrivateOutgoing, TService>[], cb?: (error?: Error) => void) => void) | null;
 	private _responses: AnyResponse<TOutgoing, TPrivateOutgoing, TService>[];
-	private _continue: null | ((requests: AnyResponse<TOutgoing, TPrivateOutgoing, TService>[], cb?: (error?: Error) => void) => void);
+
+	type: 'responseBatching';
 
 	constructor(options?: BatchingPluginOptions) {
 		super(options);
@@ -179,7 +181,7 @@ export class ResponseBatchingPlugin<
 		}
 	}
 
-	public sendResponse({ responses, cont }: SendResponsePluginArgs<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>): void {
+	public sendResponse({ cont, responses }: SendResponsePluginArgs<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>): void {
 		if (!this.isBatching) {
 			cont(responses);
 			return;
@@ -188,6 +190,4 @@ export class ResponseBatchingPlugin<
 		this._continue = cont;
 		this._responses.push(...responses);
 	}
-
-	type: 'responseBatching'
 }

@@ -1,6 +1,7 @@
-import { ChannelDetails, ChannelMap, ChannelOptions, Channels, ChannelsOptions } from "@socket-mesh/channels";
-import { ClientTransport } from "./client-transport.js";
-import { MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap } from "@socket-mesh/core";
+import { ChannelDetails, ChannelMap, ChannelOptions, Channels, ChannelsOptions } from '@socket-mesh/channels';
+import { MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap } from '@socket-mesh/core';
+
+import { ClientTransport } from './client-transport.js';
 
 export interface ClientChannelsOptions extends ChannelsOptions {
 	autoSubscribeOnConnect?: boolean
@@ -14,10 +15,10 @@ export class ClientChannels<
 	TPrivateOutgoing extends PrivateMethodMap,
 	TState extends object
 > extends Channels<TChannel> {
-	public autoSubscribeOnConnect: boolean;
+	protected _preparingPendingSubscriptions: boolean;
 
 	protected readonly _transport: ClientTransport<TIncoming, TService, TOutgoing, TPrivateOutgoing, TState>;
-	protected _preparingPendingSubscriptions: boolean;
+	public autoSubscribeOnConnect: boolean;
 
 	constructor(transport: ClientTransport<TIncoming, TService, TOutgoing, TPrivateOutgoing, TState>, options?: ClientChannelsOptions) {
 		if (!options) {
@@ -31,79 +32,30 @@ export class ClientChannels<
 		this._preparingPendingSubscriptions = false;
 
 		this._transport.plugins.push({
-			type: 'channels',
 			onAuthenticated: () => {
 				if (!this._preparingPendingSubscriptions) {
 					this.processPendingSubscriptions();
-				}	
-			},
-			onReady: () => {
-				if (this.autoSubscribeOnConnect) {
-					this.processPendingSubscriptions();
-				}		
+				}
 			},
 			onClose: () => {
 				this.suspendSubscriptions();
 			},
+			onReady: () => {
+				if (this.autoSubscribeOnConnect) {
+					this.processPendingSubscriptions();
+				}
+			},
+			type: 'channels'
 		});
 	}
 
-	private suspendSubscriptions(): void {
-		for (const channel in this._channelMap) {
-			this.triggerChannelUnsubscribe(this._channelMap[channel], true);
-		}
-	}
+	invokePublish<U extends keyof TChannel & string>(channelName: keyof TChannel & string, data: TChannel[U]): Promise<void> {
+		const pubData = {
+			channel: this.decorateChannelName(channelName),
+			data
+		};
 
-	protected trySubscribe(channel: ChannelDetails): void {
-		const meetsAuthRequirements = !channel.options.waitForAuth || !!this._transport.signedAuthToken;
-
-		// We can only ever have one pending subscribe action at any given time on a channel
-		if (
-			this._transport.status === 'ready' &&
-			!this._preparingPendingSubscriptions &&
-			!channel.subscribePromise &&
-			meetsAuthRequirements
-		) {
-			const subscriptionOptions: ChannelOptions = {};
-
-			if (channel.options.waitForAuth) {
-				subscriptionOptions.waitForAuth = true;
-			}
-			if (channel.options.data) {
-				subscriptionOptions.data = channel.options.data;
-			}
-
-			[channel.subscribePromise, channel.subscribeAbort] = this._transport.invoke(
-				{ method: '#subscribe', ackTimeoutMs: false },
-				{
-					channel: this.decorateChannelName(channel.name),
-					...subscriptionOptions
-				}
-			) as [Promise<void>, () => void];
-
-			channel.subscribePromise.then(() => {
-				delete channel.subscribePromise;
-				delete channel.subscribeAbort;
-				this.triggerChannelSubscribe(channel, subscriptionOptions);
-			}).catch(err => {
-				if (err.name === 'BadConnectionError') {
-					// In case of a failed connection, keep the subscription
-					// as pending; it will try again on reconnect.
-					return;
-				}
-
-				if (err.name !== 'AbortError') {
-					this.triggerChannelSubscribeFail(err, channel, subscriptionOptions);
-				}
-				delete channel.subscribePromise;
-				delete channel.subscribeAbort;
-			});
-
-			this.emit('subscribeRequest', {
-				channel: channel.name,
-				options: subscriptionOptions
-			});
-		}
+		return this._transport.invoke('#publish', pubData)[0] as Promise<void>;
 	}
 
 	private processPendingSubscriptions(): void {
@@ -111,7 +63,7 @@ export class ClientChannels<
 		const pendingChannels: ChannelDetails[] = [];
 
 		Object.keys(this._channelMap).forEach((channelName) => {
-			const channel = this._channelMap[channelName];
+			const channel = this._channelMap[channelName]!;
 			if (channel.state === 'pending') {
 				pendingChannels.push(channel);
 			}
@@ -134,11 +86,89 @@ export class ClientChannels<
 		});
 	}
 
-	unsubscribe(channelName: keyof TChannel & string): void {
-		const channel = this._channelMap[channelName];
+	private suspendSubscriptions(): void {
+		for (const channel in this._channelMap) {
+			this.triggerChannelUnsubscribe(this._channelMap[channel]!, true);
+		}
+	}
 
-		if (channel) {
-			this.tryUnsubscribe(channel);
+	transmitPublish<U extends keyof TChannel & string>(channelName: U, data: TChannel[U]): Promise<void> {
+		const pubData = {
+			channel: this.decorateChannelName(channelName),
+			data
+		};
+		return this._transport.transmit('#publish', pubData);
+	}
+
+	private triggerChannelSubscribeFail(err: Error, channel: ChannelDetails, options: ChannelOptions): void {
+		const hasAuthRequirements = !channel.options.waitForAuth || !!this._transport.signedAuthToken;
+		const hasChannel = !!this._channelMap[channel.name];
+
+		if (hasChannel && hasAuthRequirements) {
+			delete this._channelMap[channel.name];
+
+			this._channelEventDemux.write(`${channel.name}/subscribeFail`, {
+				channel: channel.name,
+				error: err,
+				options
+			});
+			this.emit('subscribeFail', {
+				channel: channel.name,
+				error: err,
+				options
+			});
+		}
+	}
+
+	protected trySubscribe(channel: ChannelDetails): void {
+		const hasAuthRequirements = !channel.options.waitForAuth || !!this._transport.signedAuthToken;
+
+		// We can only ever have one pending subscribe action at any given time on a channel
+		if (
+			this._transport.status === 'ready'
+			&& !this._preparingPendingSubscriptions
+			&& !channel.subscribePromise
+			&& hasAuthRequirements
+		) {
+			const subscriptionOptions: ChannelOptions = {};
+
+			if (channel.options.waitForAuth) {
+				subscriptionOptions.waitForAuth = true;
+			}
+			if (channel.options.data) {
+				subscriptionOptions.data = channel.options.data;
+			}
+
+			[channel.subscribePromise, channel.subscribeAbort] = this._transport.invoke(
+				{ ackTimeoutMs: false, method: '#subscribe' },
+				{
+					channel: this.decorateChannelName(channel.name),
+					...subscriptionOptions
+				}
+			) as [Promise<void>, () => void];
+
+			channel.subscribePromise.then(() => {
+				delete channel.subscribePromise;
+				delete channel.subscribeAbort;
+				this.triggerChannelSubscribe(channel, subscriptionOptions);
+			}).catch((err) => {
+				if (err.name === 'BadConnectionError') {
+					// In case of a failed connection, keep the subscription
+					// as pending; it will try again on reconnect.
+					return;
+				}
+
+				if (err.name !== 'AbortError') {
+					this.triggerChannelSubscribeFail(err, channel, subscriptionOptions);
+				}
+				delete channel.subscribePromise;
+				delete channel.subscribeAbort;
+			});
+
+			this.emit('subscribeRequest', {
+				channel: channel.name,
+				options: subscriptionOptions
+			});
 		}
 	}
 
@@ -157,44 +187,15 @@ export class ClientChannels<
 			// the operation on the server side.
 			this._transport
 				.transmit('#unsubscribe', decoratedChannelName)
-				.catch(err => {});
+				.catch((err) => {});
 		}
 	}
 
-	private triggerChannelSubscribeFail(err: Error, channel: ChannelDetails, options: ChannelOptions): void {
-		const meetsAuthRequirements = !channel.options.waitForAuth || !!this._transport.signedAuthToken;
-		const hasChannel = !!this._channelMap[channel.name];
+	unsubscribe(channelName: keyof TChannel & string): void {
+		const channel = this._channelMap[channelName];
 
-		if (hasChannel && meetsAuthRequirements) {
-			delete this._channelMap[channel.name];
-
-			this._channelEventDemux.write(`${channel.name}/subscribeFail`, {
-				channel: channel.name,
-				error: err,
-				options
-			});
-			this.emit('subscribeFail', {
-				error: err,
-				channel: channel.name,
-				options
-			});
+		if (channel) {
+			this.tryUnsubscribe(channel);
 		}
-	}
-
-	transmitPublish<U extends keyof TChannel & string>(channelName: U, data: TChannel[U]): Promise<void> {
-		const pubData = {
-			channel: this.decorateChannelName(channelName),
-			data
-		};
-		return this._transport.transmit('#publish', pubData);
-	}
-
-	invokePublish<U extends keyof TChannel & string>(channelName: keyof TChannel & string, data: TChannel[U]): Promise<void> {
-		const pubData = {
-			channel: this.decorateChannelName(channelName),
-			data
-		};
-
-		return this._transport.invoke('#publish', pubData)[0] as Promise<void>;
 	}
 }
