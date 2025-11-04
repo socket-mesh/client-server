@@ -1,4 +1,4 @@
 export interface CodecEngine {
-	decode: (input: string) => any;
-	encode: (object: any) => string;
+	decode: (input: string) => any,
+	encode: (object: any) => string
 }

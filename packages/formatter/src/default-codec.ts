@@ -1,8 +1,8 @@
-import type { CodecEngine } from "./codec-engine.js";
+import type { CodecEngine } from './codec-engine.js';
 
-const base64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+const base64Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
-const validJSONStartRegex = /^[ \n\r\t]*[{\[]/;
+const validJSONStartRegex = /^[ \n\r\t]*[{[]/;
 
 function arrayBufferToBase64(arraybuffer: ArrayBuffer): string {
 	const bytes = new Uint8Array(arraybuffer);
@@ -32,7 +32,7 @@ function binaryToBase64Replacer(key: string, value: any): any {
 			data: arrayBufferToBase64(value)
 		};
 	} else if (typeof Buffer !== 'undefined') {
-		if (value instanceof Buffer){
+		if (value instanceof Buffer) {
 			return {
 				base64: true,
 				data: value.toString('base64')
@@ -42,12 +42,8 @@ function binaryToBase64Replacer(key: string, value: any): any {
 		// the replacer function - Because of this, we need to rehydrate Buffers
 		// before we can convert them to base64 strings.
 		if (value && value.type === 'Buffer' && Array.isArray(value.data)) {
-			let rehydratedBuffer: Buffer;
-			if (Buffer.from) {
-				rehydratedBuffer = Buffer.from(value.data);
-			} else {
-				rehydratedBuffer = new Buffer(value.data);
-			}
+			const rehydratedBuffer = Buffer.from(value.data);
+
 			return {
 				base64: true,
 				data: rehydratedBuffer.toString('base64')
@@ -60,7 +56,7 @@ function binaryToBase64Replacer(key: string, value: any): any {
 class DefaultCodec implements CodecEngine {
 	// Decode the data which was transmitted over the wire to a JavaScript Object in a format which SC understands.
 	// See encode function below for more details.
-	decode(encodedMessage: string | null): any {
+	decode(encodedMessage: null | string): any {
 		if (encodedMessage == null) {
 			return null;
 		}
@@ -77,7 +73,9 @@ class DefaultCodec implements CodecEngine {
 
 		try {
 			return JSON.parse(message);
-		} catch (err) {}
+		} catch (err) {
+			// On purpose
+		}
 
 		return message;
 	}
