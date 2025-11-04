@@ -1,8 +1,9 @@
-import { ConsumableStream } from "@socket-mesh/consumable-stream";
-import { ConsumerStats } from "./consumer-stats.js";
-import { ConsumerNode } from "./consumer-node.js";
-import { Consumer } from "./consumer.js";
-import { WritableStreamConsumer } from "./writable-stream-consumer.js";
+import { ConsumableStream } from '@socket-mesh/consumable-stream';
+
+import { ConsumerNode } from './consumer-node.js';
+import { ConsumerStats } from './consumer-stats.js';
+import { Consumer } from './consumer.js';
+import { WritableStreamConsumer } from './writable-stream-consumer.js';
 
 export interface WritableConsumableStreamOptions {
 	generateConsumerId?: () => number,
@@ -10,12 +11,12 @@ export interface WritableConsumableStreamOptions {
 }
 
 export class WritableConsumableStream<T, TReturn = T> extends ConsumableStream<T, TReturn | undefined> {
-	nextConsumerId: number;
-
 	private _consumers: Map<number, Consumer<T, TReturn | undefined>>;
-	public tailNode: ConsumerNode<T, TReturn | undefined>;
+
 	public generateConsumerId: () => number;
-	public removeConsumerCallback?: (id: number) => void
+	nextConsumerId: number;
+	public removeConsumerCallback?: (id: number) => void;
+	public tailNode: ConsumerNode<T, TReturn | undefined>;
 
 	constructor(options?: WritableConsumableStreamOptions) {
 		super();
@@ -30,67 +31,33 @@ export class WritableConsumableStream<T, TReturn = T> extends ConsumableStream<T
 
 		// Tail node of a singly linked list.
 		this.tailNode = {
-			next: null,
 			data: {
-				value: undefined,
-				done: false
-			}
+				done: false,
+				value: undefined
+			},
+			next: null
 		} as ConsumerNode<T, TReturn | undefined>;
 	}
 
-	private _write(data: IteratorResult<T, TReturn | undefined>, consumerId?: number): void {
-		let dataNode: ConsumerNode<T, TReturn | undefined> = {
-			data,
-			next: null
-		};
-		if (consumerId) {
-			dataNode.consumerId = consumerId;
-		}
-		this.tailNode.next = dataNode;
-		this.tailNode = dataNode;
-
-		for (let consumer of this._consumers.values()) {
-			consumer.write(dataNode.data);
-		}
-	}
-
-	write(value: T): void {
-		this._write({ value, done: false });
-	}
-
 	close(value?: TReturn): void {
-		this._write({ value, done: true });
-	}
-
-	writeToConsumer(consumerId: number, value: T): void {
-		this._write({ value, done: false }, consumerId);
+		this.writeInternal({ done: true, value });
 	}
 
 	closeConsumer(consumerId: number, value?: TReturn): void {
-		this._write({ value, done: true }, consumerId);
+		this.writeInternal({ done: true, value }, consumerId);
 	}
 
-	kill(value?: TReturn): void {
-		for (let consumerId of this._consumers.keys()) {
-			this.killConsumer(consumerId, value);
-		}
-	}
-
-	killConsumer(consumerId: number, value?: TReturn): void {
-		let consumer = this._consumers.get(consumerId);
-		if (!consumer) {
-			return;
-		}
-		consumer.kill(value);
+	createConsumer(timeout?: number): WritableStreamConsumer<T, TReturn | undefined> {
+		return new WritableStreamConsumer(this, this.generateConsumerId(), this.tailNode, timeout);
 	}
 
 	getBackpressure(consumerId?: number): number {
 		if (consumerId === undefined) {
 			let maxBackpressure = 0;
 
-			for (let consumer of this._consumers.values()) {
-				let backpressure = consumer.getBackpressure();
-	
+			for (const consumer of this._consumers.values()) {
+				const backpressure = consumer.getBackpressure();
+
 				if (backpressure > maxBackpressure) {
 					maxBackpressure = backpressure;
 				}
@@ -99,7 +66,7 @@ export class WritableConsumableStream<T, TReturn = T> extends ConsumableStream<T
 			return maxBackpressure;
 		}
 
-		let consumer = this._consumers.get(consumerId);
+		const consumer = this._consumers.get(consumerId);
 
 		if (consumer) {
 			return consumer.getBackpressure();
@@ -108,37 +75,24 @@ export class WritableConsumableStream<T, TReturn = T> extends ConsumableStream<T
 		return 0;
 	}
 
-	hasConsumer(consumerId: number): boolean {
-		return this._consumers.has(consumerId);
+	getConsumerCount(): number {
+		return this._consumers.size;
 	}
 
-	setConsumer(consumerId: number, consumer: Consumer<T, TReturn | undefined>): void {
-		this._consumers.set(consumerId, consumer);
-		if (!consumer.currentNode) {
-			consumer.currentNode = this.tailNode;
-		}
-	}
-
-	removeConsumer(consumerId: number): boolean {
-    let result = this._consumers.delete(consumerId);
-
-    if (this.removeConsumerCallback) {
-			this.removeConsumerCallback(consumerId);
-		}
-
-    return result;		
+	getConsumerList(): Consumer<T, TReturn | undefined>[] {
+		return [...this._consumers.values()];
 	}
 
 	getConsumerStats(): ConsumerStats[];
 	getConsumerStats(consumerId: number): ConsumerStats;
 	getConsumerStats(consumerId?: number): ConsumerStats | ConsumerStats[] | undefined {
 		if (consumerId === undefined) {
-			let consumerStats: ConsumerStats[] = [];
+			const consumerStats: ConsumerStats[] = [];
 
-			for (let consumer of this._consumers.values()) {
+			for (const consumer of this._consumers.values()) {
 				consumerStats.push(consumer.getStats());
 			}
-	
+
 			return consumerStats;
 		}
 
@@ -148,18 +102,65 @@ export class WritableConsumableStream<T, TReturn = T> extends ConsumableStream<T
 			return consumer.getStats();
 		}
 
-		return undefined;	
+		return undefined;
 	}
 
-	createConsumer(timeout?: number): WritableStreamConsumer<T, TReturn | undefined> {
-		return new WritableStreamConsumer(this, this.generateConsumerId(), this.tailNode, timeout);
+	hasConsumer(consumerId: number): boolean {
+		return this._consumers.has(consumerId);
 	}
 
-	getConsumerList(): Consumer<T, TReturn | undefined>[] {
-		return [...this._consumers.values()];
+	kill(value?: TReturn): void {
+		for (const consumerId of this._consumers.keys()) {
+			this.killConsumer(consumerId, value);
+		}
 	}
 
-	getConsumerCount(): number {
-		return this._consumers.size;
+	killConsumer(consumerId: number, value?: TReturn): void {
+		const consumer = this._consumers.get(consumerId);
+		if (!consumer) {
+			return;
+		}
+		consumer.kill(value);
+	}
+
+	removeConsumer(consumerId: number): boolean {
+		const result = this._consumers.delete(consumerId);
+
+		if (this.removeConsumerCallback) {
+			this.removeConsumerCallback(consumerId);
+		}
+
+		return result;
+	}
+
+	setConsumer(consumerId: number, consumer: Consumer<T, TReturn | undefined>): void {
+		this._consumers.set(consumerId, consumer);
+		if (!consumer.currentNode) {
+			consumer.currentNode = this.tailNode;
+		}
+	}
+
+	write(value: T): void {
+		this.writeInternal({ done: false, value });
+	}
+
+	private writeInternal(data: IteratorResult<T, TReturn | undefined>, consumerId?: number): void {
+		const dataNode: ConsumerNode<T, TReturn | undefined> = {
+			data,
+			next: null
+		};
+		if (consumerId) {
+			dataNode.consumerId = consumerId;
+		}
+		this.tailNode.next = dataNode;
+		this.tailNode = dataNode;
+
+		for (const consumer of this._consumers.values()) {
+			consumer.write(dataNode.data);
+		}
+	}
+
+	writeToConsumer(consumerId: number, value: T): void {
+		this.writeInternal({ done: false, value }, consumerId);
 	}
 }
