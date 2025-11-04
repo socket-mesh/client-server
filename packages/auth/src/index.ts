@@ -1,23 +1,23 @@
-export { AuthState, AuthStateChange } from "./auth-state.js";
+export { AuthState, AuthStateChange } from './auth-state.js';
 
 export interface AuthToken {
+	[key: string]: any,
+	aud?: string | string[],
 	exp?: number,
-	iss?: string,
-	sub?: string,
-	aud?: string | string[];
-	nbf?: number,
 	iat?: number,
+	iss?: string,
 	jti?: string,
-	[key: string]: any
+	nbf?: number,
+	sub?: string
 }
 
 export type SignedAuthToken = string;
 
-export function extractAuthTokenData(signedAuthToken: SignedAuthToken): AuthToken | string | null {
+export function extractAuthTokenData(signedAuthToken: SignedAuthToken): AuthToken | null | string {
 	if (typeof signedAuthToken !== 'string') return null;
 
-	let tokenParts = signedAuthToken.split('.');
-	let encodedTokenData = tokenParts[1];
+	const tokenParts = signedAuthToken.split('.');
+	const encodedTokenData = tokenParts[1];
 
 	if (encodedTokenData != null) {
 		let tokenData = encodedTokenData;
