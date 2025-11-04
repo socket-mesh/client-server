@@ -1,23 +1,24 @@
 import assert from 'node:assert';
-import { beforeEach, afterEach, describe, it } from "node:test";
-import { ConsumableStream } from "../src/index.js";
+import { afterEach, beforeEach, describe, it } from 'node:test';
 
-let pendingTimeoutSet = new Set<NodeJS.Timeout>();
+import { ConsumableStream } from '../src/index.js';
+
+const pendingTimeoutSet = new Set<NodeJS.Timeout>();
+
+function cancelAllPendingWaits() {
+	for (const timeout of pendingTimeoutSet) {
+		clearTimeout(timeout);
+	}
+}
 
 function wait(duration: number): Promise<void> {
 	return new Promise((resolve) => {
-		let timeout = setTimeout(() => {
+		const timeout = setTimeout(() => {
 			pendingTimeoutSet.delete(timeout);
 			resolve();
 		}, duration);
 		pendingTimeoutSet.add(timeout);
 	});
-}
-
-function cancelAllPendingWaits() {
-	for (let timeout of pendingTimeoutSet) {
-		clearTimeout(timeout);
-	}
 }
 
 class ConsumableStreamSubclass<T> extends ConsumableStream<T> {
@@ -28,9 +29,9 @@ class ConsumableStreamSubclass<T> extends ConsumableStream<T> {
 		this._dataPromiseList = dataPromiseList;
 	}
 
-	async *createConsumer() {
+	async* createConsumer() {
 		while (this._dataPromiseList.length) {
-			let result = await this._dataPromiseList[this._dataPromiseList.length - 1];
+			const result = await this._dataPromiseList[this._dataPromiseList.length - 1];
 			yield result;
 		}
 	}
@@ -40,13 +41,13 @@ describe('ConsumableStream', () => {
 	let stream: ConsumableStreamSubclass<number>;
 
 	beforeEach(async () => {
-		let streamData = [...Array(10).keys()]
-		.map(async (value, index) => {
-			await wait(20 * (index + 1));
-			streamData.pop();
-			return value;
-		})
-		.reverse();
+		const streamData = [...Array(10).keys()]
+			.map(async (value, index) => {
+				await wait(20 * (index + 1));
+				streamData.pop();
+				return value;
+			})
+			.reverse();
 
 		stream = new ConsumableStreamSubclass(streamData);
 	});
@@ -56,8 +57,8 @@ describe('ConsumableStream', () => {
 	});
 
 	it('should receive packets asynchronously', async () => {
-		let receivedPackets: number[] = [];
-		for await (let packet of stream) {
+		const receivedPackets: number[] = [];
+		for await (const packet of stream) {
 			receivedPackets.push(packet);
 		}
 		assert.strictEqual(receivedPackets.length, 10);
@@ -67,17 +68,17 @@ describe('ConsumableStream', () => {
 	});
 
 	it('should receive packets asynchronously from multiple concurrent for-await-of loops', async () => {
-		let receivedPacketsA: number[] = [];
-		let receivedPacketsB: number[] = [];
+		const receivedPacketsA: number[] = [];
+		const receivedPacketsB: number[] = [];
 
 		await Promise.all([
 			(async () => {
-				for await (let packet of stream) {
+				for await (const packet of stream) {
 					receivedPacketsA.push(packet);
 				}
 			})(),
 			(async () => {
-				for await (let packet of stream) {
+				for await (const packet of stream) {
 					receivedPacketsB.push(packet);
 				}
 			})()
@@ -91,12 +92,12 @@ describe('ConsumableStream', () => {
 
 	it('should receive next packet asynchronously when once() method is used', async () => {
 		let nextPacket = await stream.once();
-		assert.strictEqual(nextPacket, 0)
+		assert.strictEqual(nextPacket, 0);
 
 		nextPacket = await stream.once();
-		assert.strictEqual(nextPacket, 1)
+		assert.strictEqual(nextPacket, 1);
 
 		nextPacket = await stream.once();
-		assert.strictEqual(nextPacket, 2)
+		assert.strictEqual(nextPacket, 2);
 	});
 });
