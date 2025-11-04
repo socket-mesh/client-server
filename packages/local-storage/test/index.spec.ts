@@ -1,8 +1,9 @@
 import assert from 'node:assert';
-import { beforeEach, describe, it } from "node:test";
-import localStorage from "../src/index.js";
+import { beforeEach, describe, it } from 'node:test';
 
-describe('StreamDemux', () => {
+import localStorage from '../src/index.js';
+
+describe('LocalStorage', () => {
 	beforeEach(async () => {
 		localStorage.clear();
 	});
@@ -13,7 +14,7 @@ describe('StreamDemux', () => {
 
 	it('should not make assuptions about key positioning', () => {
 		localStorage.setItem('a', '1');
-		assert.strictEqual(localStorage.key(0), 'a');	
+		assert.strictEqual(localStorage.key(0), 'a');
 	});
 
 	it('should report the correct length', () => {
@@ -33,7 +34,7 @@ describe('StreamDemux', () => {
 		localStorage.setItem('a', '1');
 		localStorage.setItem('b', '2');
 		localStorage.setItem('c', undefined as any);
-		assert.strictEqual(localStorage.getItem('c'), "undefined");
+		assert.strictEqual(localStorage.getItem('c'), 'undefined');
 		assert.strictEqual(localStorage.length, 3);
 	});
 
@@ -57,7 +58,7 @@ describe('StreamDemux', () => {
 
 	it('should handle setting prototype field names properly', () => {
 		assert.strictEqual(localStorage.getItem('length'), null);
-		localStorage.setItem('length', '12')
+		localStorage.setItem('length', '12');
 		assert.strictEqual(localStorage.length, 1);
 		assert.strictEqual(localStorage.getItem('length'), '12');
 		localStorage.removeItem('length');

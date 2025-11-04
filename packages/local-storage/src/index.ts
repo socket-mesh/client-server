@@ -1,31 +1,27 @@
 export class LocalStorage implements Storage {
-	private readonly _data: {[ key: string]: string};
+	[key: string | symbol]: any
+
+	private readonly _data: { [ key: string]: string };
 
 	constructor() {
 		this._data = {};
 	}
 
+	clear() {
+		for (const key of Object.keys(this._data)) {
+			delete this._data[key];
+		}
+	}
+
 	getItem(key: string) {
-		if (this._data.hasOwnProperty(key)) {
+		if (Object.prototype.hasOwnProperty.call(this._data, key)) {
 			return String(this._data[key]);
 		}
 		return null;
 	}
 
-	setItem(key: string, val: any) {
-		this._data[key] = String(val);
-	}
-
-	removeItem(key: string) {
-		delete this._data[key];
-	}
-
-	clear() {
-		const self = this;
-
-		Object.keys(self._data).forEach(function (key) {
-			delete self._data[key];
-		});
+	hasItem(key: string): boolean {
+		return Object.prototype.hasOwnProperty.call(this._data, key);
 	}
 
 	key(i: number): string {
@@ -33,15 +29,17 @@ export class LocalStorage implements Storage {
 		return Object.keys(this._data)[i];
 	}
 
-	hasItem(key: string): boolean {
-		return this._data.hasOwnProperty(key);
-	}
-
 	get length(): number {
 		return Object.keys(this._data).length;
 	}
 
-	[key: string | symbol]: any
+	removeItem(key: string) {
+		delete this._data[key];
+	}
+
+	setItem(key: string, val: any) {
+		this._data[key] = String(val);
+	}
 }
 
 export class LocalStorageProxyHandler implements ProxyHandler<LocalStorage> {
