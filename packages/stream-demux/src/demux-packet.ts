@@ -1,11 +1,11 @@
-export type DemuxPacket<T> = DemuxStreamPacket<T> | DemuxConsumerPacket<T>;
-
-export interface DemuxStreamPacket<T> {
-	stream: string,
-	data: IteratorResult<T, T>
-}
-
 export interface DemuxConsumerPacket<T> {
 	consumerId: number,
 	data: IteratorResult<T, T>
+}
+
+export type DemuxPacket<T> = DemuxConsumerPacket<T> | DemuxStreamPacket<T>;
+
+export interface DemuxStreamPacket<T> {
+	data: IteratorResult<T, T>,
+	stream: string
 }
