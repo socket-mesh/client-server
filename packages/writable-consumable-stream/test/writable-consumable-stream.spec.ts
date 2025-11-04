@@ -613,7 +613,7 @@ describe('WritableConsumableStream', () => {
 				}
 			}
 			assert.strictEqual(receivedPackets.length, 1);
-			assert.strictEqual(receivedPackets[0].value, '12345');
+			assert.strictEqual(receivedPackets[0]!.value, '12345');
 
 			assert.strictEqual(stream.getConsumerCount(), 0); // Check internal cleanup.
 		});
@@ -713,8 +713,8 @@ describe('WritableConsumableStream', () => {
 
 					consumerStats = stream.getConsumerStats();
 					assert.strictEqual(consumerStats.length, 1);
-					assert.strictEqual(consumerStats[0].backpressure, 0);
-					assert.strictEqual(consumerStats[0].id, 1);
+					assert.strictEqual(consumerStats[0]!.backpressure, 0);
+					assert.strictEqual(consumerStats[0]!.id, 1);
 
 					assert.strictEqual(stream.hasConsumer(1), true);
 					assert.strictEqual(stream.hasConsumer(2), false);
@@ -723,19 +723,19 @@ describe('WritableConsumableStream', () => {
 
 					consumerStats = stream.getConsumerStats();
 					assert.strictEqual(consumerStats.length, 1);
-					assert.strictEqual(consumerStats[0].backpressure, 1);
+					assert.strictEqual(consumerStats[0]!.backpressure, 1);
 
 					await wait(10);
 
 					consumerStats = stream.getConsumerStats();
 					assert.strictEqual(consumerStats.length, 1);
-					assert.strictEqual(consumerStats[0].backpressure, 0);
+					assert.strictEqual(consumerStats[0]!.backpressure, 0);
 
 					stream.write('a1');
 
 					consumerStats = stream.getConsumerStats();
 					assert.strictEqual(consumerStats.length, 1);
-					assert.strictEqual(consumerStats[0].backpressure, 1);
+					assert.strictEqual(consumerStats[0]!.backpressure, 1);
 
 					await wait(10);
 					stream.write('a2');
@@ -746,13 +746,13 @@ describe('WritableConsumableStream', () => {
 
 					consumerStats = stream.getConsumerStats();
 					assert.strictEqual(consumerStats.length, 1);
-					assert.strictEqual(consumerStats[0].backpressure, 4);
+					assert.strictEqual(consumerStats[0]!.backpressure, 4);
 
 					stream.close();
 
 					consumerStats = stream.getConsumerStats();
 					assert.strictEqual(consumerStats.length, 1);
-					assert.strictEqual(consumerStats[0].backpressure, 5);
+					assert.strictEqual(consumerStats[0]!.backpressure, 5);
 				})(),
 				(async () => {
 					let expectedPressure = 6;
@@ -761,7 +761,7 @@ describe('WritableConsumableStream', () => {
 						await wait(70);
 						const consumerStats = stream.getConsumerStats();
 						assert.strictEqual(consumerStats.length, 1);
-						assert.strictEqual(consumerStats[0].backpressure, expectedPressure);
+						assert.strictEqual(consumerStats[0]!.backpressure, expectedPressure);
 					}
 					const consumerStats = stream.getConsumerStats();
 					assert.strictEqual(consumerStats.length, 0);
@@ -779,7 +779,7 @@ describe('WritableConsumableStream', () => {
 						stream.write('a' + i);
 						const consumerStats = stream.getConsumerStats();
 						assert.strictEqual(consumerStats.length, 1);
-						assert.strictEqual(consumerStats[0].backpressure, i + 1);
+						assert.strictEqual(consumerStats[0]!.backpressure, i + 1);
 					}
 					stream.close();
 				})(),
@@ -800,7 +800,7 @@ describe('WritableConsumableStream', () => {
 							break;
 						}
 						assert.strictEqual(consumerStats.length, 1);
-						assert.strictEqual(consumerStats[0].backpressure, expectedPressure);
+						assert.strictEqual(consumerStats[0]!.backpressure, expectedPressure);
 					}
 				})()
 			]);
@@ -814,19 +814,19 @@ describe('WritableConsumableStream', () => {
 
 			let consumerStats = stream.getConsumerStats();
 			assert.strictEqual(consumerStats.length, 1);
-			assert.strictEqual(consumerStats[0].backpressure, 0);
+			assert.strictEqual(consumerStats[0]!.backpressure, 0);
 
 			await wait(10);
 
 			consumerStats = stream.getConsumerStats();
 			assert.strictEqual(consumerStats.length, 1);
-			assert.strictEqual(consumerStats[0].backpressure, 0);
+			assert.strictEqual(consumerStats[0]!.backpressure, 0);
 
 			stream.write('a0');
 
 			consumerStats = stream.getConsumerStats();
 			assert.strictEqual(consumerStats.length, 1);
-			assert.strictEqual(consumerStats[0].backpressure, 1);
+			assert.strictEqual(consumerStats[0]!.backpressure, 1);
 
 			stream.write('a1');
 			await wait(10);
@@ -842,7 +842,7 @@ describe('WritableConsumableStream', () => {
 
 			consumerStats = stream.getConsumerStats();
 			assert.strictEqual(consumerStats.length, 2);
-			assert.strictEqual(consumerStats[0].backpressure, 5);
+			assert.strictEqual(consumerStats[0]!.backpressure, 5);
 
 			assert.strictEqual(stream.getBackpressure(), 5);
 
@@ -855,14 +855,14 @@ describe('WritableConsumableStream', () => {
 
 			consumerStats = stream.getConsumerStats();
 			assert.strictEqual(consumerStats.length, 2);
-			assert.strictEqual(consumerStats[0].backpressure, 4);
+			assert.strictEqual(consumerStats[0]!.backpressure, 4);
 
 			await iterA.next();
 			await iterA.next();
 
 			consumerStats = stream.getConsumerStats();
 			assert.strictEqual(consumerStats.length, 2);
-			assert.strictEqual(consumerStats[0].backpressure, 2);
+			assert.strictEqual(consumerStats[0]!.backpressure, 2);
 
 			stream.write('a5');
 			stream.write('a6');
@@ -870,14 +870,14 @@ describe('WritableConsumableStream', () => {
 
 			consumerStats = stream.getConsumerStats();
 			assert.strictEqual(consumerStats.length, 2);
-			assert.strictEqual(consumerStats[0].backpressure, 5);
+			assert.strictEqual(consumerStats[0]!.backpressure, 5);
 			assert.strictEqual(stream.getBackpressure(2), 5);
 
 			stream.close();
 
 			consumerStats = stream.getConsumerStats();
 			assert.strictEqual(consumerStats.length, 2);
-			assert.strictEqual(consumerStats[0].backpressure, 6);
+			assert.strictEqual(consumerStats[0]!.backpressure, 6);
 
 			assert.strictEqual(stream.getBackpressure(), 6);
 
@@ -892,7 +892,7 @@ describe('WritableConsumableStream', () => {
 
 			consumerStats = stream.getConsumerStats();
 			assert.strictEqual(consumerStats.length, 2);
-			assert.strictEqual(consumerStats[0].backpressure, 1);
+			assert.strictEqual(consumerStats[0]!.backpressure, 1);
 
 			await iterB.next();
 			await iterB.next();
@@ -908,7 +908,7 @@ describe('WritableConsumableStream', () => {
 
 			consumerStats = stream.getConsumerStats();
 			assert.strictEqual(consumerStats.length, 1);
-			assert.strictEqual(consumerStats[0].backpressure, 1);
+			assert.strictEqual(consumerStats[0]!.backpressure, 1);
 
 			assert.strictEqual(stream.getBackpressure(), 1);
 
@@ -989,7 +989,7 @@ describe('WritableConsumableStream', () => {
 				const consumerStatsList = stream.getConsumerStats();
 				if (expectedPressure > 0) {
 					assert.strictEqual(consumerStatsList.length, 1);
-					assert.strictEqual(consumerStatsList[0].backpressure, expectedPressure);
+					assert.strictEqual(consumerStatsList[0]!.backpressure, expectedPressure);
 				} else {
 					assert.strictEqual(consumerStatsList.length, 0);
 				}
@@ -999,10 +999,10 @@ describe('WritableConsumableStream', () => {
 			}
 
 			assert.strictEqual(receivedPackets.length, 11);
-			assert.strictEqual(receivedPackets[0].value, 'hi0');
-			assert.strictEqual(receivedPackets[9].value, 'hi9');
-			assert.strictEqual(receivedPackets[10].done, true);
-			assert.strictEqual(receivedPackets[10].value, 'end');
+			assert.strictEqual(receivedPackets[0]!.value, 'hi0');
+			assert.strictEqual(receivedPackets[9]!.value, 'hi9');
+			assert.strictEqual(receivedPackets[10]!.done, true);
+			assert.strictEqual(receivedPackets[10]!.value, 'end');
 
 			assert.strictEqual(stream.getConsumerStats().length, 0);
 			assert.strictEqual(consumer.getBackpressure(), 0);
@@ -1258,7 +1258,7 @@ describe('WritableConsumableStream', () => {
 			assert.strictEqual(receivedPackets.length, 5);
 			assert.strictEqual(errors.length, 1);
 			assert.notEqual(errors[0], null);
-			assert.strictEqual(errors[0].name, 'TimeoutError');
+			assert.strictEqual(errors[0]!.name, 'TimeoutError');
 
 			assert.strictEqual(stream.getConsumerCount(), 0); // Check internal cleanup.
 		});
@@ -1320,11 +1320,11 @@ describe('WritableConsumableStream', () => {
 			assert.strictEqual(backpressureAfterKill, 10); // consumerB was still running.
 			assert.strictEqual(backpressureAfterConsume, 0);
 			assert.strictEqual(receivedPacketsA.length, 1);
-			assert.strictEqual(receivedPacketsA[0].done, true);
-			assert.strictEqual(receivedPacketsA[0].value, 'custom kill data');
+			assert.strictEqual(receivedPacketsA[0]!.done, true);
+			assert.strictEqual(receivedPacketsA[0]!.value, 'custom kill data');
 			assert.strictEqual(receivedPacketsB.length, 11);
-			assert.strictEqual(receivedPacketsB[0].value, 'hello0');
-			assert.strictEqual(receivedPacketsB[9].value, 'hello9');
+			assert.strictEqual(receivedPacketsB[0]!.value, 'hello0');
+			assert.strictEqual(receivedPacketsB[9]!.value, 'hello9');
 
 			assert.strictEqual(stream.getConsumerCount(), 0); // Check internal cleanup.
 		});
@@ -1382,16 +1382,16 @@ describe('WritableConsumableStream', () => {
 			assert.strictEqual(maxBackpressureAfterClose, 11);
 			assert.strictEqual(maxBackpressureAfterConsume, 0);
 			assert.strictEqual(receivedPacketsA.length, 11);
-			assert.strictEqual(receivedPacketsA[0].value, 'hello0');
-			assert.strictEqual(receivedPacketsA[9].value, 'hello9');
-			assert.strictEqual(receivedPacketsA[10].done, true);
-			assert.strictEqual(receivedPacketsA[10].value, 'custom close data');
+			assert.strictEqual(receivedPacketsA[0]!.value, 'hello0');
+			assert.strictEqual(receivedPacketsA[9]!.value, 'hello9');
+			assert.strictEqual(receivedPacketsA[10]!.done, true);
+			assert.strictEqual(receivedPacketsA[10]!.value, 'custom close data');
 			assert.strictEqual(receivedPacketsB.length, 12);
-			assert.strictEqual(receivedPacketsB[0].value, 'hello0');
-			assert.strictEqual(receivedPacketsB[9].value, 'hello9');
-			assert.strictEqual(receivedPacketsB[10].value, 'foo');
-			assert.strictEqual(receivedPacketsB[11].done, true);
-			assert.strictEqual(receivedPacketsB[11].value, 'close others');
+			assert.strictEqual(receivedPacketsB[0]!.value, 'hello0');
+			assert.strictEqual(receivedPacketsB[9]!.value, 'hello9');
+			assert.strictEqual(receivedPacketsB[10]!.value, 'foo');
+			assert.strictEqual(receivedPacketsB[11]!.done, true);
+			assert.strictEqual(receivedPacketsB[11]!.value, 'close others');
 
 			assert.strictEqual(stream.getConsumerCount(), 0); // Check internal cleanup.
 		});
@@ -1441,11 +1441,11 @@ describe('WritableConsumableStream', () => {
 			assert.strictEqual(backpressureAfterClose!, 11);
 			assert.strictEqual(backpressureAfterConsume, 0);
 			assert.strictEqual(receivedPacketsA.length, 11);
-			assert.strictEqual(receivedPacketsA[10].done, true);
-			assert.strictEqual(receivedPacketsA[10].value, 'custom close data');
+			assert.strictEqual(receivedPacketsA[10]!.done, true);
+			assert.strictEqual(receivedPacketsA[10]!.value, 'custom close data');
 			assert.strictEqual(receivedPacketsB.length, 10);
-			assert.strictEqual(receivedPacketsB[0].value, 'hello0');
-			assert.strictEqual(receivedPacketsB[9].value, 'hello9');
+			assert.strictEqual(receivedPacketsB[0]!.value, 'hello0');
+			assert.strictEqual(receivedPacketsB[9]!.value, 'hello9');
 
 			stream.close(consumerB.id.toString());
 			await wait(10);
@@ -1494,17 +1494,17 @@ describe('WritableConsumableStream', () => {
 
 			assert.strictEqual(backpressureAfterConsume, 0);
 			assert.strictEqual(receivedPacketsA.length, 14);
-			assert.strictEqual(receivedPacketsA[0].value, 'hello0');
-			assert.strictEqual(receivedPacketsA[9].value, 'hello9');
-			assert.strictEqual(receivedPacketsA[10].value, 'hi0');
-			assert.strictEqual(receivedPacketsA[12].value, 'hi2');
-			assert.strictEqual(receivedPacketsA[13].done, true);
-			assert.strictEqual(receivedPacketsA[13].value, 'close all');
+			assert.strictEqual(receivedPacketsA[0]!.value, 'hello0');
+			assert.strictEqual(receivedPacketsA[9]!.value, 'hello9');
+			assert.strictEqual(receivedPacketsA[10]!.value, 'hi0');
+			assert.strictEqual(receivedPacketsA[12]!.value, 'hi2');
+			assert.strictEqual(receivedPacketsA[13]!.done, true);
+			assert.strictEqual(receivedPacketsA[13]!.value, 'close all');
 			assert.strictEqual(receivedPacketsB.length, 11);
-			assert.strictEqual(receivedPacketsB[0].value, 'hello0');
-			assert.strictEqual(receivedPacketsB[9].value, 'hello9');
-			assert.strictEqual(receivedPacketsB[10].done, true);
-			assert.strictEqual(receivedPacketsB[10].value, 'close all');
+			assert.strictEqual(receivedPacketsB[0]!.value, 'hello0');
+			assert.strictEqual(receivedPacketsB[9]!.value, 'hello9');
+			assert.strictEqual(receivedPacketsB[10]!.done, true);
+			assert.strictEqual(receivedPacketsB[10]!.value, 'close all');
 
 			assert.strictEqual(stream.getConsumerCount(), 0); // Check internal cleanup.
 		});
