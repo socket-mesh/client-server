@@ -40,7 +40,7 @@ export class StreamDemux<T> {
 				this._allEventsStream.write({ stream: streamName, value });
 			}
 
-			if (streamName in this.streams) {
+			if (this.streams[streamName]) {
 				this.streams[streamName].close(value);
 			}
 		} else if (this._allEventsStream) {
@@ -89,7 +89,7 @@ export class StreamDemux<T> {
 			return this._allEventsStream.createConsumer(timeout);
 		}
 
-		if (!(streamName in this.streams)) {
+		if (!this.streams[streamName]) {
 			this.streams[streamName] = new WritableConsumableStream({
 				generateConsumerId: this.generateConsumerId,
 				removeConsumerCallback: () => {
@@ -99,7 +99,7 @@ export class StreamDemux<T> {
 				}
 			});
 		}
-		return this.streams[streamName].createConsumer(timeout);
+		return this.streams[streamName]!.createConsumer(timeout);
 	}
 
 	getBackpressure(consumerId?: number): number;
@@ -110,7 +110,7 @@ export class StreamDemux<T> {
 				return this._allEventsStream?.getBackpressure() ?? 0;
 			}
 
-			if (streamName in this.streams) {
+			if (this.streams[streamName]) {
 				return this.streams[streamName].getBackpressure();
 			}
 			return 0;
@@ -140,7 +140,7 @@ export class StreamDemux<T> {
 			return this._allEventsStream.getConsumerCount();
 		}
 
-		if (streamName && streamName in this.streams) {
+		if (streamName && this.streams[streamName]) {
 			return this.streams[streamName].getConsumerCount();
 		}
 		return 0;
@@ -182,7 +182,7 @@ export class StreamDemux<T> {
 
 		if (typeof consumerId === 'string') {
 			return (
-				!(consumerId in this.streams)
+				!this.streams[consumerId]
 					? []
 					: this.streams[consumerId]
 						.getConsumerStats()
@@ -223,7 +223,7 @@ export class StreamDemux<T> {
 			return this._allEventsStream?.hasConsumer(streamName) || Object.values(this.streams).some(stream => stream.hasConsumer(streamName));
 		}
 
-		if (streamName && streamName in this.streams) {
+		if (streamName && this.streams[streamName]) {
 			return this.streams[streamName].hasConsumer(consumerId!);
 		}
 
@@ -246,7 +246,7 @@ export class StreamDemux<T> {
 			return;
 		}
 
-		if (streamName && streamName in this.streams) {
+		if (streamName && this.streams[streamName]) {
 			if (this._allEventsStream) {
 				this._allEventsStream.write({ stream: streamName, value });
 			}
@@ -289,7 +289,7 @@ export class StreamDemux<T> {
 	}
 
 	write(streamName: string, value: T): void {
-		if (streamName in this.streams) {
+		if (this.streams[streamName]) {
 			this.streams[streamName].write(value);
 		}
 

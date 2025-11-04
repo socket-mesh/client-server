@@ -667,12 +667,12 @@ describe('StreamDemux', () => {
 
 		let consumerStatsList = demux.getConsumerStats('hello');
 		assert.strictEqual(consumerStatsList.length, 2);
-		assert.strictEqual(consumerStatsList[0].id, consumerA.id);
-		assert.strictEqual(consumerStatsList[0].backpressure, 12);
-		assert.strictEqual(consumerStatsList[0].backpressure, consumerA.getBackpressure());
-		assert.strictEqual(consumerStatsList[1].id, consumerB.id);
-		assert.strictEqual(consumerStatsList[1].backpressure, 2);
-		assert.strictEqual(consumerStatsList[1].backpressure, consumerB.getBackpressure());
+		assert.strictEqual(consumerStatsList[0]!.id, consumerA.id);
+		assert.strictEqual(consumerStatsList[0]!.backpressure, 12);
+		assert.strictEqual(consumerStatsList[0]!.backpressure, consumerA.getBackpressure());
+		assert.strictEqual(consumerStatsList[1]!.id, consumerB.id);
+		assert.strictEqual(consumerStatsList[1]!.backpressure, 2);
+		assert.strictEqual(consumerStatsList[1]!.backpressure, consumerB.getBackpressure());
 
 		consumerStatsList = demux.getConsumerStats('bar');
 		assert.strictEqual(consumerStatsList.length, 0);
@@ -696,15 +696,15 @@ describe('StreamDemux', () => {
 
 		let consumerStatsList = demux.getConsumerStats();
 		assert.strictEqual(consumerStatsList.length, 3);
-		assert.strictEqual(consumerStatsList[0].id, consumerA.id);
-		assert.strictEqual(consumerStatsList[0].backpressure, 12);
-		assert.strictEqual(consumerStatsList[0].backpressure, consumerA.getBackpressure());
-		assert.strictEqual(consumerStatsList[1].id, consumerB.id);
-		assert.strictEqual(consumerStatsList[1].backpressure, 2);
-		assert.strictEqual(consumerStatsList[1].backpressure, consumerB.getBackpressure());
-		assert.strictEqual(consumerStatsList[2].id, consumerC.id);
-		assert.strictEqual(consumerStatsList[2].backpressure, 0);
-		assert.strictEqual(consumerStatsList[2].backpressure, consumerC.getBackpressure());
+		assert.strictEqual(consumerStatsList[0]!.id, consumerA.id);
+		assert.strictEqual(consumerStatsList[0]!.backpressure, 12);
+		assert.strictEqual(consumerStatsList[0]!.backpressure, consumerA.getBackpressure());
+		assert.strictEqual(consumerStatsList[1]!.id, consumerB.id);
+		assert.strictEqual(consumerStatsList[1]!.backpressure, 2);
+		assert.strictEqual(consumerStatsList[1]!.backpressure, consumerB.getBackpressure());
+		assert.strictEqual(consumerStatsList[2]!.id, consumerC.id);
+		assert.strictEqual(consumerStatsList[2]!.backpressure, 0);
+		assert.strictEqual(consumerStatsList[2]!.backpressure, consumerC.getBackpressure());
 
 		consumerA.return();
 		consumerB.return();
@@ -740,11 +740,11 @@ describe('StreamDemux', () => {
 		await wait(50);
 
 		assert.strictEqual(receivedPackets.length, 4);
-		assert.strictEqual(receivedPackets[0].value, 'world0');
-		assert.strictEqual(receivedPackets[1].value, 'world1');
-		assert.strictEqual(receivedPackets[2].value, 'world2');
-		assert.strictEqual(receivedPackets[3].done, true);
-		assert.strictEqual(receivedPackets[3].value, 'end');
+		assert.strictEqual(receivedPackets[0]!.value, 'world0');
+		assert.strictEqual(receivedPackets[1]!.value, 'world1');
+		assert.strictEqual(receivedPackets[2]!.value, 'world2');
+		assert.strictEqual(receivedPackets[3]!.done, true);
+		assert.strictEqual(receivedPackets[3]!.value, 'end');
 		assert.strictEqual(consumerA.getBackpressure(), 0);
 		assert.strictEqual(consumerB.getBackpressure(), 0);
 	});
@@ -784,17 +784,17 @@ describe('StreamDemux', () => {
 		await wait(50);
 
 		assert.strictEqual(receivedPacketsA.length, 4);
-		assert.strictEqual(receivedPacketsA[0].value, 'world0');
-		assert.strictEqual(receivedPacketsA[1].value, 'world1');
-		assert.strictEqual(receivedPacketsA[2].value, 'world2');
-		assert.strictEqual(receivedPacketsA[3].done, true);
-		assert.strictEqual(receivedPacketsA[3].value, 'bar');
+		assert.strictEqual(receivedPacketsA[0]!.value, 'world0');
+		assert.strictEqual(receivedPacketsA[1]!.value, 'world1');
+		assert.strictEqual(receivedPacketsA[2]!.value, 'world2');
+		assert.strictEqual(receivedPacketsA[3]!.done, true);
+		assert.strictEqual(receivedPacketsA[3]!.value, 'bar');
 		assert.strictEqual(receivedPacketsC.length, 4);
-		assert.strictEqual(receivedPacketsC[0].value, 'world0');
-		assert.strictEqual(receivedPacketsC[1].value, 'world1');
-		assert.strictEqual(receivedPacketsC[2].value, 'world2');
-		assert.strictEqual(receivedPacketsC[3].done, true);
-		assert.strictEqual(receivedPacketsC[3].value, 'bar');
+		assert.strictEqual(receivedPacketsC[0]!.value, 'world0');
+		assert.strictEqual(receivedPacketsC[1]!.value, 'world1');
+		assert.strictEqual(receivedPacketsC[2]!.value, 'world2');
+		assert.strictEqual(receivedPacketsC[3]!.done, true);
+		assert.strictEqual(receivedPacketsC[3]!.value, 'bar');
 		assert.strictEqual(consumerA.getBackpressure(), 0);
 		assert.strictEqual(consumerB.getBackpressure(), 0);
 	});
@@ -835,16 +835,16 @@ describe('StreamDemux', () => {
 		await wait(350);
 
 		assert.strictEqual(receivedPacketsA.length, 4);
-		assert.strictEqual(receivedPacketsA[0].value, 'world0');
-		assert.strictEqual(receivedPacketsA[1].value, 'world1');
-		assert.strictEqual(receivedPacketsA[2].value, 'world2');
-		assert.strictEqual(receivedPacketsA[3].done, true);
-		assert.strictEqual(receivedPacketsA[3].value, 'the end');
+		assert.strictEqual(receivedPacketsA[0]!.value, 'world0');
+		assert.strictEqual(receivedPacketsA[1]!.value, 'world1');
+		assert.strictEqual(receivedPacketsA[2]!.value, 'world2');
+		assert.strictEqual(receivedPacketsA[3]!.done, true);
+		assert.strictEqual(receivedPacketsA[3]!.value, 'the end');
 
 		assert.strictEqual(receivedPacketsB.length, 10);
-		assert.strictEqual(receivedPacketsB[0].value, 'world0');
-		assert.strictEqual(receivedPacketsB[1].value, 'world1');
-		assert.strictEqual(receivedPacketsB[9].value, 'world9');
+		assert.strictEqual(receivedPacketsB[0]!.value, 'world0');
+		assert.strictEqual(receivedPacketsB[1]!.value, 'world1');
+		assert.strictEqual(receivedPacketsB[9]!.value, 'world9');
 
 		assert.strictEqual(consumerA.getBackpressure(), 0);
 		assert.strictEqual(consumerB.getBackpressure(), 0);
