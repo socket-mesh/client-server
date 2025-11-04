@@ -1,11 +1,11 @@
-import { DemuxedConsumableStream, StreamDemux, StreamDemuxStats, StreamEvent } from "@socket-mesh/stream-demux";
+import { DemuxedConsumableStream, StreamDemux, StreamDemuxStats, StreamEvent } from '@socket-mesh/stream-demux';
 
 export interface EventEmitter {
-	emit(eventName: string | symbol, ...args: any[]): boolean;
+	emit(eventName: string | symbol, ...args: any[]): boolean,
 
-	listenerCount?(eventName: string | symbol, listener?: Function): number;
+	listenerCount?(eventName: string | symbol, listener?: (...args: any[]) => void): number,
 
-	on(eventName: string | symbol, listener: (...args: any[]) => void): this;
+	on?(eventName: string | symbol, listener: (...args: any[]) => void): this
 }
 
 export class AsyncStreamEmitter<T> {
@@ -13,6 +13,19 @@ export class AsyncStreamEmitter<T> {
 
 	constructor() {
 		this._listenerDemux = new StreamDemux<T>();
+	}
+
+	closeListeners(eventName?: string): void {
+		if (eventName === undefined) {
+			this._listenerDemux.closeAll();
+			return;
+		}
+
+		this._listenerDemux.close(eventName);
+	}
+
+	emit(eventName: string, data: T): void {
+		this._listenerDemux.write(eventName, data);
 	}
 
 	static from<T>(object: EventEmitter): AsyncStreamEmitter<T> {
@@ -34,9 +47,9 @@ export class AsyncStreamEmitter<T> {
 		}
 
 		if (object.listenerCount) {
-			const objListenerCountMethod = object.listenerCount.bind(object) as (eventName: string | symbol, listener?: Function) => number;
+			const objListenerCountMethod = object.listenerCount.bind(object) as (eventName: string | symbol, listener?: (...args: any[]) => void) => number;
 
-			object.listenerCount = (eventName: string | symbol, listener?: Function): number => {
+			object.listenerCount = (eventName: string | symbol, listener?: (...args: any[]) => void): number => {
 				const eventListenerCount = objListenerCountMethod(eventName, listener);
 				const streamConsumerCount = result.getListenerConsumerCount(eventName as string);
 
@@ -44,26 +57,17 @@ export class AsyncStreamEmitter<T> {
 			};
 		}
 
-		return result;		
+		return result;
 	}
 
-	emit(eventName: string, data: T): void {
-		this._listenerDemux.write(eventName, data);
+	getListenerBackpressure(eventName?: string): number;
+	getListenerBackpressure(consumerId?: number): number;
+	getListenerBackpressure(eventName?: number | string): number {
+		return this._listenerDemux.getBackpressure(eventName as any);
 	}
 
-	listen(): DemuxedConsumableStream<StreamEvent<T>>;
-	listen<U extends T, V = U>(eventName: string): DemuxedConsumableStream<V>;
-	listen<U extends T, V = U>(eventName?: string): DemuxedConsumableStream<StreamEvent<T>> | DemuxedConsumableStream<V> {
-		return this._listenerDemux.listen<U, V>(eventName);
-	}
-
-	closeListeners(eventName?: string): void {
-		if (eventName === undefined) {
-			this._listenerDemux.closeAll();
-			return;
-		}
-
-		this._listenerDemux.close(eventName);
+	getListenerConsumerCount(eventName?: string): number {
+		return this._listenerDemux.getConsumerCount(eventName);
 	}
 
 	getListenerConsumerStats(eventName?: string): StreamDemuxStats[];
@@ -72,13 +76,15 @@ export class AsyncStreamEmitter<T> {
 		return this._listenerDemux.getConsumerStats(consumerId as any);
 	}
 
-	getListenerConsumerCount(eventName?: string): number {
-		return this._listenerDemux.getConsumerCount(eventName);
+	hasListenerConsumer(consumerId: number): boolean;
+	hasListenerConsumer(eventName: string, consumerId: number): boolean;
+	hasListenerConsumer(eventName: number | string, consumerId?: number) {
+		return this._listenerDemux.hasConsumer(eventName as any, consumerId!);
 	}
 
 	killListeners(consumerId?: number): void;
 	killListeners(eventName?: string): void;
-	killListeners(eventName?: string | number): void {
+	killListeners(eventName?: number | string): void {
 		if (eventName === undefined) {
 			this._listenerDemux.killAll();
 			return;
@@ -87,19 +93,13 @@ export class AsyncStreamEmitter<T> {
 		this._listenerDemux.kill(eventName as any);
 	}
 
-	getListenerBackpressure(eventName?: string): number;
-	getListenerBackpressure(consumerId?: number): number;
-	getListenerBackpressure(eventName?: string | number): number {
-		return this._listenerDemux.getBackpressure(eventName as any);
+	listen(): DemuxedConsumableStream<StreamEvent<T>>;
+	listen<U extends T, V = U>(eventName: string): DemuxedConsumableStream<V>;
+	listen<U extends T, V = U>(eventName?: string): DemuxedConsumableStream<StreamEvent<T>> | DemuxedConsumableStream<V> {
+		return this._listenerDemux.listen<U, V>(eventName);
 	}
 
 	removeListener(eventName: string): void {
 		this._listenerDemux.unlisten(eventName);
-	};
-
-	hasListenerConsumer(consumerId: number): boolean;
-	hasListenerConsumer(eventName: string, consumerId: number): boolean;
-	hasListenerConsumer(eventName: string | number, consumerId?: number) {
-		return this._listenerDemux.hasConsumer(eventName as any, consumerId!);
 	}
 }

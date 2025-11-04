@@ -1,24 +1,25 @@
-import { AsyncStreamEmitter } from "../src/index.js";
 import assert from 'node:assert';
-import { afterEach, beforeEach, describe, it } from "node:test";
-import { EventEmitter } from "node:events";
+import { EventEmitter } from 'node:events';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 
-let pendingTimeoutSet = new Set<NodeJS.Timeout>();
+import { AsyncStreamEmitter } from '../src/index.js';
 
-function wait(duration: number): Promise<void> {
-  return new Promise((resolve) => {
-    let timeout = setTimeout(() => {
-      pendingTimeoutSet.clear();
-      resolve();
-    }, duration);
-    pendingTimeoutSet.add(timeout);
-  });
-}
+const pendingTimeoutSet = new Set<NodeJS.Timeout>();
 
 function cancelAllPendingWaits() {
-	for (let timeout of pendingTimeoutSet) {
+	for (const timeout of pendingTimeoutSet) {
 		clearTimeout(timeout);
 	}
+}
+
+function wait(duration: number): Promise<void> {
+	return new Promise((resolve) => {
+		const timeout = setTimeout(() => {
+			pendingTimeoutSet.clear();
+			resolve();
+		}, duration);
+		pendingTimeoutSet.add(timeout);
+	});
 }
 
 describe('AsyncStreamEmitter', () => {
@@ -46,11 +47,11 @@ describe('AsyncStreamEmitter', () => {
 				streamEmitter.closeListeners('foo');
 			})();
 
-			for await (let event of streamEmitter.listen('foo')) {
+			for await (const event of streamEmitter.listen('foo')) {
 				packets.push(event);
 			}
 
-			let expectedEvents = [
+			const expectedEvents = [
 				'hello0',
 				'hello1',
 				'hello2',
@@ -63,13 +64,13 @@ describe('AsyncStreamEmitter', () => {
 
 		it('should stop consuming specified events after the closeAllListeners method is invoked', async () => {
 			(async () => {
-				for await (let event of streamEmitter.listen('foo')) {
+				for await (const event of streamEmitter.listen('foo')) {
 					packets.push(event);
 				}
 			})();
 
 			(async () => {
-				for await (let event of streamEmitter.listen('bar')) {
+				for await (const event of streamEmitter.listen('bar')) {
 					packets.push(event);
 				}
 			})();
@@ -97,21 +98,21 @@ describe('AsyncStreamEmitter', () => {
 		});
 
 		it('should return a consumer stats object when the getListenerConsumerStats method is called', async () => {
-			let fooConsumer = streamEmitter.listen('foo').createConsumer();
+			const fooConsumer = streamEmitter.listen('foo').createConsumer();
 
 			(async () => {
-				for await (let event of fooConsumer) {
+				for await (const event of fooConsumer) {
 					packets.push(event);
 				}
 			})();
 
 			(async () => {
-				for await (let event of streamEmitter.listen('bar')) {
+				for await (const event of streamEmitter.listen('bar')) {
 					packets.push(event);
 				}
 			})();
 
-			let fooStats = streamEmitter.getListenerConsumerStats(fooConsumer.id);
+			const fooStats = streamEmitter.getListenerConsumerStats(fooConsumer.id);
 
 			assert.notStrictEqual(fooStats, null);
 			assert.strictEqual(fooStats.backpressure, 0);
@@ -119,59 +120,59 @@ describe('AsyncStreamEmitter', () => {
 		});
 
 		it('should return a list of consumer stats when the getListenerConsumerStatsList method is called', async () => {
-			let fooConsumerA = streamEmitter.listen('foo').createConsumer();
-			let fooConsumerB = streamEmitter.listen('foo').createConsumer();
-			let barConsumer = streamEmitter.listen('bar').createConsumer();
+			const fooConsumerA = streamEmitter.listen('foo').createConsumer();
+			const fooConsumerB = streamEmitter.listen('foo').createConsumer();
+			const barConsumer = streamEmitter.listen('bar').createConsumer();
 
 			(async () => {
-				for await (let event of fooConsumerA) {
+				for await (const event of fooConsumerA) {
 					packets.push(event);
 				}
 			})();
 			(async () => {
-				for await (let event of fooConsumerB) {
+				for await (const event of fooConsumerB) {
 					packets.push(event);
 				}
 			})();
 			(async () => {
-				for await (let event of barConsumer) {
+				for await (const event of barConsumer) {
 					packets.push(event);
 				}
 			})();
 
-			let fooStatsList = streamEmitter.getListenerConsumerStats('foo');
-			let barStatsList = streamEmitter.getListenerConsumerStats('bar');
+			const fooStatsList = streamEmitter.getListenerConsumerStats('foo');
+			const barStatsList = streamEmitter.getListenerConsumerStats('bar');
 
 			assert.notStrictEqual(fooStatsList, null);
 			assert.strictEqual(fooStatsList.length, 2);
-			assert.strictEqual(fooStatsList[0].stream, 'foo');
-			assert.strictEqual(fooStatsList[0].backpressure, 0);
-			assert.strictEqual(fooStatsList[1].stream, 'foo');
-			assert.strictEqual(fooStatsList[1].backpressure, 0);
+			assert.strictEqual(fooStatsList[0]!.stream, 'foo');
+			assert.strictEqual(fooStatsList[0]!.backpressure, 0);
+			assert.strictEqual(fooStatsList[1]!.stream, 'foo');
+			assert.strictEqual(fooStatsList[1]!.backpressure, 0);
 			assert.notStrictEqual(barStatsList, null);
 			assert.strictEqual(barStatsList.length, 1);
-			assert.strictEqual(barStatsList[0].backpressure, 0);
-			assert.strictEqual(barStatsList[0].stream, 'bar');
+			assert.strictEqual(barStatsList[0]!.backpressure, 0);
+			assert.strictEqual(barStatsList[0]!.stream, 'bar');
 		});
 
 		it('should return a complete list of consumer stats when the getAllListenersConsumerStatsList method is called', async () => {
 			(async () => {
-				for await (let event of streamEmitter.listen('foo')) {
+				for await (const event of streamEmitter.listen('foo')) {
 					packets.push(event);
 				}
 			})();
 			(async () => {
-				for await (let event of streamEmitter.listen('foo')) {
+				for await (const event of streamEmitter.listen('foo')) {
 					packets.push(event);
 				}
 			})();
 			(async () => {
-				for await (let event of streamEmitter.listen('bar')) {
+				for await (const event of streamEmitter.listen('bar')) {
 					packets.push(event);
 				}
 			})();
 
-			let allStatsList = streamEmitter.getListenerConsumerStats();
+			const allStatsList = streamEmitter.getListenerConsumerStats();
 
 			assert.notStrictEqual(allStatsList, null);
 			assert.strictEqual(allStatsList.length, 3);
@@ -180,17 +181,17 @@ describe('AsyncStreamEmitter', () => {
 		});
 
 		it('should stop consuming on the specified listeners after the killListener method is called', async () => {
-			let ended: string[] = [];
+			const ended: string[] = [];
 
 			(async () => {
-				for await (let event of streamEmitter.listen('foo')) {
+				for await (const event of streamEmitter.listen('foo')) {
 					packets.push(event);
 				}
 				ended.push('foo');
 			})();
 
 			(async () => {
-				for await (let event of streamEmitter.listen('bar')) {
+				for await (const event of streamEmitter.listen('bar')) {
 					packets.push(event);
 				}
 				ended.push('bar');
@@ -205,26 +206,26 @@ describe('AsyncStreamEmitter', () => {
 
 			await wait(0);
 
-			let allStatsList = streamEmitter.getListenerConsumerStats();
+			const allStatsList = streamEmitter.getListenerConsumerStats();
 
 			assert.strictEqual(ended.length, 1);
 			assert.strictEqual(ended[0], 'bar');
 			assert.strictEqual(allStatsList.length, 1);
-			assert.strictEqual(allStatsList[0].stream, 'foo');
+			assert.strictEqual(allStatsList[0]!.stream, 'foo');
 		});
 
 		it('should stop consuming on all listeners after the killAllListeners method is called', async () => {
-			let ended: string[] = [];
+			const ended: string[] = [];
 
 			(async () => {
-				for await (let event of streamEmitter.listen('foo')) {
+				for await (const event of streamEmitter.listen('foo')) {
 					packets.push(event);
 				}
 				ended.push('foo');
 			})();
 
 			(async () => {
-				for await (let event of streamEmitter.listen('bar')) {
+				for await (const event of streamEmitter.listen('bar')) {
 					packets.push(event);
 				}
 				ended.push('bar');
@@ -239,7 +240,7 @@ describe('AsyncStreamEmitter', () => {
 
 			await wait(0);
 
-			let allStatsList = streamEmitter.getListenerConsumerStats();
+			const allStatsList = streamEmitter.getListenerConsumerStats();
 
 			assert.strictEqual(ended.length, 2);
 			assert.strictEqual(ended[0], 'foo');
@@ -248,19 +249,19 @@ describe('AsyncStreamEmitter', () => {
 		});
 
 		it('should stop consuming by a specific consumer after the killListenerConsumer method is called', async () => {
-			let ended: string[] = [];
+			const ended: string[] = [];
 
 			(async () => {
-				for await (let event of streamEmitter.listen('bar')) {
+				for await (const event of streamEmitter.listen('bar')) {
 					packets.push(event);
 				}
 				ended.push('bar');
 			})();
 
-			let fooConsumer = streamEmitter.listen('foo').createConsumer();
+			const fooConsumer = streamEmitter.listen('foo').createConsumer();
 
 			(async () => {
-				for await (let event of fooConsumer) {
+				for await (const event of fooConsumer) {
 					packets.push(event);
 				}
 				ended.push('foo');
@@ -270,17 +271,17 @@ describe('AsyncStreamEmitter', () => {
 
 			await wait(0);
 
-			let allStatsList = streamEmitter.getListenerConsumerStats();
+			const allStatsList = streamEmitter.getListenerConsumerStats();
 
 			assert.strictEqual(ended.length, 1);
 			assert.strictEqual(ended[0], 'foo');
 			assert.strictEqual(allStatsList.length, 1);
-			assert.strictEqual(allStatsList[0].stream, 'bar');
+			assert.strictEqual(allStatsList[0]!.stream, 'bar');
 		});
 
 		it('should return the backpressure of the specified event when the getListenerBackpressure method is called', async () => {
 			(async () => {
-				for await (let event of streamEmitter.listen('foo')) {
+				for await (const event of streamEmitter.listen('foo')) {
 					packets.push(event);
 					await wait(300);
 				}
@@ -302,13 +303,13 @@ describe('AsyncStreamEmitter', () => {
 
 		it('should return the max backpressure of all events when the getAllListenersBackpressure method is called', async () => {
 			(async () => {
-				for await (let event of streamEmitter.listen('foo')) {
+				for await (const event of streamEmitter.listen('foo')) {
 					packets.push(event);
 					await wait(300);
 				}
 			})();
 			(async () => {
-				for await (let event of streamEmitter.listen('bar')) {
+				for await (const event of streamEmitter.listen('bar')) {
 					packets.push(event);
 					await wait(300);
 				}
@@ -329,15 +330,15 @@ describe('AsyncStreamEmitter', () => {
 		});
 
 		it('should return the backpressure of the specified consumer when getListenerConsumerBackpressure method is called', async () => {
-			let fooConsumer = streamEmitter.listen('foo').createConsumer();
+			const fooConsumer = streamEmitter.listen('foo').createConsumer();
 			(async () => {
-				for await (let event of fooConsumer) {
+				for await (const event of fooConsumer) {
 					packets.push(event);
 					await wait(300);
 				}
 			})();
 			(async () => {
-				for await (let event of streamEmitter.listen('bar')) {
+				for await (const event of streamEmitter.listen('bar')) {
 					packets.push(event);
 					await wait(300);
 				}
@@ -357,9 +358,9 @@ describe('AsyncStreamEmitter', () => {
 		});
 
 		it('should return the correct boolean when hasListenerConsumer method is called', async () => {
-			let fooConsumer = streamEmitter.listen('foo').createConsumer();
+			const fooConsumer = streamEmitter.listen('foo').createConsumer();
 			(async () => {
-				for await (let event of fooConsumer) {
+				for await (const event of fooConsumer) {
 					packets.push(event);
 					await wait(300);
 				}
@@ -370,9 +371,9 @@ describe('AsyncStreamEmitter', () => {
 		});
 
 		it('should return the correct boolean when hasAnyListenerConsumer method is called', async () => {
-			let fooConsumer = streamEmitter.listen('foo').createConsumer();
+			const fooConsumer = streamEmitter.listen('foo').createConsumer();
 			(async () => {
-				for await (let event of fooConsumer) {
+				for await (const event of fooConsumer) {
 					packets.push(event);
 					await wait(300);
 				}
@@ -382,10 +383,10 @@ describe('AsyncStreamEmitter', () => {
 		});
 
 		it('should stop consuming processing a specific event after a listener is removed with the removeListener method', async () => {
-			let ended: string[] = [];
+			const ended: string[] = [];
 
 			(async () => {
-				for await (let event of streamEmitter.listen('bar')) {
+				for await (const event of streamEmitter.listen('bar')) {
 					packets.push(event);
 				}
 				ended.push('bar');
@@ -416,22 +417,22 @@ describe('AsyncStreamEmitter', () => {
 	describe('From Tests', () => {
 		let emitter: EventEmitter;
 		let streamEmitter: AsyncStreamEmitter<string>;
-		
+
 		beforeEach(async () => {
 			emitter = new EventEmitter();
 			streamEmitter = AsyncStreamEmitter.from<string>(emitter);
 		});
-	
+
 		afterEach(async () => {
 			cancelAllPendingWaits();
 		});
-	
+
 		it('should add AsyncStreamEmitter methods to the EventEmitter instance', async () => {
 			assert.strictEqual(!!streamEmitter.emit, true);
 			assert.strictEqual(!!streamEmitter.listen, true);
 			assert.strictEqual(!!streamEmitter.closeListeners, true);
 		});
-	
+
 		it('should support AsyncStreamEmitter functionality', async () => {
 			(async () => {
 				for (let i = 0; i < 10; i++) {
@@ -440,17 +441,17 @@ describe('AsyncStreamEmitter', () => {
 				}
 				streamEmitter.closeListeners('foo');
 			})();
-	
+
 			let receivedData: string[] = [];
-	
-			for await (let data of streamEmitter.listen('foo')) {
+
+			for await (const data of streamEmitter.listen('foo')) {
 				receivedData.push(data);
 			}
-	
+
 			assert.strictEqual(receivedData.length, 10);
 			assert.strictEqual(receivedData[0], 'hello0');
 			assert.strictEqual(receivedData[9], 'hello9');
-	
+
 			(async () => {
 				for (let i = 0; i < 20; i++) {
 					await wait(10);
@@ -458,23 +459,23 @@ describe('AsyncStreamEmitter', () => {
 				}
 				streamEmitter.closeListeners();
 			})();
-	
+
 			receivedData = [];
-	
-			for await (let data of streamEmitter.listen('bar')) {
+
+			for await (const data of streamEmitter.listen('bar')) {
 				receivedData.push(data);
 			}
-	
+
 			assert.strictEqual(receivedData.length, 20);
 			assert.strictEqual(receivedData[0], 'hi0');
 			assert.strictEqual(receivedData[19], 'hi19');
-	
+
 			(async () => {
 				await wait(10);
 				streamEmitter.emit('test', 'abc');
 			})();
-	
-			let data = await streamEmitter.listen('test').once();
+
+			const data = await streamEmitter.listen('test').once();
 			assert.strictEqual(data, 'abc');
 		});
 
