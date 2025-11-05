@@ -1,18 +1,19 @@
-import { ChannelOptions } from "./channel-options.js";
-import { ChannelState } from "./channel-state.js";
-import { DemuxedConsumableStream, StreamDemux, StreamDemuxWrapper, StreamEvent } from "@socket-mesh/stream-demux";
-import { ChannelsListeners } from "./channels-listeners.js";
-import { Channel } from "./channel.js";
-import { ChannelEvent, KickOutEvent, SubscribeEvent, SubscribeFailEvent, SubscribeStateChangeEvent, UnsubscribeEvent } from "./channel-events.js";
-import { ChannelMap } from "./channel-map.js";
-import { AsyncStreamEmitter } from "@socket-mesh/async-stream-emitter";
+import { AsyncStreamEmitter } from '@socket-mesh/async-stream-emitter';
+import { DemuxedConsumableStream, StreamDemux, StreamDemuxWrapper, StreamEvent } from '@socket-mesh/stream-demux';
+
+import { ChannelEvent, KickOutEvent, SubscribeEvent, SubscribeFailEvent, SubscribeStateChangeEvent, UnsubscribeEvent } from './channel-events.js';
+import { ChannelMap } from './channel-map.js';
+import { ChannelOptions } from './channel-options.js';
+import { ChannelState } from './channel-state.js';
+import { Channel } from './channel.js';
+import { ChannelsListeners } from './channels-listeners.js';
 
 export interface ChannelDetails {
 	name: string,
-	state: ChannelState,
 	options: ChannelOptions,
-	subscribePromise?: Promise<void>,
-	subscribeAbort?: () => void
+	state: ChannelState,
+	subscribeAbort?: () => void,
+	subscribePromise?: Promise<void>
 }
 
 export interface ChannelsOptions {
@@ -29,13 +30,13 @@ export function isPublishOptions(options: unknown): options is PublishOptions {
 }
 
 export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<ChannelEvent> {
-	public readonly channelPrefix?: string;
-	public readonly output: StreamDemuxWrapper<T[keyof T & string]>;
-	public readonly listeners: ChannelsListeners<T>;
-
-	protected readonly _channelEventDemux: StreamDemux<ChannelEvent>;
 	protected readonly _channelDataDemux: StreamDemux<T[keyof T & string]>;
+	protected readonly _channelEventDemux: StreamDemux<ChannelEvent>;
 	protected readonly _channelMap: { [channelName: string]: ChannelDetails };
+
+	public readonly channelPrefix?: string;
+	public readonly listeners: ChannelsListeners<T>;
+	public readonly output: StreamDemuxWrapper<T[keyof T & string]>;
 
 	constructor(options?: ChannelsOptions) {
 		super();
@@ -70,7 +71,6 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 		);
 	}
 
-
 	close(channelName?: keyof T & string): void {
 		this.output.close(channelName);
 		this.listeners.close(channelName);
@@ -80,9 +80,14 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 		return `${this.channelPrefix || ''}${channelName}`;
 	}
 
-	kill(channelName?: keyof T & string | string): void {
-		this.output.kill(channelName);
-		this.listeners.kill(channelName);
+	emit(eventName: 'kickOut', data: KickOutEvent): void;
+	emit(eventName: 'subscribe', data: SubscribeEvent): void;
+	emit(eventName: 'subscribeFail', data: SubscribeFailEvent): void;
+	emit(eventName: 'subscribeRequest', data: SubscribeEvent): void;
+	emit(eventName: 'subscribeStateChange', data: SubscribeStateChangeEvent): void;
+	emit(eventName: 'unsubscribe', data: UnsubscribeEvent): void;
+	emit(eventName: string, data: ChannelEvent): void {
+		super.emit(eventName, data);
 	}
 
 	getBackpressure(channelName?: keyof T & string): number {
@@ -90,6 +95,15 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 			this.output.getBackpressure(channelName),
 			this.listeners.getBackpressure(channelName)
 		);
+	}
+
+	getOptions(channelName: keyof T & string): ChannelOptions {
+		const channel = this._channelMap[channelName];
+
+		if (channel) {
+			return { ...channel.options };
+		}
+		return {};
 	}
 
 	getState(channelName: keyof T & string): ChannelState {
@@ -102,17 +116,19 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 		return 'unsubscribed';
 	}
 
-	getOptions(channelName: keyof T & string): ChannelOptions {
+	abstract invokePublish<U extends keyof T & string>(channelName: keyof T, data: T[U]): Promise<void>;
+
+	isSubscribed(channelName: keyof T & string, includePending?: boolean): boolean {
 		const channel = this._channelMap[channelName];
 
-		if (channel) {
-			return { ...channel.options };
+		if (includePending) {
+			return !!channel;
 		}
-		return {};
+		return !!channel && channel.state === 'subscribed';
 	}
 
 	kickOut(channelName: keyof T & string, message: string): void {
-		const undecoratedChannelName = this.undecorateChannelName(channelName);		
+		const undecoratedChannelName = this.undecorateChannelName(channelName);
 		const channel = this._channelMap[undecoratedChannelName];
 
 		if (channel) {
@@ -125,26 +141,42 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 		}
 	}
 
+	kill(channelName?: keyof T & string | string): void {
+		this.output.kill(channelName);
+		this.listeners.kill(channelName);
+	}
+
+	listen(): DemuxedConsumableStream<StreamEvent<ChannelEvent>>;
+	listen(eventName: 'kickOut'): DemuxedConsumableStream<KickOutEvent>;
+	listen(eventName: 'subscribe'): DemuxedConsumableStream<SubscribeEvent>;
+	listen(eventName: 'subscribeFail'): DemuxedConsumableStream<SubscribeFailEvent>;
+	listen(eventName: 'subscribeRequest'): DemuxedConsumableStream<SubscribeEvent>;
+	listen(eventName: 'subscribeStateChange'): DemuxedConsumableStream<SubscribeStateChangeEvent>;
+	listen(eventName: 'unsubscribe'): DemuxedConsumableStream<UnsubscribeEvent>;
+	listen<U extends ChannelEvent, V = U>(eventName: string): DemuxedConsumableStream<V>;
+	listen<U extends ChannelEvent, V = U>(eventName?: string): DemuxedConsumableStream<StreamEvent<ChannelEvent>> | DemuxedConsumableStream<V> {
+		return super.listen<U, V>(eventName ?? '');
+	}
+
 	subscribe<U extends keyof T & string>(channelName: U, options?: ChannelOptions): Channel<T, U> {
-		options = options || {};
 		let channel = this._channelMap[channelName];
 
 		const sanitizedOptions: ChannelOptions = {
-			waitForAuth: !!options.waitForAuth
+			waitForAuth: !!options?.waitForAuth
 		};
 
-		if (options.priority != null) {
+		if (options?.priority != null) {
 			sanitizedOptions.priority = options.priority;
 		}
-		if (options.data !== undefined) {
+		if (options?.data !== undefined) {
 			sanitizedOptions.data = options.data;
 		}
 
 		if (!channel) {
 			channel = {
 				name: channelName,
-				state: 'pending',
-				options: sanitizedOptions
+				options: sanitizedOptions,
+				state: 'pending'
 			};
 			this._channelMap[channelName] = channel;
 			this.trySubscribe(channel);
@@ -162,6 +194,18 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 		return channelIterable;
 	}
 
+	subscriptions(includePending?: boolean): string[] {
+		const subs: string[] = [];
+
+		Object.keys(this._channelMap).forEach((channelName) => {
+			if (includePending || this._channelMap[channelName]!.state === 'subscribed') {
+				subs.push(channelName);
+			}
+		});
+		return subs;
+	}
+
+	abstract transmitPublish<U extends keyof T & string>(channelName: U, data: T[U]): Promise<void>;
 	protected triggerChannelSubscribe(channel: ChannelDetails, options: ChannelOptions): void {
 		const channelName = channel.name;
 
@@ -171,8 +215,8 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 
 			const stateChangeData: SubscribeStateChangeEvent = {
 				channel: channelName,
-				oldState,
 				newState: channel.state,
+				oldState,
 				options
 			};
 			this._channelEventDemux.write(`${channelName}/subscribeStateChange`, stateChangeData);
@@ -190,8 +234,8 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 		if (channel.state === 'subscribed') {
 			const stateChangeData: SubscribeStateChangeEvent = {
 				channel: channel.name,
-				oldState: channel.state as ChannelState,
 				newState: setAsPending ? 'pending' : 'unsubscribed',
+				oldState: channel.state as ChannelState,
 				options: channel.options
 			};
 			this._channelEventDemux.write(`${channelName}/subscribeStateChange`, stateChangeData);
@@ -206,9 +250,7 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 			delete this._channelMap[channelName];
 		}
 	}
-
 	protected abstract trySubscribe(channel: ChannelDetails): void;
-
 	protected abstract tryUnsubscribe(channel: ChannelDetails): void;
 
 	protected undecorateChannelName(channelName: keyof T & string): string {
@@ -227,52 +269,6 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 		}
 	}
 
-	subscriptions(includePending?: boolean): string[] {
-		const subs: string[] = [];
-
-		Object.keys(this._channelMap).forEach((channelName) => {
-			if (includePending || this._channelMap[channelName].state === 'subscribed') {
-				subs.push(channelName);
-			}
-		});
-		return subs;
-	}
-
-	isSubscribed(channelName: keyof T & string, includePending?: boolean): boolean {
-		const channel = this._channelMap[channelName];
-
-		if (includePending) {
-			return !!channel;
-		}
-		return !!channel && channel.state === 'subscribed';
-	}
-
-	emit(eventName: 'kickOut', data: KickOutEvent): void;
-	emit(eventName: 'subscribe', data: SubscribeEvent): void;
-	emit(eventName: 'subscribeFail', data: SubscribeFailEvent): void;
-	emit(eventName: 'subscribeRequest', data: SubscribeEvent): void;
-	emit(eventName: 'subscribeStateChange', data: SubscribeStateChangeEvent): void;
-	emit(eventName: 'unsubscribe', data: UnsubscribeEvent): void;
-	emit(eventName: string, data: ChannelEvent): void {
-		super.emit(eventName, data);
-	}
-
-	listen(): DemuxedConsumableStream<StreamEvent<ChannelEvent>>;
-	listen(eventName: 'kickOut'): DemuxedConsumableStream<KickOutEvent>;
-	listen(eventName: 'subscribe'): DemuxedConsumableStream<SubscribeEvent>;
-	listen(eventName: 'subscribeFail'): DemuxedConsumableStream<SubscribeFailEvent>;
-	listen(eventName: 'subscribeRequest'): DemuxedConsumableStream<SubscribeEvent>;
-	listen(eventName: 'subscribeStateChange'): DemuxedConsumableStream<SubscribeStateChangeEvent>;
-	listen(eventName: 'unsubscribe'): DemuxedConsumableStream<UnsubscribeEvent>;
-	listen<U extends ChannelEvent, V = U>(eventName: string): DemuxedConsumableStream<V>;	
-	listen<U extends ChannelEvent, V = U>(eventName?: string): DemuxedConsumableStream<StreamEvent<ChannelEvent>> | DemuxedConsumableStream<V> {
-		return super.listen<U, V>(eventName ?? '');
-	}
-
-	abstract transmitPublish<U extends keyof T & string>(channelName: U, data: T[U]): Promise<void>;
-
-	abstract invokePublish<U extends keyof T & string>(channelName: keyof T, data: T[U]): Promise<void>
-
 	write<U extends keyof T & string>(channelName: U, data: T[U]): void {
 		const undecoratedChannelName = this.undecorateChannelName(channelName);
 		const isSubscribed = this.isSubscribed(undecoratedChannelName, true);
@@ -280,5 +276,5 @@ export abstract class Channels<T extends ChannelMap> extends AsyncStreamEmitter<
 		if (isSubscribed) {
 			this._channelDataDemux.write(undecoratedChannelName, data);
 		}
-	}	
+	}
 }
