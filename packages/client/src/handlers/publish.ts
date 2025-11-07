@@ -1,12 +1,13 @@
-import { ChannelMap, PublishOptions } from "@socket-mesh/channels";
-import { RequestHandlerArgs } from "@socket-mesh/core";
-import { ClientSocket } from "../client-socket.js";
-import { ClientTransport } from "../client-transport.js";
-import { ClientPrivateMap } from "../maps/client-map.js";
-import { ServerPrivateMap } from "../maps/server-map.js";
+import { ChannelMap, PublishOptions } from '@socket-mesh/channels';
+import { RequestHandlerArgs } from '@socket-mesh/core';
+
+import { ClientSocket } from '../client-socket.js';
+import { ClientTransport } from '../client-transport.js';
+import { ClientPrivateMap } from '../maps/client-map.js';
+import { ServerPrivateMap } from '../maps/server-map.js';
 
 export async function publishHandler(
-	{ socket, options }: RequestHandlerArgs<
+	{ options, socket }: RequestHandlerArgs<
 		PublishOptions,
 		ClientPrivateMap,
 		{},
@@ -14,7 +15,7 @@ export async function publishHandler(
 		{},
 		{},
 		ClientSocket<{}, ChannelMap>,
-		ClientTransport<{}, {}, {}, {}, {}>
+		ClientTransport<{}, {}, {}, {}, { }>
 	>
 ): Promise<void> {
 	socket.channels.write(options.channel, options.data);

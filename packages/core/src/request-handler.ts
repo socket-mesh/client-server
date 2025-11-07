@@ -1,7 +1,19 @@
-import { TimeoutError } from "@socket-mesh/errors";
-import { Socket } from "./socket.js";
-import { SocketTransport } from "./socket-transport.js";
-import { MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap } from "./maps/method-map.js";
+import { TimeoutError } from '@socket-mesh/errors';
+
+import { MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap } from './maps/method-map.js';
+import { SocketTransport } from './socket-transport.js';
+import { Socket } from './socket.js';
+
+export type RequestHandler<
+	TOptions, U,
+	TIncoming extends MethodMap,
+	TOutgoing extends PublicMethodMap,
+	TPrivateOutgoing extends PrivateMethodMap,
+	TService extends ServiceMap,
+	TState extends object,
+	TSocket extends Socket<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> = Socket<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>,
+	TTransport extends SocketTransport<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> = SocketTransport<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>
+> = (args: RequestHandlerArgs<TOptions, TIncoming, TOutgoing, TPrivateOutgoing, TService, TState, TSocket, TTransport>) => Promise<U>;
 
 export interface RequestHandlerArgsOptions<
 	TOptions,
@@ -15,10 +27,10 @@ export interface RequestHandlerArgsOptions<
 > {
 	isRpc: boolean,
 	method: string,
+	options: TOptions,
 	socket: TSocket,
-	transport: TTransport,
-	timeoutMs?: number | boolean,
-	options: TOptions
+	timeoutMs?: boolean | number,
+	transport: TTransport
 }
 
 export class RequestHandlerArgs<
@@ -36,7 +48,7 @@ export class RequestHandlerArgs<
 	public options: TOptions;
 	public requestedAt: Date;
 	public socket: TSocket;
-	public timeoutMs?: number | boolean;
+	public timeoutMs?: boolean | number;
 	public transport: TTransport;
 
 	constructor(options: RequestHandlerArgsOptions<TOptions, TIncoming, TOutgoing, TPrivateOutgoing, TService, TState, TSocket, TTransport>) {
@@ -51,7 +63,7 @@ export class RequestHandlerArgs<
 
 	checkTimeout(timeLeftMs = 0): void {
 		if (typeof this.timeoutMs === 'number' && this.getRemainingTimeMs() <= timeLeftMs) {
-			throw new TimeoutError(`Method \'${this.method}\' timed out.`);
+			throw new TimeoutError(`Method '${this.method}' timed out.`);
 		}
 	}
 
@@ -63,14 +75,3 @@ export class RequestHandlerArgs<
 		return Infinity;
 	}
 }
-
-export type RequestHandler<
-	TOptions, U,
-	TIncoming extends MethodMap,
-	TOutgoing extends PublicMethodMap,
-	TPrivateOutgoing extends PrivateMethodMap,
-	TService extends ServiceMap,
-	TState extends object,
-	TSocket extends Socket<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> = Socket<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>,
-	TTransport extends SocketTransport<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState> = SocketTransport<TIncoming, TOutgoing, TPrivateOutgoing, TService, TState>
-> = (args: RequestHandlerArgs<TOptions, TIncoming, TOutgoing, TPrivateOutgoing, TService, TState, TSocket, TTransport>) => Promise<U>;

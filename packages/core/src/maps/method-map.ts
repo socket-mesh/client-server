@@ -1,8 +1,10 @@
+/* eslint-disable @typescript-eslint/consistent-type-definitions */
+
 export type FunctionReturnType<T extends (...args: any) => any> = T extends (...args: any) => infer R ? R : never;
 
 export type MappedFunction = (...args: any) => any;
 
-export interface MethodMap { [method: string]: MappedFunction }
+export type MethodMap = { [method: string]: MappedFunction };
 
 export type PrivateMethodMap = { [method: string]: MappedFunction } & { [method: `#${string}`]: MappedFunction };
 
@@ -29,4 +31,4 @@ export type RemoveIndexSignature<T> = {
 	]: T[K];
 };
 
-export interface ServiceMap { [service: string]: MethodMap }
+export type ServiceMap = { [service: string]: MethodMap };

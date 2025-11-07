@@ -1,11 +1,12 @@
-import { ServerOptions as WebSocketServerOptions } from "ws";
-import { AuthEngine, AuthOptions } from "@socket-mesh/auth-engine";
-import { CallIdGenerator, HandlerMap, StreamCleanupMode, ServiceMap, PublicMethodMap, PrivateMethodMap } from "@socket-mesh/core";
-import { CodecEngine } from "@socket-mesh/formatter";
-import { ServerPlugin } from "./plugin/server-plugin.js";
-import { Broker } from "./broker/broker.js";
-import { ChannelMap } from "@socket-mesh/channels";
-import { ClientPrivateMap, ServerPrivateMap } from "@socket-mesh/client";
+import { AuthEngine, AuthOptions } from '@socket-mesh/auth-engine';
+import { ChannelMap } from '@socket-mesh/channels';
+import { ClientPrivateMap, ServerPrivateMap } from '@socket-mesh/client';
+import { CallIdGenerator, HandlerMap, PrivateMethodMap, PublicMethodMap, ServiceMap, StreamCleanupMode } from '@socket-mesh/core';
+import { CodecEngine } from '@socket-mesh/formatter';
+import { ServerOptions as WebSocketServerOptions } from 'ws';
+
+import { Broker } from './broker/broker.js';
+import { ServerPlugin } from './plugin/server-plugin.js';
 
 export interface ServerOptions<
 	TIncoming extends PublicMethodMap = {},
@@ -32,24 +33,24 @@ export interface ServerOptions<
 
 	codecEngine?: CodecEngine,
 
-	// In milliseconds, the timeout for receiving a response
-	// when using invoke() or invokePublish().	ackTimeout: number
-	handshakeTimeoutMs?: number,
+	handlers?: HandlerMap<TIncoming & TPrivateIncoming & ServerPrivateMap, TOutgoing, TPrivateOutgoing & ClientPrivateMap, TService, TState>,
 
-	handlers?: HandlerMap<TIncoming & TPrivateIncoming & ServerPrivateMap, TOutgoing, TPrivateOutgoing & ClientPrivateMap, TService, TState>;
+	// In milliseconds, the timeout for receiving a response
+	// when using invoke() or invokePublish(). ackTimeout: number
+	handshakeTimeoutMs?: number,
 
 	isPingTimeoutDisabled?: boolean,
 
-	plugins?: ServerPlugin<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>[],
-
 	// Origins which are allowed to connect to the server.
-	origins?: string;
+	origins?: string,
 
 	// The interval in milliseconds on which to send a ping to the client to check that
 	// it is still alive.
 	pingIntervalMs?: number,
 
 	pingTimeoutMs?: number,
+
+	plugins?: ServerPlugin<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>[],
 
 	// The maximum number of unique channels which a single socket can subscribe to.
 	socketChannelLimit?: number,

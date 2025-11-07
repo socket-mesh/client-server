@@ -1,23 +1,24 @@
-import jwt from "jsonwebtoken";
-import { AuthTokenError, AuthTokenExpiredError, AuthTokenInvalidError, AuthTokenNotBeforeError, InvalidActionError } from "@socket-mesh/errors";
-import { AuthEngine } from "@socket-mesh/auth-engine";
-import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
-import { ServerSocket } from "../server-socket.js";
-import { ServerTransport } from "../server-transport.js";
-import { ServerRequestHandlerArgs } from "./server-request-handler.js";
+import { AuthToken, SignedAuthToken } from '@socket-mesh/auth';
+import { AuthEngine } from '@socket-mesh/auth-engine';
+import { AuthTokenError, AuthTokenExpiredError, AuthTokenInvalidError, AuthTokenNotBeforeError, InvalidActionError } from '@socket-mesh/errors';
+import jwt from 'jsonwebtoken';
+
+import { ServerSocket } from '../server-socket.js';
+import { ServerTransport } from '../server-transport.js';
+import { ServerRequestHandlerArgs } from './server-request-handler.js';
 
 const HANDSHAKE_REJECTION_STATUS_CODE = 4008;
 
-export type AuthInfo = ValidAuthInfo | InvalidAuthInfo;
+export type AuthInfo = InvalidAuthInfo | ValidAuthInfo;
 
 export interface InvalidAuthInfo {
-	signedAuthToken: SignedAuthToken,
-	authError: AuthTokenError
+	authError: AuthTokenError,
+	signedAuthToken: SignedAuthToken
 };
 
 export interface ValidAuthInfo {
-	signedAuthToken: SignedAuthToken,
-	authToken: AuthToken
+	authToken: AuthToken,
+	signedAuthToken: SignedAuthToken
 }
 
 export async function authenticateHandler(
@@ -25,45 +26,13 @@ export async function authenticateHandler(
 ): Promise<void> {
 	if (!isRpc) {
 		socket.disconnect(HANDSHAKE_REJECTION_STATUS_CODE);
-		
+
 		throw new InvalidActionError('Handshake request was malformatted');
 	}
 
 	const authInfo = await validateAuthToken(socket.server.auth, signedAuthToken);
 
 	await processAuthentication(socket, transport, authInfo);
-}
-
-export async function validateAuthToken(
-	auth: AuthEngine, authToken: SignedAuthToken, verificationOptions?: jwt.VerifyOptions
-): Promise<AuthInfo> {
-
-	try {
-		return {
-			signedAuthToken: authToken,
-			authToken: await auth.verifyToken(authToken, verificationOptions)
-		};
-	} catch (error) {
-		return {
-			signedAuthToken: authToken,
-			authError: processTokenError(error)
-		};		
-	}
-}
-
-function processTokenError(err: jwt.VerifyErrors): AuthTokenError {
-	if (err.name === 'TokenExpiredError' && 'expiredAt' in err) {
-		return new AuthTokenExpiredError(err.message, err.expiredAt);
-	}
-	if (err.name === 'JsonWebTokenError') {
-		return new AuthTokenInvalidError(err.message);
-	}
-	if (err.name === 'NotBeforeError' && 'date' in err) {
-		// In this case, the token is good; it's just not active yet.
-		return new AuthTokenNotBeforeError(err.message, err.date);
-	}
-
-	return new AuthTokenError(err.message);
 }
 
 export async function processAuthentication(
@@ -76,6 +45,7 @@ export async function processAuthentication(
 
 		// If the error is related to the JWT being badly formatted, then we will
 		// treat the error as a socket error.
+		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 		if (authInfo.signedAuthToken != null) {
 			transport.onError(authInfo.authError);
 
@@ -103,4 +73,35 @@ export async function processAuthentication(
 	}
 
 	return await transport.setAuthorization(authInfo.signedAuthToken, authInfo.authToken);
+}
+
+function processTokenError(err: jwt.VerifyErrors): AuthTokenError {
+	if (err.name === 'TokenExpiredError' && 'expiredAt' in err) {
+		return new AuthTokenExpiredError(err.message, err.expiredAt);
+	}
+	if (err.name === 'JsonWebTokenError') {
+		return new AuthTokenInvalidError(err.message);
+	}
+	if (err.name === 'NotBeforeError' && 'date' in err) {
+		// In this case, the token is good; it's just not active yet.
+		return new AuthTokenNotBeforeError(err.message, err.date);
+	}
+
+	return new AuthTokenError(err.message);
+}
+
+export async function validateAuthToken(
+	auth: AuthEngine, authToken: SignedAuthToken, verificationOptions?: jwt.VerifyOptions
+): Promise<AuthInfo> {
+	try {
+		return {
+			authToken: await auth.verifyToken(authToken, verificationOptions),
+			signedAuthToken: authToken
+		};
+	} catch (error) {
+		return {
+			authError: processTokenError(error),
+			signedAuthToken: authToken
+		};
+	}
 }

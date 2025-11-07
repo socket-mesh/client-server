@@ -1,9 +1,10 @@
-import { BrokerError, InvalidActionError } from "@socket-mesh/errors";
-import { SubscribeOptions } from "@socket-mesh/client";
-import { ServerRequestHandlerArgs } from "./server-request-handler.js";
+import { SubscribeOptions } from '@socket-mesh/client';
+import { BrokerError, InvalidActionError } from '@socket-mesh/errors';
+
+import { ServerRequestHandlerArgs } from './server-request-handler.js';
 
 export async function subscribeHandler(
-	{ socket, transport, options }: ServerRequestHandlerArgs<SubscribeOptions>
+	{ options, socket, transport }: ServerRequestHandlerArgs<SubscribeOptions>
 ): Promise<void> {
 	if (socket.status !== 'ready') {
 		// This is an invalid state; it means the client tried to subscribe before
@@ -32,7 +33,7 @@ export async function subscribeHandler(
 		if (state.channelSubscriptions == null) {
 			state.channelSubscriptions = {};
 		}
-	
+
 		if (state.channelSubscriptionsCount == null) {
 			state.channelSubscriptionsCount = 0;
 		}
@@ -49,7 +50,7 @@ export async function subscribeHandler(
 			state.channelSubscriptionsCount--;
 			throw error;
 		}
-		
+
 		server.exchange.emit('subscribe', { channel, options: channelOptions });
 	} catch (err) {
 		throw new BrokerError(`Failed to subscribe socket to the ${options.channel} channel - ${err}`);

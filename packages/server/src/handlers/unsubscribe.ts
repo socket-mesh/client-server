@@ -1,8 +1,9 @@
-import { BrokerError } from "@socket-mesh/errors";
-import { ServerRequestHandlerArgs } from "./server-request-handler.js";
+import { BrokerError } from '@socket-mesh/errors';
+
+import { ServerRequestHandlerArgs } from './server-request-handler.js';
 
 export async function unsubscribeHandler(
-	{ transport, options: channel }: ServerRequestHandlerArgs<string>
+	{ options: channel, transport }: ServerRequestHandlerArgs<string>
 ): Promise<void> {
 	try {
 		await transport.unsubscribe(channel);

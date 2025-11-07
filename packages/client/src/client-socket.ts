@@ -1,16 +1,17 @@
-import { ClientTransport } from "./client-transport.js";
-import { AutoReconnectOptions, ClientSocketOptions, ConnectOptions, parseClientOptions } from "./client-socket-options.js";
-import { setAuthTokenHandler } from "./handlers/set-auth-token.js";
-import { removeAuthTokenHandler } from "./handlers/remove-auth-token.js";
-import { SignedAuthToken } from "@socket-mesh/auth";
-import { hydrateError } from "@socket-mesh/errors";
-import { MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap, Socket, wait } from "@socket-mesh/core";
-import { ClientChannels } from "./client-channels.js";
-import { ClientPrivateMap } from "./maps/client-map.js";
-import { publishHandler } from "./handlers/publish.js";
-import { kickOutHandler } from "./handlers/kickout.js";
-import { ChannelMap } from "@socket-mesh/channels";
-import { ServerPrivateMap } from "./maps/server-map.js";
+import { SignedAuthToken } from '@socket-mesh/auth';
+import { ChannelMap } from '@socket-mesh/channels';
+import { MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap, Socket, wait } from '@socket-mesh/core';
+import { hydrateError } from '@socket-mesh/errors';
+
+import { ClientChannels } from './client-channels.js';
+import { AutoReconnectOptions, ClientSocketOptions, ConnectOptions, parseClientOptions } from './client-socket-options.js';
+import { ClientTransport } from './client-transport.js';
+import { kickOutHandler } from './handlers/kickout.js';
+import { publishHandler } from './handlers/publish.js';
+import { removeAuthTokenHandler } from './handlers/remove-auth-token.js';
+import { setAuthTokenHandler } from './handlers/set-auth-token.js';
+import { ClientPrivateMap } from './maps/client-map.js';
+import { ServerPrivateMap } from './maps/server-map.js';
 
 export class ClientSocket<
 	TOutgoing extends PublicMethodMap = {},
@@ -25,7 +26,7 @@ export class ClientSocket<
 	TPrivateOutgoing & ServerPrivateMap,
 	TService,
 	TState
-> {
+	> {
 	private readonly _clientTransport: ClientTransport<TIncoming, TService, TOutgoing, TPrivateOutgoing, TState>;
 	public readonly channels: ClientChannels<TChannel, TIncoming, TService, TOutgoing, TPrivateOutgoing, TState>;
 
@@ -34,13 +35,13 @@ export class ClientSocket<
 	constructor(options: ClientSocketOptions<TOutgoing, TService, TIncoming, TPrivateOutgoing, TState> | string | URL) {
 		options = parseClientOptions(options);
 
-		options.handlers = 
+		options.handlers =
 			Object.assign(
 				{
-					"#kickOut": kickOutHandler,
-					"#publish": publishHandler,
-					"#setAuthToken": setAuthTokenHandler,
-					"#removeAuthToken": removeAuthTokenHandler
+					'#kickOut': kickOutHandler,
+					'#publish': publishHandler,
+					'#removeAuthToken': removeAuthTokenHandler,
+					'#setAuthToken': setAuthTokenHandler
 				},
 				options.handlers
 			);
@@ -56,7 +57,7 @@ export class ClientSocket<
 			this.connect(options);
 		}
 	}
-	
+
 	public async authenticate(signedAuthToken: SignedAuthToken): Promise<void> {
 		try {
 			await this._clientTransport.invoke('#authenticate', signedAuthToken)[0];
@@ -83,7 +84,7 @@ export class ClientSocket<
 		return this._clientTransport.autoReconnect;
 	}
 
-	public set autoReconnect(value: Partial<AutoReconnectOptions> | boolean) {
+	public set autoReconnect(value: boolean | Partial<AutoReconnectOptions>) {
 		this._clientTransport.autoReconnect = value;
 	}
 
@@ -101,7 +102,7 @@ export class ClientSocket<
 
 	async deauthenticate(): Promise<boolean> {
 		(async () => {
-			let oldAuthToken: SignedAuthToken | null;
+			let oldAuthToken: null | SignedAuthToken;
 
 			try {
 				oldAuthToken = await this._clientTransport.authEngine.removeToken();

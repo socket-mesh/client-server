@@ -21,14 +21,15 @@ export type HandshakeStatus = HandshakeAuthenticatedStatus | HandshakeErrorStatu
 
 // Typescript automatically adds an index signature to type definitions (vs interfaces).
 // If you add an index signature to an interface it has effects on IntelliSense.
-export interface ServerPrivateMap {
+// eslint-disable-next-line @typescript-eslint/consistent-type-definitions
+export type ServerPrivateMap = {
 	'#authenticate': (authToken: string) => void,
 	'#handshake': (options: HandshakeOptions) => HandshakeStatus,
 	'#publish': (options: PublishOptions) => void,
 	'#removeAuthToken': () => void,
 	'#subscribe': (options: SubscribeOptions) => void,
 	'#unsubscribe': (channelName: string) => void
-}
+};
 
 export interface SubscribeOptions extends ChannelOptions {
 	channel: string

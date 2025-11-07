@@ -1,10 +1,10 @@
-import assert from 'node:assert';
-import { beforeEach, afterEach, describe, it, mock } from "node:test";
 import { ClientSocket, ClientSocketOptions, LocalStorageAuthEngine, OfflinePlugin } from '@socket-mesh/client';
-import { AuthStateChangeEvent, CloseEvent, DisconnectEvent, SocketStatus, RequestHandlerArgs, wait } from '@socket-mesh/core';
-import { Server, ServerRequestHandlerArgs, listen } from '@socket-mesh/server';
+import { AuthStateChangeEvent, CloseEvent, DisconnectEvent, RequestHandlerArgs, SocketStatus, wait } from '@socket-mesh/core';
 import localStorage from '@socket-mesh/local-storage';
-import jwt from "jsonwebtoken";
+import { listen, Server, ServerRequestHandlerArgs } from '@socket-mesh/server';
+import jwt from 'jsonwebtoken';
+import assert from 'node:assert';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 // Add to the global scope like in browser.
 global.localStorage = localStorage;
@@ -22,23 +22,23 @@ interface LoginRequest {
 	username: string
 }
 
-type MyChannels = {
-	foo: string | { abc: number },
+interface MyChannels {
 	bar: string | { def: number },
+	foo: string | { abc: number },
 	priv: string,
 	priv2: string
 }
 
-type ServerIncomingMap = {
+interface ServerIncomingMap {
 	login: (req: LoginRequest) => void,
 	performTask: (num: number) => void,
-	setAuthKey: (secret: jwt.Secret) => void,
+	setAuthKey: (secret: jwt.Secret) => void
 }
 
 const allowedUsers: { [name: string]: true } = {
+	alice: true,
 	bob: true,
-	kate: true,
-	alice: true
+	kate: true
 };
 
 let client: ClientSocket<ServerIncomingMap, MyChannels>;
@@ -46,7 +46,7 @@ let server: Server<ServerIncomingMap, MyChannels>;
 
 let performTaskTriggered: boolean;
 
-async function loginHandler({ transport, options }: ServerRequestHandlerArgs<LoginRequest>): Promise<void> {
+async function loginHandler({ options, transport }: ServerRequestHandlerArgs<LoginRequest>): Promise<void> {
 	if (!allowedUsers[options.username]) {
 		const err = new Error('Failed to login');
 		err.name = 'FailedLoginError';
@@ -54,8 +54,8 @@ async function loginHandler({ transport, options }: ServerRequestHandlerArgs<Log
 	}
 
 	const authToken = {
-		username: options.username,
-		exp: Math.round(Date.now() / 1000) + TOKEN_EXPIRY_IN_SECONDS
+		exp: Math.round(Date.now() / 1000) + TOKEN_EXPIRY_IN_SECONDS,
+		username: options.username
 	};
 
 	transport.setAuthorization(authToken);
@@ -66,23 +66,23 @@ async function performTaskHandler({ options }: RequestHandlerArgs<number>): Prom
 	await wait(options);
 }
 
-async function setAuthKeyHandler({ socket, options: secret }: ServerRequestHandlerArgs<jwt.Secret>): Promise<void> {
+async function setAuthKeyHandler({ options: secret, socket }: ServerRequestHandlerArgs<jwt.Secret>): Promise<void> {
 	socket.server!.auth.authKey = secret;
 }
 
 const clientOptions: ClientSocketOptions<ServerIncomingMap> = {
-	authEngine: { authTokenName },
+	ackTimeoutMs: 200,
 	address: `ws://127.0.0.1:${PORT_NUMBER}`,
-	ackTimeoutMs: 200
-}
+	authEngine: { authTokenName }
+};
 
 describe('Client Tests', function () {
 	beforeEach(async function () {
 		server = listen<ServerIncomingMap, MyChannels>(
 			PORT_NUMBER,
 			{
-				authEngine: { authKey: SERVER_AUTH_KEY },
 				ackTimeoutMs: 200,
+				authEngine: { authKey: SERVER_AUTH_KEY },
 				handlers: {
 					login: loginHandler,
 					performTask: performTaskHandler,
@@ -99,7 +99,7 @@ describe('Client Tests', function () {
 		const cleanupTasks: Promise<DisconnectEvent | void>[] = [];
 
 		global.localStorage.removeItem(authTokenName);
-		
+
 		if (client) {
 			if (client.status !== 'closed') {
 				cleanupTasks.push(
@@ -145,12 +145,10 @@ describe('Client Tests', function () {
 			client = new ClientSocket(clientOptions);
 
 			(async () => {
-				for await (let { error } of client.listen('error')) {
+				for await (const { error } of client.listen('error')) {
 					try {
 						assert.notEqual(error, null);
 						assert.strictEqual(error.name, 'CustomError');
-					} catch (err) {
-						throw err;
 					} finally {
 						done();
 					}
@@ -158,10 +156,10 @@ describe('Client Tests', function () {
 			})();
 
 			(async () => {
-				for await (let status of client.listen('connect')) {
-					let error = new Error('Custom error');
+				for await (const status of client.listen('connect')) {
+					const error = new Error('Custom error');
 					error.name = 'CustomError';
-					client.emit('error', {error});
+					client.emit('error', { error });
 				}
 			})();
 		});
@@ -252,7 +250,7 @@ describe('Client Tests', function () {
 		});
 
 		it('If token engine signing is synchronous, authentication can be captured using the authenticate event', async function () {
-//				authSignAsync: false
+			//				authSignAsync: false
 			client = new ClientSocket(clientOptions);
 
 			await client.listen('connect').once(100);
@@ -262,7 +260,7 @@ describe('Client Tests', function () {
 				client.listen('authenticate').once(100)
 			]);
 
-			//assert.strictEqual(client.authState, AuthState.AUTHENTICATED);
+			// assert.strictEqual(client.authState, AuthState.AUTHENTICATED);
 			assert.notEqual(client.authToken, null);
 			assert.strictEqual(client.authToken?.username, 'bob');
 		});
@@ -274,11 +272,11 @@ describe('Client Tests', function () {
 			await client.listen('connect').once(100);
 
 			await Promise.all([
-				client.invoke('login', {username: 'bob'}),
+				client.invoke('login', { username: 'bob' }),
 				client.listen('authenticate').once(100)
 			]);
 
-			//assert.strictEqual(client.authState, AuthState.AUTHENTICATED);
+			// assert.strictEqual(client.authState, AuthState.AUTHENTICATED);
 			assert.notEqual(client.authToken, null);
 			assert.strictEqual(client.authToken?.username, 'bob');
 		});
@@ -286,13 +284,13 @@ describe('Client Tests', function () {
 		it('If token verification is synchronous, authentication can be captured using the authenticate event', async function () {
 			client = new ClientSocket(clientOptions);
 			// authVerifyAsync: false
-	
+
 			await client.listen('connect').once();
-	
+
 			await Promise.all([
 				(async () => {
 					await Promise.all([
-						client.invoke('login', {username: 'bob'}),
+						client.invoke('login', { username: 'bob' }),
 						client.listen('authenticate').once()
 					]);
 					client.disconnect();
@@ -300,11 +298,11 @@ describe('Client Tests', function () {
 				(async () => {
 					await client.listen('authenticate').once();
 					await client.listen('disconnect').once();
-					
+
 					client.connect();
-					
+
 					const event = await client.listen('connect').once();
-	
+
 					assert.strictEqual(event.isAuthenticated, true);
 					assert.notEqual(client.authToken, null);
 					assert.strictEqual(client.authToken?.username, 'bob');
@@ -315,7 +313,7 @@ describe('Client Tests', function () {
 		it('Should start out in pending authState and switch to unauthenticated if no token exists', async function () {
 			client = new ClientSocket(clientOptions);
 
-			//assert.strictEqual(client.authState, AuthState.UNAUTHENTICATED);
+			// assert.strictEqual(client.authState, AuthState.UNAUTHENTICATED);
 			assert.equal(client.signedAuthToken, null);
 
 			(async () => {
@@ -334,9 +332,9 @@ describe('Client Tests', function () {
 
 			mock.method(
 				authEngine,
-				'saveToken', 
+				'saveToken',
 				() => {
-					let err = new Error('Failed to save token');
+					const err = new Error('Failed to save token');
 					err.name = 'FailedToSaveTokenError';
 					return Promise.reject(err);
 				}
@@ -350,7 +348,7 @@ describe('Client Tests', function () {
 			let caughtError: Error;
 
 			(async () => {
-				for await (let {error} of client.listen('error')) {
+				for await (const { error } of client.listen('error')) {
 					caughtError = error;
 				}
 			})();
@@ -388,49 +386,49 @@ describe('Client Tests', function () {
 
 		it('Should go through the correct sequence of authentication state changes when dealing with disconnections; part 1', async function () {
 			client = new ClientSocket(clientOptions);
-	
+
 			const expectedAuthStateChanges = [
 				'false->true'
 			];
 			const authStateChanges: string[] = [];
-	
+
 			(async () => {
-				for await (let state of client.listen('authStateChange')) {
+				for await (const state of client.listen('authStateChange')) {
 					authStateChanges.push(`${state.wasAuthenticated}->${state.isAuthenticated}`);
 				}
 			})();
-	
+
 			assert.equal(client.signedAuthToken, null);
-	
+
 			await client.listen('connect').once();
-	
+
 			assert.equal(client.signedAuthToken, null);
-	
+
 			(async () => {
 				await Promise.all([
-					client.invoke('login', {username: 'bob'}),
+					client.invoke('login', { username: 'bob' }),
 					client.listen('authenticate').once()
 				]);
 				client.disconnect();
 			})();
-	
+
 			assert.equal(client.signedAuthToken, null);
 
-			const { signedAuthToken, authToken } = await client.listen('authenticate').once();
+			const { authToken, signedAuthToken } = await client.listen('authenticate').once();
 
 			assert.notEqual(signedAuthToken, null);
 			assert.notEqual(authToken, null);
-	
+
 			assert.notEqual(client.signedAuthToken, null);
 
 			await client.listen('disconnect').once();
-	
+
 			// In case of disconnection, the socket maintains the last known auth state.
 			assert.notEqual(client.signedAuthToken, null);
 
 			await client.authenticate(signedAuthToken);
 
-			assert.notEqual(client.signedAuthToken, null);			
+			assert.notEqual(client.signedAuthToken, null);
 			assert.strictEqual(JSON.stringify(authStateChanges), JSON.stringify(expectedAuthStateChanges));
 			client.closeListeners('authStateChange');
 		});
@@ -438,7 +436,7 @@ describe('Client Tests', function () {
 		it('Should go through the correct sequence of authentication state changes when dealing with disconnections; part 2', async function () {
 			global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
 			client = new ClientSocket(clientOptions);
-	
+
 			const expectedAuthStateChanges = [
 				'false->true',
 				'true->false',
@@ -448,7 +446,7 @@ describe('Client Tests', function () {
 			const authStateChanges: string[] = [];
 
 			(async () => {
-				for await (let status of client.listen('authStateChange')) {
+				for await (const status of client.listen('authStateChange')) {
 					authStateChanges.push(`${status.wasAuthenticated}->${status.isAuthenticated}`);
 				}
 			})();
@@ -462,7 +460,7 @@ describe('Client Tests', function () {
 			await client.deauthenticate();
 			assert.equal(client.signedAuthToken, null);
 
-			let authenticatePromise = client.authenticate(validSignedAuthTokenBob);
+			const authenticatePromise = client.authenticate(validSignedAuthTokenBob);
 			assert.equal(client.signedAuthToken, null);
 
 			await authenticatePromise;
@@ -489,7 +487,7 @@ describe('Client Tests', function () {
 			const authStateChanges: string[] = [];
 
 			(async () => {
-				for await (let status of client.listen('authStateChange')) {
+				for await (const status of client.listen('authStateChange')) {
 					authStateChanges.push(`${status.wasAuthenticated}->${status.isAuthenticated}`);
 				}
 			})();
@@ -522,7 +520,7 @@ describe('Client Tests', function () {
 			const authStateChanges: string[] = [];
 
 			(async () => {
-				for await (let status of client.listen('authStateChange')) {
+				for await (const status of client.listen('authStateChange')) {
 					authStateChanges.push(`${status.wasAuthenticated}->${status.isAuthenticated}`);
 				}
 			})();
@@ -531,16 +529,16 @@ describe('Client Tests', function () {
 				validSignedAuthTokenBob,
 				validSignedAuthTokenKate
 			];
-			const authTokenChanges: (string | null)[] = [];
+			const authTokenChanges: (null | string)[] = [];
 
 			(async () => {
-				for await (let event of client.listen('authenticate')) {
+				for await (const event of client.listen('authenticate')) {
 					authTokenChanges.push(client.signedAuthToken);
 				}
 			})();
 
 			(async () => {
-				for await (let event of client.listen('deauthenticate')) {
+				for await (const event of client.listen('deauthenticate')) {
 					authTokenChanges.push(client.signedAuthToken);
 				}
 			})();
@@ -566,7 +564,7 @@ describe('Client Tests', function () {
 		it('Should wait for socket to be authenticated before subscribing to waitForAuth channel', async function () {
 			client = new ClientSocket(clientOptions);
 
-			let privateChannel = client.channels.subscribe('priv', { waitForAuth: true });
+			const privateChannel = client.channels.subscribe('priv', { waitForAuth: true });
 			assert.strictEqual(privateChannel.state, 'pending');
 
 			await client.listen('connect').once(100);
@@ -575,7 +573,7 @@ describe('Client Tests', function () {
 			let isAuthenticated = false;
 
 			(async () => {
-				await client.invoke('login', {username: 'bob'});
+				await client.invoke('login', { username: 'bob' });
 
 				isAuthenticated = !!client.signedAuthToken;
 			})();
@@ -604,11 +602,11 @@ describe('Client Tests', function () {
 				'false->true',
 				'true->false'
 			];
-			let initialSignedAuthToken: string | null;
+			let initialSignedAuthToken: null | string;
 			const authStateChanges: string[] = [];
 
 			(async () => {
-				for await (let status of client.listen('authStateChange')) {
+				for await (const status of client.listen('authStateChange')) {
 					authStateChanges.push(`${status.wasAuthenticated}->${status.isAuthenticated}`);
 				}
 			})();
@@ -649,7 +647,7 @@ describe('Client Tests', function () {
 
 			(async () => {
 				// The subscription already went through so it should still be subscribed.
-				const { signedAuthToken, authToken } = await client.listen('deauthenticate').once();
+				const { authToken, signedAuthToken } = await client.listen('deauthenticate').once();
 				// The subscription already went through so it should still be subscribed.
 				assert.strictEqual(privateChannel.state, 'subscribed');
 				assert.strictEqual(!!client.signedAuthToken, false);
@@ -724,7 +722,7 @@ describe('Client Tests', function () {
 			})();
 
 			(async () => {
-				for await (let event of client.listen('connect')) {
+				for await (const event of client.listen('connect')) {
 					client.disconnect();
 				}
 			})();
@@ -745,14 +743,14 @@ describe('Client Tests', function () {
 			let clientError: Error | null = null;
 
 			(async () => {
-				for await (let {error} of client.listen('error')) {
+				for await (const { error } of client.listen('error')) {
 					clientError = error;
 				}
 			})();
 
 			let responseError: Error | null = null;
 
-			for await (let event of client.listen('connect')) {
+			for await (const event of client.listen('connect')) {
 				try {
 					await client.invoke('performTask', 1000);
 				} catch (err) {
@@ -775,20 +773,20 @@ describe('Client Tests', function () {
 
 	describe('Pub/sub', function () {
 		let publisherClient: ClientSocket<ServerIncomingMap, MyChannels>;
-		let lastServerMessage: string | null = null;
+		const lastServerMessage: null | string = null;
 
 		beforeEach(async function () {
 			publisherClient = new ClientSocket(clientOptions);
 
-//			server.removePlugin(PluginType.MIDDLEWARE_INBOUND);
-//			server.setPlugin(PluginType.MIDDLEWARE_INBOUND, async (pluginStream) => {
-//				for await (let action of pluginStream) {
-//					if (action.type === 'publishIn') {
-//						lastServerMessage = (action as ActionPublishIn).data;
-//					}
-//					action.allow();
-//				}
-//			});
+			//			server.removePlugin(PluginType.MIDDLEWARE_INBOUND);
+			//			server.setPlugin(PluginType.MIDDLEWARE_INBOUND, async (pluginStream) => {
+			//				for await (let action of pluginStream) {
+			//					if (action.type === 'publishIn') {
+			//						lastServerMessage = (action as ActionPublishIn).data;
+			//					}
+			//					action.allow();
+			//				}
+			//			});
 		});
 
 		afterEach(async function () {
@@ -813,14 +811,14 @@ describe('Client Tests', function () {
 
 			const receivedMessages: (string | { abc: number })[] = [];
 
-			for await (let message of channel) {
+			for await (const message of channel) {
 				receivedMessages.push(message);
 			}
 
 			assert.strictEqual(receivedMessages.length, 3);
 			assert.strictEqual(receivedMessages[0], 'hello');
 			assert.strictEqual(receivedMessages[1], 'world');
-			assert.strictEqual(JSON.stringify(receivedMessages[2]), JSON.stringify({abc: 123}));
+			assert.strictEqual(JSON.stringify(receivedMessages[2]), JSON.stringify({ abc: 123 }));
 		});
 
 		it('Should receive invoked publish messages if subscribed to channel', async function () {
@@ -842,9 +840,9 @@ describe('Client Tests', function () {
 				channel.close();
 			})();
 
-			let clientReceivedMessages: (string | { def: number })[] = [];
+			const clientReceivedMessages: (string | { def: number })[] = [];
 
-			for await (let message of channel) {
+			for await (const message of channel) {
 				clientReceivedMessages.push(message);
 			}
 
@@ -865,7 +863,7 @@ describe('Client Tests', function () {
 			let disconnectReason;
 
 			(async () => {
-				for await (let event of client.listen('disconnect')) {
+				for await (const event of client.listen('disconnect')) {
 					disconnectCode = event.code;
 					disconnectReason = event.reason;
 				}
@@ -887,7 +885,7 @@ describe('Client Tests', function () {
 			let disconnectReason;
 
 			(async () => {
-				let event = await client.listen('disconnect').once();
+				const event = await client.listen('disconnect').once();
 				disconnectCode = event.code;
 				disconnectReason = event.reason;
 			})();
@@ -900,67 +898,67 @@ describe('Client Tests', function () {
 		});
 	});
 
-  describe('Connecting an already connected socket', function () {
-    it('Should not disconnect socket if no options are provided', async function () {
-      client = new ClientSocket(clientOptions);
+	describe('Connecting an already connected socket', function () {
+		it('Should not disconnect socket if no options are provided', async function () {
+			client = new ClientSocket(clientOptions);
 
-      await client.listen('connect').once();
+			await client.listen('connect').once();
 
-      let disconnectCode: number;
-      let disconnectReason: string | undefined;
+			let disconnectCode: number;
+			let disconnectReason: string | undefined;
 
-      (async () => {
-        for await (let event of client.listen('disconnect')) {
-          disconnectCode = event.code;
-          disconnectReason = event.reason;
-        }
-      })();
+			(async () => {
+				for await (const event of client.listen('disconnect')) {
+					disconnectCode = event.code;
+					disconnectReason = event.reason;
+				}
+			})();
 
-      client.connect();
+			client.connect();
 
-      assert.equal(disconnectCode!, null);
-      assert.equal(disconnectReason, null);
-    });
+			assert.equal(disconnectCode!, null);
+			assert.equal(disconnectReason, null);
+		});
 
-    it('Should disconnect socket with code 1000 and connect again if new options are provided', async function () {
-      client = new ClientSocket(clientOptions);
+		it('Should disconnect socket with code 1000 and connect again if new options are provided', async function () {
+			client = new ClientSocket(clientOptions);
 
-      await client.listen('connect').once();
+			await client.listen('connect').once();
 
-      let disconnectCode: number;
-      let disconnectReason: string | undefined;
+			let disconnectCode: number;
+			let disconnectReason: string | undefined;
 
-      (async () => {
-        for await (let event of client.listen('disconnect')) {
-          disconnectCode = event.code;
-          disconnectReason = event.reason;
-        }
-      })();
+			(async () => {
+				for await (const event of client.listen('disconnect')) {
+					disconnectCode = event.code;
+					disconnectReason = event.reason;
+				}
+			})();
 
-      client.connect(clientOptions);
-      await client.listen('connect').once();
+			client.connect(clientOptions);
+			await client.listen('connect').once();
 
-      assert.equal(disconnectCode!, 1000);
-      assert.equal(disconnectReason, 'Socket was disconnected by the client to initiate a new connection');
-    });
-  });
+			assert.equal(disconnectCode!, 1000);
+			assert.equal(disconnectReason, 'Socket was disconnected by the client to initiate a new connection');
+		});
+	});
 
 	describe('Events', function () {
 		it('Should trigger unsubscribe event on channel before disconnect event', async function () {
 			client = new ClientSocket(clientOptions);
 			let hasUnsubscribed = false;
 
-			let fooChannel = client.channels.subscribe('foo');
+			const fooChannel = client.channels.subscribe('foo');
 
 			(async () => {
-				for await (let event of fooChannel.listen('subscribe')) {
+				for await (const event of fooChannel.listen('subscribe')) {
 					await wait(100);
 					client.disconnect();
 				}
 			})();
 
 			(async () => {
-				for await (let event of fooChannel.listen('unsubscribe')) {
+				for await (const event of fooChannel.listen('unsubscribe')) {
 					hasUnsubscribed = true;
 				}
 			})();
@@ -976,7 +974,7 @@ describe('Client Tests', function () {
 			let wasConnected = false;
 
 			(async () => {
-				for await (let event of client.listen('connect')) {
+				for await (const event of client.listen('connect')) {
 					wasConnected = true;
 					(async () => {
 						try {
@@ -988,9 +986,9 @@ describe('Client Tests', function () {
 						}
 					})();
 
-					let fooChannel = client.channels.subscribe('foo');
+					const fooChannel = client.channels.subscribe('foo');
 					(async () => {
-						for await (let event of fooChannel.listen('subscribeFail')) {
+						for await (const event of fooChannel.listen('subscribeFail')) {
 							hasSubscribeFailed = true;
 						}
 					})();
@@ -1012,26 +1010,26 @@ describe('Client Tests', function () {
 		it('Should resolve invoke Promise with BadConnectionError before triggering the disconnect event', async function () {
 			client = new ClientSocket({
 				...clientOptions,
-				plugins: [new OfflinePlugin()],
-				ackTimeoutMs: 2000
+				ackTimeoutMs: 2000,
+				plugins: [new OfflinePlugin()]
 			});
 
 			const messageList: any[] = [];
 			let clientStatus = client.status;
 
 			(async () => {
-				for await (let event of client.listen('disconnect')) {
+				for await (const event of client.listen('disconnect')) {
 					messageList.push({
-						type: 'disconnect',
 						code: event.code,
-						reason: event.reason
+						reason: event.reason,
+						type: 'disconnect'
 					});
 				}
 
-				for await (let event of client.listen('error')) {
+				for await (const event of client.listen('error')) {
 					messageList.push({
-						type: 'error',
-						error: event.error
+						error: event.error,
+						type: 'error'
 					});
 				}
 			})();
@@ -1042,8 +1040,8 @@ describe('Client Tests', function () {
 				} catch (err) {
 					clientStatus = client.status;
 					messageList.push({
-						type: 'error',
-						error: err
+						error: err,
+						type: 'error'
 					});
 				}
 			})();
@@ -1063,7 +1061,7 @@ describe('Client Tests', function () {
 			let clientError: Error | null = null;
 
 			(async () => {
-				for await (let {error} of client.listen('error')) {
+				for await (const { error } of client.listen('error')) {
 					clientError = error;
 				}
 			})();
@@ -1071,31 +1069,31 @@ describe('Client Tests', function () {
 			const eventList: string[] = [];
 
 			(async () => {
-				for await (let event of client.listen('connecting')) {
+				for await (const event of client.listen('connecting')) {
 					eventList.push('connecting');
 				}
 			})();
 
 			(async () => {
-				for await (let event of client.listen('connect')) {
+				for await (const event of client.listen('connect')) {
 					eventList.push('connect');
 				}
 			})();
 
 			(async () => {
-				for await (let event of client.listen('disconnect')) {
+				for await (const event of client.listen('disconnect')) {
 					eventList.push('disconnect');
 				}
 			})();
 
 			(async () => {
-				for await (let event of client.listen('close')) {
+				for await (const event of client.listen('close')) {
 					eventList.push('close');
 				}
 			})();
 
 			(async () => {
-				for await (let event of client.listen('connectAbort')) {
+				for await (const event of client.listen('connectAbort')) {
 					eventList.push('connectAbort');
 				}
 			})();
@@ -1118,18 +1116,18 @@ describe('Client Tests', function () {
 		it('Should correctly handle multiple successive connect and disconnect calls', async function () {
 			client = new ClientSocket(clientOptions);
 
-			let eventList: any[] = [];
+			const eventList: any[] = [];
 
 			let clientError: Error;
 
 			(async () => {
-				for await (let {error} of client.listen('error')) {
+				for await (const { error } of client.listen('error')) {
 					clientError = error;
 				}
 			})();
 
 			(async () => {
-				for await (let event of client.listen('connecting')) {
+				for await (const event of client.listen('connecting')) {
 					eventList.push({
 						event: 'connecting'
 					});
@@ -1137,7 +1135,7 @@ describe('Client Tests', function () {
 			})();
 
 			(async () => {
-				for await (let event of client.listen('connect')) {
+				for await (const event of client.listen('connect')) {
 					eventList.push({
 						event: 'connect'
 					});
@@ -1145,30 +1143,30 @@ describe('Client Tests', function () {
 			})();
 
 			(async () => {
-				for await (let event of client.listen('connectAbort')) {
+				for await (const event of client.listen('connectAbort')) {
 					eventList.push({
+						code: event.code,
 						event: 'connectAbort',
-						code: event.code,
 						reason: event.reason
 					});
 				}
 			})();
 
 			(async () => {
-				for await (let event of client.listen('disconnect')) {
+				for await (const event of client.listen('disconnect')) {
 					eventList.push({
+						code: event.code,
 						event: 'disconnect',
-						code: event.code,
 						reason: event.reason
 					});
 				}
 			})();
 
 			(async () => {
-				for await (let event of client.listen('close')) {
+				for await (const event of client.listen('close')) {
 					eventList.push({
-						event: 'close',
 						code: event.code,
+						event: 'close',
 						reason: event.reason
 					});
 				}
@@ -1192,26 +1190,26 @@ describe('Client Tests', function () {
 
 			const expectedEventList = [
 				{
-					event: 'connectAbort',
 					code: 1000,
+					event: 'connectAbort',
 					reason: 'One'
 				},
 				{
-					event: 'close',
 					code: 1000,
+					event: 'close',
 					reason: 'One'
 				},
 				{
 					event: 'connecting'
 				},
 				{
-					event: 'close',
 					code: 4444,
+					event: 'close',
 					reason: 'Two'
 				},
 				{
-					event: 'connectAbort',
 					code: 4444,
+					event: 'connectAbort',
 					reason: 'Two'
 				},
 				{
@@ -1221,13 +1219,13 @@ describe('Client Tests', function () {
 					event: 'connect'
 				},
 				{
-					event: 'close',
 					code: 4455,
+					event: 'close',
 					reason: 'Three'
 				},
 				{
-					event: 'disconnect',
 					code: 4455,
+					event: 'disconnect',
 					reason: 'Three'
 				}
 			];
@@ -1263,7 +1261,7 @@ describe('Client Tests', function () {
 			assert.strictEqual(client.pingTimeoutMs, 500);
 
 			(async () => {
-				for await (let event of client.listen('connect')) {
+				for await (const event of client.listen('connect')) {
 					assert.strictEqual(client.pingTimeoutMs, server.pingTimeoutMs);
 					// Hack to make the client ping independent from the server ping.
 					client.pingTimeoutMs = 500;
@@ -1275,19 +1273,19 @@ describe('Client Tests', function () {
 			let clientError: Error | null = null;
 
 			(async () => {
-				for await (let { error } of client.listen('error')) {
+				for await (const { error } of client.listen('error')) {
 					clientError = error;
 				}
 			})();
 
 			(async () => {
-				for await (let event of client.listen('close')) {
+				for await (const event of client.listen('close')) {
 					closeEvent = event;
 				}
 			})();
 
 			(async () => {
-				for await (let event of client.listen('disconnect')) {
+				for await (const event of client.listen('disconnect')) {
 					disconnectEvent = event;
 				}
 			})();
@@ -1316,19 +1314,19 @@ describe('Client Tests', function () {
 			let clientError: Error | null = null;
 
 			(async () => {
-				for await (let { error } of client.listen('error')) {
+				for await (const { error } of client.listen('error')) {
 					clientError = error;
 				}
 			})();
 
 			(async () => {
-				for await (let event of client.listen('close')) {
+				for await (const event of client.listen('close')) {
 					closeEvent = event;
 				}
 			})();
 
 			(async () => {
-				for await (let event of client.listen('disconnect')) {
+				for await (const event of client.listen('disconnect')) {
 					disconnectEvent = event;
 				}
 			})();
@@ -1347,20 +1345,20 @@ describe('Client Tests', function () {
 			const fooChannel = client.channels.channel('foo');
 
 			(async () => {
-				for await (let data of fooChannel.listen('subscribe')) {}
+				for await (const data of fooChannel.listen('subscribe')) {}
 			})();
 			(async () => {
-				for await (let data of fooChannel.listen('subscribe')) {}
+				for await (const data of fooChannel.listen('subscribe')) {}
 			})();
 			(async () => {
-				for await (let data of fooChannel.listen('subscribeFail')) {}
+				for await (const data of fooChannel.listen('subscribeFail')) {}
 			})();
 			(async () => {
-				for await (let data of fooChannel.listen('customEvent')) {}
+				for await (const data of fooChannel.listen('customEvent')) {}
 			})();
 
 			(async () => {
-				for await (let data of client.channels.channel('bar').listen('subscribe')) {}
+				for await (const data of client.channels.channel('bar').listen('subscribe')) {}
 			})();
 
 			const fooStatsList = client.channels.listeners.getConsumerStats('foo');
@@ -1394,13 +1392,13 @@ describe('Client Tests', function () {
 
 			await Promise.all([
 				(async () => {
-					for await (let data of fooChannel.listen('customEvent')) {
+					for await (const data of fooChannel.listen('customEvent')) {
 						fooBackpressures.push(client.channels.listeners.getBackpressure('foo'));
 						await wait(50);
 					}
 				})(),
 				(async () => {
-					for await (let data of barChannel.listen('customEvent')) {
+					for await (const data of barChannel.listen('customEvent')) {
 						barBackpressures.push(client.channels.listeners.getBackpressure('bar'));
 						await wait(20);
 					}
@@ -1449,7 +1447,7 @@ describe('Client Tests', function () {
 
 			await Promise.all([
 				(async () => {
-					for await (let data of barChannel) {
+					for await (const data of barChannel) {
 						await wait(10);
 						assert.strictEqual(client.channels.getBackpressure('bar'), barChannel.getBackpressure());
 						barBackpressures.push(client.channels.getBackpressure('bar'));
@@ -1458,13 +1456,13 @@ describe('Client Tests', function () {
 					}
 				})(),
 				(async () => {
-					for await (let data of fooChannel.listen<string>('customEvent')) {
+					for await (const data of fooChannel.listen<string>('customEvent')) {
 						fooEvents.push(data);
 						await wait(50);
 					}
 				})(),
 				(async () => {
-					for await (let data of barChannel.listen<string>('customEvent')) {
+					for await (const data of barChannel.listen<string>('customEvent')) {
 						barEvents.push(data);
 						await wait(20);
 					}
@@ -1485,7 +1483,6 @@ describe('Client Tests', function () {
 					assert.strictEqual(client.channels.getBackpressure('bar'), 5);
 					fooChannel.closeEvent('customEvent');
 					client.channels.kill('foo');
-
 
 					await wait(1000);
 					assert.strictEqual(client.channels.getBackpressure('bar'), 0);
