@@ -756,7 +756,7 @@ describe('WritableConsumableStream', () => {
 				})(),
 				(async () => {
 					let expectedPressure = 6;
-					for await (const data of stream) {
+					for await (const _ of stream) {
 						expectedPressure--;
 						await wait(70);
 						const consumerStats = stream.getConsumerStats();
@@ -902,7 +902,7 @@ describe('WritableConsumableStream', () => {
 
 			assert.strictEqual(stream.getBackpressure(2), 1);
 
-			const iterBData = await iterB.next();
+			const iterDataB = await iterB.next();
 
 			assert.strictEqual(stream.getBackpressure(2), 0);
 
@@ -912,12 +912,12 @@ describe('WritableConsumableStream', () => {
 
 			assert.strictEqual(stream.getBackpressure(), 1);
 
-			const iterAData = await iterA.next();
+			const iterDataA = await iterA.next();
 
 			consumerStats = stream.getConsumerStats();
 			assert.strictEqual(consumerStats.length, 0);
-			assert.strictEqual(iterAData.done, true);
-			assert.strictEqual(iterBData.done, true);
+			assert.strictEqual(iterDataA.done, true);
+			assert.strictEqual(iterDataB.done, true);
 
 			assert.strictEqual(iterA.getBackpressure(), 0);
 			assert.strictEqual(iterB.getBackpressure(), 0);
@@ -1522,7 +1522,7 @@ describe('WritableConsumableStream', () => {
 
 		it('should return the number of consumers as 1 after stream.createConsumer() is used once', async () => {
 			(async () => {
-				for await (const message of stream.createConsumer()) {}
+				for await (const _ of stream.createConsumer()) {}
 			})();
 
 			assert.strictEqual(stream.getConsumerCount(), 1);
@@ -1530,10 +1530,10 @@ describe('WritableConsumableStream', () => {
 
 		it('should return the number of consumers as 2 after stream.createConsumer() is used twice', async () => {
 			(async () => {
-				for await (const message of stream.createConsumer()) {}
+				for await (const _ of stream.createConsumer()) {}
 			})();
 			(async () => {
-				for await (const message of stream.createConsumer()) {}
+				for await (const _ of stream.createConsumer()) {}
 			})();
 
 			assert.strictEqual(stream.getConsumerCount(), 2);
@@ -1541,7 +1541,7 @@ describe('WritableConsumableStream', () => {
 
 		it('should return the number of consumers as 1 after stream is consumed directly by for-await-of loop once', async () => {
 			(async () => {
-				for await (const message of stream) {}
+				for await (const _ of stream) {}
 			})();
 
 			assert.strictEqual(stream.getConsumerCount(), 1);
@@ -1549,11 +1549,11 @@ describe('WritableConsumableStream', () => {
 
 		it('should return the number of consumers as 2 after stream is consumed directly by for-await-of loop twice', async () => {
 			(async () => {
-				for await (const message of stream) {}
+				for await (const _ of stream) {}
 			})();
 
 			(async () => {
-				for await (const message of stream) {}
+				for await (const _ of stream) {}
 			})();
 
 			assert.strictEqual(stream.getConsumerCount(), 2);
@@ -1561,10 +1561,10 @@ describe('WritableConsumableStream', () => {
 
 		it('should return the number of consumers as 0 after stream is killed', async () => {
 			(async () => {
-				for await (const message of stream.createConsumer()) {}
+				for await (const _ of stream.createConsumer()) {}
 			})();
 			(async () => {
-				for await (const message of stream.createConsumer()) {}
+				for await (const _ of stream.createConsumer()) {}
 			})();
 
 			stream.kill();
@@ -1577,10 +1577,10 @@ describe('WritableConsumableStream', () => {
 
 			(async () => {
 				consumerA = stream.createConsumer();
-				for await (const message of consumerA) {}
+				for await (const _ of consumerA) {}
 			})();
 			(async () => {
-				for await (const message of stream.createConsumer()) {}
+				for await (const _ of stream.createConsumer()) {}
 			})();
 
 			stream.killConsumer(consumerA!.id);
@@ -1590,13 +1590,13 @@ describe('WritableConsumableStream', () => {
 
 		it('should return the number of consumers as 0 after stream is close after last message has been consumed', async () => {
 			(async () => {
-				for await (const message of stream.createConsumer()) {}
+				for await (const _ of stream.createConsumer()) {}
 			})();
 			(async () => {
-				for await (const message of stream.createConsumer()) {}
+				for await (const _ of stream.createConsumer()) {}
 			})();
 			(async () => {
-				for await (const message of stream.createConsumer()) {}
+				for await (const _ of stream.createConsumer()) {}
 			})();
 
 			stream.close();
@@ -1613,10 +1613,10 @@ describe('WritableConsumableStream', () => {
 
 			(async () => {
 				consumerA = stream.createConsumer();
-				for await (const message of consumerA) {}
+				for await (const _ of consumerA) {}
 			})();
 			(async () => {
-				for await (const message of stream.createConsumer()) {}
+				for await (const _ of stream.createConsumer()) {}
 			})();
 
 			stream.closeConsumer(consumerA!.id);

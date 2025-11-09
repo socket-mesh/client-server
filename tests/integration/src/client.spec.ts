@@ -9,31 +9,33 @@ import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 // Add to the global scope like in browser.
 global.localStorage = localStorage;
 
-const PORT_NUMBER = 8009;
-const TOKEN_EXPIRY_IN_SECONDS = 60 * 60 * 24 * 366 * 5000;
+const portNumber = 8009;
+const tokenExpiryInSeconds = 60 * 60 * 24 * 366 * 5000;
 const authTokenName = 'socketmesh.authToken';
 
 const validSignedAuthTokenBob = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImJvYiIsImV4cCI6MzE2Mzc1ODk3ODIxNTQ4NywiaWF0IjoxNTAyNzQ3NzQ2fQ.GLf_jqi_qUSCRahxe2D2I9kD8iVIs0d4xTbiZMRiQq4';
 const validSignedAuthTokenKate = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImthdGUiLCJleHAiOjMxNjM3NTg5NzgyMTU0ODcsImlhdCI6MTUwMjc0Nzc5NX0.Yfb63XvDt9Wk0wHSDJ3t7Qb1F0oUVUaM5_JKxIE2kyw';
 const invalidSignedAuthToken = 'fakebGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.fakec2VybmFtZSI6ImJvYiIsImlhdCI6MTUwMjYyNTIxMywiZXhwIjoxNTAyNzExNjEzfQ.fakemYcOOjM9bzmS4UYRvlWSk_lm3WGHvclmFjLbyOk';
-const SERVER_AUTH_KEY = 'testkey';
+const serverAuthKey = 'testkey';
 
 interface LoginRequest {
 	username: string
 }
 
-interface MyChannels {
+// eslint-disable-next-line @typescript-eslint/consistent-type-definitions
+type MyChannels = {
 	bar: string | { def: number },
 	foo: string | { abc: number },
 	priv: string,
 	priv2: string
-}
+};
 
-interface ServerIncomingMap {
+// eslint-disable-next-line @typescript-eslint/consistent-type-definitions
+type ServerIncomingMap = {
 	login: (req: LoginRequest) => void,
 	performTask: (num: number) => void,
 	setAuthKey: (secret: jwt.Secret) => void
-}
+};
 
 const allowedUsers: { [name: string]: true } = {
 	alice: true,
@@ -44,7 +46,7 @@ const allowedUsers: { [name: string]: true } = {
 let client: ClientSocket<ServerIncomingMap, MyChannels>;
 let server: Server<ServerIncomingMap, MyChannels>;
 
-let performTaskTriggered: boolean;
+let wasPerformTaskTriggered: boolean;
 
 async function loginHandler({ options, transport }: ServerRequestHandlerArgs<LoginRequest>): Promise<void> {
 	if (!allowedUsers[options.username]) {
@@ -54,7 +56,7 @@ async function loginHandler({ options, transport }: ServerRequestHandlerArgs<Log
 	}
 
 	const authToken = {
-		exp: Math.round(Date.now() / 1000) + TOKEN_EXPIRY_IN_SECONDS,
+		exp: Math.round(Date.now() / 1000) + tokenExpiryInSeconds,
 		username: options.username
 	};
 
@@ -62,7 +64,7 @@ async function loginHandler({ options, transport }: ServerRequestHandlerArgs<Log
 }
 
 async function performTaskHandler({ options }: RequestHandlerArgs<number>): Promise<void> {
-	performTaskTriggered = true;
+	wasPerformTaskTriggered = true;
 	await wait(options);
 }
 
@@ -72,17 +74,17 @@ async function setAuthKeyHandler({ options: secret, socket }: ServerRequestHandl
 
 const clientOptions: ClientSocketOptions<ServerIncomingMap> = {
 	ackTimeoutMs: 200,
-	address: `ws://127.0.0.1:${PORT_NUMBER}`,
+	address: `ws://127.0.0.1:${portNumber}`,
 	authEngine: { authTokenName }
 };
 
 describe('Client Tests', function () {
 	beforeEach(async function () {
 		server = listen<ServerIncomingMap, MyChannels>(
-			PORT_NUMBER,
+			portNumber,
 			{
 				ackTimeoutMs: 200,
-				authEngine: { authKey: SERVER_AUTH_KEY },
+				authEngine: { authKey: serverAuthKey },
 				handlers: {
 					login: loginHandler,
 					performTask: performTaskHandler,
@@ -91,7 +93,7 @@ describe('Client Tests', function () {
 			}
 		);
 
-		performTaskTriggered = false;
+		wasPerformTaskTriggered = false;
 		await server.listen('ready').once(100);
 	});
 
@@ -100,6 +102,7 @@ describe('Client Tests', function () {
 
 		global.localStorage.removeItem(authTokenName);
 
+		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 		if (client) {
 			if (client.status !== 'closed') {
 				cleanupTasks.push(
@@ -156,7 +159,7 @@ describe('Client Tests', function () {
 			})();
 
 			(async () => {
-				for await (const status of client.listen('connect')) {
+				for await (const _ of client.listen('connect')) {
 					const error = new Error('Custom error');
 					error.name = 'CustomError';
 					client.emit('error', { error });
@@ -216,14 +219,14 @@ describe('Client Tests', function () {
 			assert.strictEqual(client.authToken, null);
 
 			// Set authKey back to what it was.
-			await client.invoke('setAuthKey', SERVER_AUTH_KEY);
+			await client.invoke('setAuthKey', serverAuthKey);
 		});
 
 		it('Should allow switching between users', async function () {
 			global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
 			client = new ClientSocket(clientOptions);
-			let authenticateTriggered = false;
-			let authStateChangeTriggered = false;
+			let wasAuthenticateTriggered = false;
+			let wasAuthStateChangeTriggered = false;
 
 			await client.listen('connect').once(100);
 
@@ -232,25 +235,25 @@ describe('Client Tests', function () {
 
 			(async () => {
 				await client.listen('authenticate').once();
-				authenticateTriggered = true;
+				wasAuthenticateTriggered = true;
 				assert.notEqual(client.authToken, null);
 				assert.strictEqual(client.authToken?.username, 'alice');
 			})();
 
 			(async () => {
 				await client.listen('authStateChange').once();
-				authStateChangeTriggered = true;
+				wasAuthStateChangeTriggered = true;
 			})();
 
 			await client.invoke('login', { username: 'alice' });
 
 			await wait(100);
-			assert.strictEqual(authenticateTriggered, true);
-			assert.strictEqual(authStateChangeTriggered, true);
+			assert.strictEqual(wasAuthenticateTriggered, true);
+			assert.strictEqual(wasAuthStateChangeTriggered, true);
 		});
 
 		it('If token engine signing is synchronous, authentication can be captured using the authenticate event', async function () {
-			//				authSignAsync: false
+			// authSignAsync: false
 			client = new ClientSocket(clientOptions);
 
 			await client.listen('connect').once(100);
@@ -363,7 +366,7 @@ describe('Client Tests', function () {
 			// authentication from taking place, it only prevents the token from being
 			// stored correctly on the client.
 			assert.notEqual(client.authToken, null);
-			assert.strictEqual(client.authToken?.username, 'kate');
+			assert.strictEqual(client.authToken.username, 'kate');
 			assert.notEqual(caughtError!, null);
 			assert.strictEqual(caughtError!.name, 'FailedToSaveTokenError');
 		});
@@ -532,13 +535,13 @@ describe('Client Tests', function () {
 			const authTokenChanges: (null | string)[] = [];
 
 			(async () => {
-				for await (const event of client.listen('authenticate')) {
+				for await (const _ of client.listen('authenticate')) {
 					authTokenChanges.push(client.signedAuthToken);
 				}
 			})();
 
 			(async () => {
-				for await (const event of client.listen('deauthenticate')) {
+				for await (const _ of client.listen('deauthenticate')) {
 					authTokenChanges.push(client.signedAuthToken);
 				}
 			})();
@@ -672,66 +675,66 @@ describe('Client Tests', function () {
 
 		it('Should trigger the close event if the socket disconnects in the middle of the handshake phase', async function () {
 			client = new ClientSocket(clientOptions);
-			let aborted = false;
-			let diconnected = false;
-			let closed = false;
+			let wasAborted = false;
+			let wasDiconnected = false;
+			let wasClosed = false;
 
 			(async () => {
 				await client.listen('connectAbort').once();
-				aborted = true;
+				wasAborted = true;
 			})();
 
 			(async () => {
 				await client.listen('disconnect').once();
-				diconnected = true;
+				wasDiconnected = true;
 			})();
 
 			(async () => {
 				await client.listen('close').once();
-				closed = true;
+				wasClosed = true;
 			})();
 
 			client.disconnect();
 
 			await wait(0);
 
-			assert.strictEqual(aborted, true);
-			assert.strictEqual(diconnected, false);
-			assert.strictEqual(closed, true);
+			assert.strictEqual(wasAborted, true);
+			assert.strictEqual(wasDiconnected, false);
+			assert.strictEqual(wasClosed, true);
 		});
 
 		it('Should trigger the close event if the socket disconnects after the handshake phase', async function () {
 			client = new ClientSocket(clientOptions);
-			let aborted = false;
-			let diconnected = false;
-			let closed = false;
+			let wasAborted = false;
+			let wasDiconnected = false;
+			let wasClosed = false;
 
 			(async () => {
 				await client.listen('connectAbort').once();
-				aborted = true;
+				wasAborted = true;
 			})();
 
 			(async () => {
 				await client.listen('disconnect').once();
-				diconnected = true;
+				wasDiconnected = true;
 			})();
 
 			(async () => {
 				await client.listen('close').once();
-				closed = true;
+				wasClosed = true;
 			})();
 
 			(async () => {
-				for await (const event of client.listen('connect')) {
+				for await (const _ of client.listen('connect')) {
 					client.disconnect();
 				}
 			})();
 
 			await wait(50);
 
-			assert.strictEqual(aborted, false);
-			assert.strictEqual(diconnected, true);
-			assert.strictEqual(closed, true);
+			assert.strictEqual(wasAborted, false);
+			assert.strictEqual(wasDiconnected, true);
+			assert.strictEqual(wasClosed, true);
 		});
 	});
 
@@ -750,7 +753,7 @@ describe('Client Tests', function () {
 
 			let responseError: Error | null = null;
 
-			for await (const event of client.listen('connect')) {
+			for await (const _ of client.listen('connect')) {
 				try {
 					await client.invoke('performTask', 1000);
 				} catch (err) {
@@ -778,15 +781,15 @@ describe('Client Tests', function () {
 		beforeEach(async function () {
 			publisherClient = new ClientSocket(clientOptions);
 
-			//			server.removePlugin(PluginType.MIDDLEWARE_INBOUND);
-			//			server.setPlugin(PluginType.MIDDLEWARE_INBOUND, async (pluginStream) => {
-			//				for await (let action of pluginStream) {
-			//					if (action.type === 'publishIn') {
-			//						lastServerMessage = (action as ActionPublishIn).data;
-			//					}
-			//					action.allow();
-			//				}
-			//			});
+			// server.removePlugin(PluginType.MIDDLEWARE_INBOUND);
+			//  server.setPlugin(PluginType.MIDDLEWARE_INBOUND, async (pluginStream) => {
+			//   for await (let action of pluginStream) {
+			//    if (action.type === 'publishIn') {
+			//     lastServerMessage = (action as ActionPublishIn).data;
+			//    }
+			//   action.allow();
+			//  }
+			// });
 		});
 
 		afterEach(async function () {
@@ -951,14 +954,14 @@ describe('Client Tests', function () {
 			const fooChannel = client.channels.subscribe('foo');
 
 			(async () => {
-				for await (const event of fooChannel.listen('subscribe')) {
+				for await (const _ of fooChannel.listen('subscribe')) {
 					await wait(100);
 					client.disconnect();
 				}
 			})();
 
 			(async () => {
-				for await (const event of fooChannel.listen('unsubscribe')) {
+				for await (const _ of fooChannel.listen('unsubscribe')) {
 					hasUnsubscribed = true;
 				}
 			})();
@@ -970,25 +973,25 @@ describe('Client Tests', function () {
 		it('Should not invoke subscribeFail event if connection is aborted', async function () {
 			client = new ClientSocket(clientOptions);
 			let hasSubscribeFailed = false;
-			let gotBadConnectionError = false;
+			let hasBadConnectionError = false;
 			let wasConnected = false;
 
 			(async () => {
-				for await (const event of client.listen('connect')) {
+				for await (const _ of client.listen('connect')) {
 					wasConnected = true;
 					(async () => {
 						try {
 							await client.invoke('performTask', 123);
 						} catch (err) {
 							if (err.name === 'BadConnectionError') {
-								gotBadConnectionError = true;
+								hasBadConnectionError = true;
 							}
 						}
 					})();
 
 					const fooChannel = client.channels.subscribe('foo');
 					(async () => {
-						for await (const event of fooChannel.listen('subscribeFail')) {
+						for await (const _ of fooChannel.listen('subscribeFail')) {
 							hasSubscribeFailed = true;
 						}
 					})();
@@ -1003,7 +1006,7 @@ describe('Client Tests', function () {
 			await client.listen('close').once();
 			await wait(100);
 			assert.strictEqual(wasConnected, true);
-			assert.strictEqual(gotBadConnectionError, true);
+			assert.strictEqual(hasBadConnectionError, true);
 			assert.strictEqual(hasSubscribeFailed, false);
 		});
 
@@ -1069,31 +1072,31 @@ describe('Client Tests', function () {
 			const eventList: string[] = [];
 
 			(async () => {
-				for await (const event of client.listen('connecting')) {
+				for await (const _ of client.listen('connecting')) {
 					eventList.push('connecting');
 				}
 			})();
 
 			(async () => {
-				for await (const event of client.listen('connect')) {
+				for await (const _ of client.listen('connect')) {
 					eventList.push('connect');
 				}
 			})();
 
 			(async () => {
-				for await (const event of client.listen('disconnect')) {
+				for await (const _ of client.listen('disconnect')) {
 					eventList.push('disconnect');
 				}
 			})();
 
 			(async () => {
-				for await (const event of client.listen('close')) {
+				for await (const _ of client.listen('close')) {
 					eventList.push('close');
 				}
 			})();
 
 			(async () => {
-				for await (const event of client.listen('connectAbort')) {
+				for await (const _ of client.listen('connectAbort')) {
 					eventList.push('connectAbort');
 				}
 			})();
@@ -1110,7 +1113,7 @@ describe('Client Tests', function () {
 
 			assert.strictEqual(clientError, null);
 			assert.strictEqual(JSON.stringify(eventList), JSON.stringify(expectedEventList));
-			assert.strictEqual(performTaskTriggered, true);
+			assert.strictEqual(wasPerformTaskTriggered, true);
 		});
 
 		it('Should correctly handle multiple successive connect and disconnect calls', async function () {
@@ -1127,7 +1130,7 @@ describe('Client Tests', function () {
 			})();
 
 			(async () => {
-				for await (const event of client.listen('connecting')) {
+				for await (const _ of client.listen('connecting')) {
 					eventList.push({
 						event: 'connecting'
 					});
@@ -1135,7 +1138,7 @@ describe('Client Tests', function () {
 			})();
 
 			(async () => {
-				for await (const event of client.listen('connect')) {
+				for await (const _ of client.listen('connect')) {
 					eventList.push({
 						event: 'connect'
 					});
@@ -1261,7 +1264,7 @@ describe('Client Tests', function () {
 			assert.strictEqual(client.pingTimeoutMs, 500);
 
 			(async () => {
-				for await (const event of client.listen('connect')) {
+				for await (const _ of client.listen('connect')) {
 					assert.strictEqual(client.pingTimeoutMs, server.pingTimeoutMs);
 					// Hack to make the client ping independent from the server ping.
 					client.pingTimeoutMs = 500;
@@ -1345,36 +1348,36 @@ describe('Client Tests', function () {
 			const fooChannel = client.channels.channel('foo');
 
 			(async () => {
-				for await (const data of fooChannel.listen('subscribe')) {}
+				for await (const _ of fooChannel.listen('subscribe')) { /* Intentional */ }
 			})();
 			(async () => {
-				for await (const data of fooChannel.listen('subscribe')) {}
+				for await (const _ of fooChannel.listen('subscribe')) { /* Intentional */ }
 			})();
 			(async () => {
-				for await (const data of fooChannel.listen('subscribeFail')) {}
+				for await (const _ of fooChannel.listen('subscribeFail')) { /* Intentional */ }
 			})();
 			(async () => {
-				for await (const data of fooChannel.listen('customEvent')) {}
+				for await (const _ of fooChannel.listen('customEvent')) { /* Intentional */ }
 			})();
 
 			(async () => {
-				for await (const data of client.channels.channel('bar').listen('subscribe')) {}
+				for await (const _ of client.channels.channel('bar').listen('subscribe')) { /* Intentional */ }
 			})();
 
 			const fooStatsList = client.channels.listeners.getConsumerStats('foo');
 			const barStatsList = client.channels.listeners.getConsumerStats('bar');
 
 			assert.strictEqual(fooStatsList.length, 4);
-			assert.strictEqual(fooStatsList[0].id, 1);
-			assert.strictEqual(fooStatsList[0].stream, 'foo/subscribe');
-			assert.strictEqual(fooStatsList[1].id, 2);
-			assert.strictEqual(fooStatsList[2].id, 3);
-			assert.strictEqual(fooStatsList[3].id, 4);
-			assert.strictEqual(fooStatsList[3].stream, 'foo/customEvent');
+			assert.strictEqual(fooStatsList[0]!.id, 1);
+			assert.strictEqual(fooStatsList[0]!.stream, 'foo/subscribe');
+			assert.strictEqual(fooStatsList[1]!.id, 2);
+			assert.strictEqual(fooStatsList[2]!.id, 3);
+			assert.strictEqual(fooStatsList[3]!.id, 4);
+			assert.strictEqual(fooStatsList[3]!.stream, 'foo/customEvent');
 
 			assert.strictEqual(barStatsList.length, 1);
-			assert.strictEqual(barStatsList[0].id, 5);
-			assert.strictEqual(barStatsList[0].stream, 'bar/subscribe');
+			assert.strictEqual(barStatsList[0]!.id, 5);
+			assert.strictEqual(barStatsList[0]!.stream, 'bar/subscribe');
 
 			assert.strictEqual(client.channels.listeners.hasConsumer('foo', 1), true);
 			assert.strictEqual(client.channels.listeners.hasConsumer('foo', 4), true);
@@ -1392,13 +1395,13 @@ describe('Client Tests', function () {
 
 			await Promise.all([
 				(async () => {
-					for await (const data of fooChannel.listen('customEvent')) {
+					for await (const _ of fooChannel.listen('customEvent')) {
 						fooBackpressures.push(client.channels.listeners.getBackpressure('foo'));
 						await wait(50);
 					}
 				})(),
 				(async () => {
-					for await (const data of barChannel.listen('customEvent')) {
+					for await (const _ of barChannel.listen('customEvent')) {
 						barBackpressures.push(client.channels.listeners.getBackpressure('bar'));
 						await wait(20);
 					}

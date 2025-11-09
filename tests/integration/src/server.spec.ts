@@ -18,23 +18,24 @@ import { RawData } from 'ws';
 // Add to the global scope like in browser.
 global.localStorage = localStorage;
 
-const PORT_NUMBER = 8008;
+const portNumber = 8008;
 // const WS_ENGINE = 'ws';
-const LOG_WARNINGS = false;
-const LOG_ERRORS = false;
+const shouldLogWarnings = false;
+const shouldLogErrors = false;
 
-const TEN_DAYS_IN_SECONDS = 60 * 60 * 24 * 10;
+const tenDaysInSeconds = 60 * 60 * 24 * 10;
 const authTokenName = 'socketmesh.authToken';
 
 const validSignedAuthTokenBob = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImJvYiIsImV4cCI6MzE2Mzc1ODk3OTA4MDMxMCwiaWF0IjoxNTAyNzQ3NzQ2fQ.dSZOfsImq4AvCu-Or3Fcmo7JNv1hrV3WqxaiSKkTtAo';
 const validSignedAuthTokenAlice = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFsaWNlIiwiaWF0IjoxNTE4NzI4MjU5LCJleHAiOjMxNjM3NTg5NzkwODAzMTB9.XxbzPPnnXrJfZrS0FJwb_EAhIu2VY5i7rGyUThtNLh4';
 const invalidSignedAuthToken = 'fakebGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.fakec2VybmFtZSI6ImJvYiIsImlhdCI6MTUwMjYyNTIxMywiZXhwIjoxNTAyNzExNjEzfQ.fakemYcOOjM9bzmS4UYRvlWSk_lm3WGHvclmFjLbyOk';
-const SERVER_AUTH_KEY = 'testkey';
+const serverAuthKey = 'testkey';
 
-interface ClientIncomingMap {
+// eslint-disable-next-line @typescript-eslint/consistent-type-definitions
+type ClientIncomingMap = {
 	bla: (num: number) => void,
 	hi: (num: number) => void
-}
+};
 
 type CustomProcArgs = { bad: true } | { good: true };
 
@@ -45,7 +46,8 @@ interface MyChannels {
 	hello: number | string
 }
 
-interface ServerIncomingMap {
+// eslint-disable-next-line @typescript-eslint/consistent-type-definitions
+type ServerIncomingMap = {
 	customProc: (args: CustomProcArgs) => string,
 	customRemoteEvent: (str: string) => void,
 	foo: (num: number) => string,
@@ -57,17 +59,19 @@ interface ServerIncomingMap {
 	loginWithTenDayExpiry: (auth: AuthToken) => void,
 	proc: (num: number) => string,
 	setAuthKey: (secret: jwt.Secret) => void
-}
+};
 
 function bindFailureHandlers(server: Server<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>) {
-	if (LOG_ERRORS) {
+	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+	if (shouldLogErrors) {
 		(async () => {
 			for await (const { error } of server.listen('error')) {
 				console.error('ERROR', error);
 			}
 		})();
 	}
-	if (LOG_WARNINGS) {
+	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+	if (shouldLogWarnings) {
 		(async () => {
 			for await (const { warning } of server.listen('warning')) {
 				console.warn('WARNING', warning);
@@ -110,9 +114,9 @@ async function loginWithTenDayExpAndExpiryHandler({ options: authToken, transpor
 		throw err;
 	}
 
-	authToken.exp = Math.round(Date.now() / 1000) + TEN_DAYS_IN_SECONDS;
+	authToken.exp = Math.round(Date.now() / 1000) + tenDaysInSeconds;
 
-	await transport.setAuthorization(authToken, { expiresIn: TEN_DAYS_IN_SECONDS * 100 });
+	await transport.setAuthorization(authToken, { expiresIn: tenDaysInSeconds * 100 });
 }
 
 async function loginWithTenDayExpHandler({ options: authToken, transport }: ServerRequestHandlerArgs<AuthToken>): Promise<void> {
@@ -122,7 +126,7 @@ async function loginWithTenDayExpHandler({ options: authToken, transport }: Serv
 		throw err;
 	}
 
-	authToken.exp = Math.round(Date.now() / 1000) + TEN_DAYS_IN_SECONDS;
+	authToken.exp = Math.round(Date.now() / 1000) + tenDaysInSeconds;
 
 	await transport.setAuthorization(authToken);
 }
@@ -134,7 +138,7 @@ async function loginWithTenDayExpiryHandler({ options: authToken, transport }: S
 		throw err;
 	}
 
-	await transport.setAuthorization(authToken, { expiresIn: TEN_DAYS_IN_SECONDS });
+	await transport.setAuthorization(authToken, { expiresIn: tenDaysInSeconds });
 }
 
 async function procHandler({ options: data }: RequestHandlerArgs<number>): Promise<string> {
@@ -146,13 +150,13 @@ async function setAuthKeyHandler({ options: secret, socket }: ServerRequestHandl
 }
 
 const clientOptions: ClientSocketOptions<ServerIncomingMap> = {
-	address: `ws://127.0.0.1:${PORT_NUMBER}`,
+	address: `ws://127.0.0.1:${portNumber}`,
 	authEngine: { authTokenName }
 };
 
 const serverOptions: ServerOptions<ServerIncomingMap, MyChannels, {}, ClientIncomingMap> = {
 	ackTimeoutMs: 200,
-	authEngine: { authKey: SERVER_AUTH_KEY },
+	authEngine: { authKey: serverAuthKey },
 	handlers: {
 		login: loginHandler,
 		loginWithIssAndIssuer: loginWithIssAndIssuerHandler,
@@ -169,10 +173,12 @@ let server: Server<ServerIncomingMap, MyChannels, {}, ClientIncomingMap>;
 
 describe('Server Tests', function () {
 	afterEach(async function () {
+		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 		if (client) {
 			client.closeListeners();
 			client.disconnect();
 		}
+		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 		if (server) {
 			server.closeListeners();
 			server.httpServer.close();
@@ -184,7 +190,7 @@ describe('Server Tests', function () {
 	describe('Client authentication', function () {
 		beforeEach(async function () {
 			server = listen(
-				PORT_NUMBER,
+				portNumber,
 				{
 					plugins: [{
 						onAuthenticate: (authInfo: AuthInfo) => {
@@ -273,11 +279,10 @@ describe('Server Tests', function () {
 				}
 			})();
 
-			let clientSocketId: null | string;
-
 			client = new ClientSocket(clientOptions);
 			await client.listen('connect').once();
-			clientSocketId = client.id;
+
+			const clientSocketId = client.id;
 			client.invoke('login', { username: 'alice' });
 
 			await wait(100);
@@ -288,28 +293,28 @@ describe('Server Tests', function () {
 			assert.strictEqual(authenticateEvents[1]!.username, 'alice');
 
 			assert.strictEqual(authenticationStateChangeEvents.length, 2);
-			assert.notEqual(authenticationStateChangeEvents[0].socket, null);
-			assert.strictEqual(authenticationStateChangeEvents[0].socket.id, clientSocketId);
-			assert.strictEqual(authenticationStateChangeEvents[0].wasAuthenticated, false);
-			assert.strictEqual(authenticationStateChangeEvents[0].isAuthenticated, true);
-			assert.notEqual(authenticationStateChangeEvents[0].authToken, null);
-			assert.strictEqual(authenticationStateChangeEvents[0].authToken!.username, 'bob');
-			assert.notEqual(authenticationStateChangeEvents[1].socket, null);
-			assert.strictEqual(authenticationStateChangeEvents[1].socket.id, clientSocketId);
-			assert.strictEqual(authenticationStateChangeEvents[1].wasAuthenticated, true);
-			assert.strictEqual(authenticationStateChangeEvents[1].isAuthenticated, true);
-			assert.notEqual(authenticationStateChangeEvents[1].authToken, null);
-			assert.strictEqual(authenticationStateChangeEvents[1].authToken!.username, 'alice');
+			assert.notEqual(authenticationStateChangeEvents[0]!.socket, null);
+			assert.strictEqual(authenticationStateChangeEvents[0]!.socket.id, clientSocketId);
+			assert.strictEqual(authenticationStateChangeEvents[0]!.wasAuthenticated, false);
+			assert.strictEqual(authenticationStateChangeEvents[0]!.isAuthenticated, true);
+			assert.notEqual(authenticationStateChangeEvents[0]!.authToken, null);
+			assert.strictEqual(authenticationStateChangeEvents[0]!.authToken!.username, 'bob');
+			assert.notEqual(authenticationStateChangeEvents[1]!.socket, null);
+			assert.strictEqual(authenticationStateChangeEvents[1]!.socket.id, clientSocketId);
+			assert.strictEqual(authenticationStateChangeEvents[1]!.wasAuthenticated, true);
+			assert.strictEqual(authenticationStateChangeEvents[1]!.isAuthenticated, true);
+			assert.notEqual(authenticationStateChangeEvents[1]!.authToken, null);
+			assert.strictEqual(authenticationStateChangeEvents[1]!.authToken!.username, 'alice');
 
 			assert.strictEqual(authStateChangeEvents.length, 2);
-			assert.strictEqual(authStateChangeEvents[0].wasAuthenticated, false);
-			assert.strictEqual(authStateChangeEvents[0].isAuthenticated, true);
-			assert.notEqual(authStateChangeEvents[0].authToken, null);
-			assert.strictEqual(authStateChangeEvents[0].authToken!.username, 'bob');
-			assert.strictEqual(authStateChangeEvents[1].wasAuthenticated, true);
-			assert.strictEqual(authStateChangeEvents[1].isAuthenticated, true);
-			assert.notEqual(authStateChangeEvents[1].authToken, null);
-			assert.strictEqual(authStateChangeEvents[1].authToken!.username, 'alice');
+			assert.strictEqual(authStateChangeEvents[0]!.wasAuthenticated, false);
+			assert.strictEqual(authStateChangeEvents[0]!.isAuthenticated, true);
+			assert.notEqual(authStateChangeEvents[0]!.authToken, null);
+			assert.strictEqual(authStateChangeEvents[0]!.authToken!.username, 'bob');
+			assert.strictEqual(authStateChangeEvents[1]!.wasAuthenticated, true);
+			assert.strictEqual(authStateChangeEvents[1]!.isAuthenticated, true);
+			assert.notEqual(authStateChangeEvents[1]!.authToken, null);
+			assert.strictEqual(authStateChangeEvents[1]!.authToken!.username, 'alice');
 		});
 
 		it('Should emit correct events/data when socket is deauthenticated', async function () {
@@ -346,24 +351,24 @@ describe('Server Tests', function () {
 			assert.strictEqual(authToken, initialAuthToken);
 
 			assert.strictEqual(authStateChangeEvents.length, 2);
-			assert.strictEqual(authStateChangeEvents[0].wasAuthenticated, false);
-			assert.strictEqual(authStateChangeEvents[0].isAuthenticated, true);
-			assert.notEqual(authStateChangeEvents[0].authToken, undefined);
-			assert.strictEqual(authStateChangeEvents[0].authToken!.username, 'bob');
-			assert.strictEqual(authStateChangeEvents[1].wasAuthenticated, true);
-			assert.strictEqual(authStateChangeEvents[1].isAuthenticated, false);
-			assert.strictEqual('authToken' in authStateChangeEvents[1], false);
+			assert.strictEqual(authStateChangeEvents[0]!.wasAuthenticated, false);
+			assert.strictEqual(authStateChangeEvents[0]!.isAuthenticated, true);
+			assert.notEqual(authStateChangeEvents[0]!.authToken, undefined);
+			assert.strictEqual(authStateChangeEvents[0]!.authToken!.username, 'bob');
+			assert.strictEqual(authStateChangeEvents[1]!.wasAuthenticated, true);
+			assert.strictEqual(authStateChangeEvents[1]!.isAuthenticated, false);
+			assert.strictEqual('authToken' in authStateChangeEvents[1]!, false);
 
 			assert.strictEqual(authenticationStateChangeEvents.length, 2);
 			assert.notEqual(authenticationStateChangeEvents[0], null);
-			assert.strictEqual(authenticationStateChangeEvents[0].wasAuthenticated, false);
-			assert.strictEqual(authenticationStateChangeEvents[0].isAuthenticated, true);
-			assert.notEqual(authenticationStateChangeEvents[0].authToken, undefined);
-			assert.strictEqual(authenticationStateChangeEvents[0].authToken!.username, 'bob');
+			assert.strictEqual(authenticationStateChangeEvents[0]!.wasAuthenticated, false);
+			assert.strictEqual(authenticationStateChangeEvents[0]!.isAuthenticated, true);
+			assert.notEqual(authenticationStateChangeEvents[0]!.authToken, undefined);
+			assert.strictEqual(authenticationStateChangeEvents[0]!.authToken!.username, 'bob');
 			assert.notEqual(authenticationStateChangeEvents[1], null);
 			assert.strictEqual((authenticationStateChangeEvents[1] as AuthenticatedChangeEvent).authToken, undefined);
-			assert.strictEqual(authenticationStateChangeEvents[1].wasAuthenticated, true);
-			assert.strictEqual(authenticationStateChangeEvents[1].isAuthenticated, false);
+			assert.strictEqual(authenticationStateChangeEvents[1]!.wasAuthenticated, true);
+			assert.strictEqual(authenticationStateChangeEvents[1]!.isAuthenticated, false);
 		});
 
 		it('Should throw error if server socket deauthenticate is called after client disconnected and rejectOnFailedDelivery is true', async function () {
@@ -413,7 +418,7 @@ describe('Server Tests', function () {
 
 	describe('Server authentication', function () {
 		it('Token should be available after the authenticate listener resolves', async function () {
-			server = listen(PORT_NUMBER, serverOptions);
+			server = listen(portNumber, serverOptions);
 
 			bindFailureHandlers(server);
 
@@ -432,7 +437,7 @@ describe('Server Tests', function () {
 		});
 
 		it('Authentication can be captured using the authenticate listener', async function () {
-			server = listen(PORT_NUMBER, serverOptions);
+			server = listen(portNumber, serverOptions);
 
 			bindFailureHandlers(server);
 
@@ -451,7 +456,7 @@ describe('Server Tests', function () {
 		});
 
 		it('Previously authenticated client should still be authenticated after reconnecting', async function () {
-			server = listen(PORT_NUMBER, serverOptions);
+			server = listen(portNumber, serverOptions);
 
 			bindFailureHandlers(server);
 
@@ -476,7 +481,7 @@ describe('Server Tests', function () {
 		});
 
 		it('Should set the correct expiry when using expiresIn option when creating a JWT with socket.setAuthToken', async function () {
-			server = listen(PORT_NUMBER, serverOptions);
+			server = listen(portNumber, serverOptions);
 
 			bindFailureHandlers(server);
 
@@ -491,7 +496,7 @@ describe('Server Tests', function () {
 			assert.notEqual(client.authToken, null);
 			assert.notEqual(client.authToken!.exp, null);
 
-			const dateMillisecondsInTenDays = Date.now() + TEN_DAYS_IN_SECONDS * 1000;
+			const dateMillisecondsInTenDays = Date.now() + tenDaysInSeconds * 1000;
 			const dateDifference = Math.abs(dateMillisecondsInTenDays - client.authToken!.exp! * 1000);
 
 			// Expiry must be accurate within 1000 milliseconds.
@@ -499,7 +504,7 @@ describe('Server Tests', function () {
 		});
 
 		it('Should set the correct expiry when adding exp claim when creating a JWT with socket.setAuthToken', async function () {
-			server = listen(PORT_NUMBER, serverOptions);
+			server = listen(portNumber, serverOptions);
 
 			bindFailureHandlers(server);
 
@@ -514,7 +519,7 @@ describe('Server Tests', function () {
 			assert.notEqual(client.authToken, null);
 			assert.notEqual(client.authToken!.exp, null);
 
-			const dateMillisecondsInTenDays = Date.now() + TEN_DAYS_IN_SECONDS * 1000;
+			const dateMillisecondsInTenDays = Date.now() + tenDaysInSeconds * 1000;
 			const dateDifference = Math.abs(dateMillisecondsInTenDays - client.authToken!.exp! * 1000);
 
 			// Expiry must be accurate within 1000 milliseconds.
@@ -522,7 +527,7 @@ describe('Server Tests', function () {
 		});
 
 		it('The exp claim should have priority over expiresIn option when using socket.setAuthToken', async function () {
-			server = listen(PORT_NUMBER, serverOptions);
+			server = listen(portNumber, serverOptions);
 			bindFailureHandlers(server);
 
 			await server.listen('ready').once(100);
@@ -536,7 +541,7 @@ describe('Server Tests', function () {
 			assert.notEqual(client.authToken, null);
 			assert.notEqual(client.authToken!.exp, null);
 
-			const dateMillisecondsInTenDays = Date.now() + TEN_DAYS_IN_SECONDS * 1000;
+			const dateMillisecondsInTenDays = Date.now() + tenDaysInSeconds * 1000;
 			const dateDifference = Math.abs(dateMillisecondsInTenDays - client.authToken!.exp! * 1000);
 
 			// Expiry must be accurate within 1000 milliseconds.
@@ -544,7 +549,7 @@ describe('Server Tests', function () {
 		});
 
 		it('Should send back error if socket.setAuthToken tries to set both iss claim and issuer option', async function () {
-			server = listen(PORT_NUMBER, serverOptions);
+			server = listen(portNumber, serverOptions);
 			bindFailureHandlers(server);
 
 			const warningMap: { [name: string]: Error } = {};
@@ -595,21 +600,21 @@ describe('Server Tests', function () {
 			await wait(0);
 
 			assert.strictEqual(closePackets.length, 1);
-			assert.strictEqual(closePackets[0].code, 4002);
+			assert.strictEqual(closePackets[0]!.code, 4002);
 			server.closeListeners('socketError');
 			assert.notEqual(warningMap['SocketProtocolError'], null);
 		});
 
 		it('Should trigger an authTokenSigned event and socket.signedAuthToken should be set after calling the socket.setAuthToken method', async function () {
-			server = listen(PORT_NUMBER, serverOptions);
+			server = listen(portNumber, serverOptions);
 			bindFailureHandlers(server);
 
-			let authTokenSignedEventEmitted = false;
+			let wasAuthTokenSignedEventEmitted = false;
 
 			(async () => {
 				for await (const { signedAuthToken, socket, wasSigned } of server.listen('socketAuthenticate')) {
 					if (wasSigned) {
-						authTokenSignedEventEmitted = true;
+						wasAuthTokenSignedEventEmitted = true;
 						assert.notEqual(signedAuthToken, null);
 						assert.strictEqual(signedAuthToken, socket.signedAuthToken);
 					}
@@ -627,7 +632,7 @@ describe('Server Tests', function () {
 				client.listen('authenticate').once(100)
 			]);
 
-			assert.strictEqual(authTokenSignedEventEmitted, true);
+			assert.strictEqual(wasAuthTokenSignedEventEmitted, true);
 		});
 
 		it('The socket.setAuthToken call should reject if token delivery fails and rejectOnFailedDelivery option is true', async function () {
@@ -635,7 +640,7 @@ describe('Server Tests', function () {
 			let reject: (err: Error) => void;
 
 			server = listen(
-				PORT_NUMBER,
+				portNumber,
 				{
 					...serverOptions,
 					handlers: {
@@ -665,9 +670,9 @@ describe('Server Tests', function () {
 									await wait(0);
 
 									assert.notEqual(serverWarnings[0], null);
-									assert.strictEqual(serverWarnings[0].name, 'BadConnectionError');
+									assert.strictEqual(serverWarnings[0]!.name, 'BadConnectionError');
 									assert.notEqual(serverWarnings[1], null);
-									assert.strictEqual(serverWarnings[1].name, 'AuthError');
+									assert.strictEqual(serverWarnings[1]!.name, 'AuthError');
 									resolve();
 								} catch (err) {
 									reject(err);
@@ -704,7 +709,7 @@ describe('Server Tests', function () {
 			let reject: (err: Error) => void;
 
 			server = listen(
-				PORT_NUMBER,
+				portNumber,
 				{
 					...serverOptions,
 					handlers: {
@@ -731,7 +736,7 @@ describe('Server Tests', function () {
 									assert.strictEqual(error, null);
 									await wait(0);
 									assert.notEqual(serverWarnings[0], null);
-									assert.strictEqual(serverWarnings[0].name, 'BadConnectionError');
+									assert.strictEqual(serverWarnings[0]!.name, 'BadConnectionError');
 
 									resolve();
 								} catch (err) {
@@ -770,7 +775,7 @@ describe('Server Tests', function () {
 
 			global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
 
-			server = listen(PORT_NUMBER,
+			server = listen(portNumber,
 				{
 					...serverOptions,
 					authEngine: {
@@ -807,11 +812,11 @@ describe('Server Tests', function () {
 		});
 
 		it('Should remove client data from the server when client disconnects before authentication process finished', async function () {
-			server = listen(PORT_NUMBER,
+			server = listen(portNumber,
 				{
 					...serverOptions,
 					authEngine: {
-						authKey: SERVER_AUTH_KEY,
+						authKey: serverAuthKey,
 						signToken: async () => {
 							return '';
 						},
@@ -852,7 +857,7 @@ describe('Server Tests', function () {
 		});
 
 		it('Should close the connection if the client tries to send a malformatted authenticate packet', async function () {
-			server = listen(PORT_NUMBER, serverOptions);
+			server = listen(portNumber, serverOptions);
 
 			await server.listen('ready').once();
 
@@ -901,7 +906,7 @@ describe('Server Tests', function () {
 
 	describe('Socket handshake', function () {
 		it('Exchange is attached to socket before the handshake event is triggered', async function () {
-			server = listen(PORT_NUMBER, serverOptions);
+			server = listen(portNumber, serverOptions);
 			bindFailureHandlers(server);
 
 			await server.listen('ready').once(100);
@@ -914,7 +919,7 @@ describe('Server Tests', function () {
 		});
 
 		it('Should close the connection if the client tries to send a message before the handshake', async function () {
-			server = listen(PORT_NUMBER, serverOptions);
+			server = listen(portNumber, serverOptions);
 
 			await server.listen('ready').once(100);
 
@@ -942,7 +947,7 @@ describe('Server Tests', function () {
 		});
 
 		it('Should close the connection if the client tries to send a pong before the handshake', async function () {
-			server = listen(PORT_NUMBER, serverOptions);
+			server = listen(portNumber, serverOptions);
 
 			await server.listen('ready').once(100);
 
@@ -964,7 +969,7 @@ describe('Server Tests', function () {
 		});
 
 		it('Should not close the connection if the client tries to send a message before the handshake and strictHandshake is false', async function () {
-			server = listen(PORT_NUMBER,
+			server = listen(portNumber,
 				{
 					strictHandshake: false,
 					...serverOptions
@@ -994,7 +999,7 @@ describe('Server Tests', function () {
 
 	describe('Socket connection', function () {
 		it('Server-side socket connect event and server connection event should trigger', async function () {
-			server = listen(PORT_NUMBER, serverOptions);
+			server = listen(portNumber, serverOptions);
 			bindFailureHandlers(server);
 
 			let connectionEvent: ConnectEvent | null = null;
@@ -1063,7 +1068,7 @@ describe('Server Tests', function () {
 		});
 
 		it('Server-side connection event should trigger with large number of concurrent connections', async function () {
-			server = listen(PORT_NUMBER, serverOptions);
+			server = listen(portNumber, serverOptions);
 			bindFailureHandlers(server);
 
 			const connectionList: ConnectionEvent<MyChannels, {}, ServerIncomingMap, ClientIncomingMap, {}, {}, {}, {}>[] = [];
@@ -1100,7 +1105,7 @@ describe('Server Tests', function () {
 			let requestCount = 0;
 
 			server = listen(
-				PORT_NUMBER,
+				portNumber,
 				{
 					...serverOptions,
 					handlers: {
@@ -1115,7 +1120,7 @@ describe('Server Tests', function () {
 			bindFailureHandlers(server);
 
 			(async () => {
-				for await (let {} of server.listen('connection')) {
+				for await (const _ of server.listen('connection')) {
 					connectionCount++;
 				}
 			})();
@@ -1148,11 +1153,11 @@ describe('Server Tests', function () {
 
 	describe('Socket disconnection', function () {
 		it('Server-side socket disconnect event should not trigger if the socket did not complete the handshake; instead, it should trigger connectAbort', async function () {
-			server = listen(PORT_NUMBER,
+			server = listen(portNumber,
 				{
 					...serverOptions,
 					authEngine: {
-						authKey: SERVER_AUTH_KEY,
+						authKey: serverAuthKey,
 						signToken: async () => {
 							return '';
 						},
@@ -1166,11 +1171,11 @@ describe('Server Tests', function () {
 
 			bindFailureHandlers(server);
 
-			let connectionOnServer = false;
+			let wasConnectionOnServer = false;
 
 			(async () => {
-				for await (const { socket } of server.listen('connection')) {
-					connectionOnServer = true;
+				for await (const _ of server.listen('connection')) {
+					wasConnectionOnServer = true;
 				}
 			})();
 
@@ -1178,9 +1183,9 @@ describe('Server Tests', function () {
 
 			client = new ClientSocket(clientOptions);
 
-			let socketDisconnected = false;
-			let socketDisconnectedBeforeConnect = false;
-			let clientSocketAborted = false;
+			let wasSocketDisconnected = false;
+			let wasSocketDisconnectedBeforeConnect = false;
+			let wasClientSocketAborted = false;
 
 			(async () => {
 				const { socket } = await server.listen('handshake').once();
@@ -1189,32 +1194,33 @@ describe('Server Tests', function () {
 
 				(async () => {
 					await socket.listen('disconnect').once();
-					if (!connectionOnServer) {
-						socketDisconnectedBeforeConnect = true;
+					// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+					if (!wasConnectionOnServer) {
+						wasSocketDisconnectedBeforeConnect = true;
 					}
-					socketDisconnected = true;
+					wasSocketDisconnected = true;
 				})();
 
 				(async () => {
 					const event = await socket.listen('connectAbort').once();
-					clientSocketAborted = true;
+					wasClientSocketAborted = true;
 
 					assert.strictEqual(event.code, 4444);
 					assert.strictEqual(event.reason, 'Disconnect before handshake');
 				})();
 			})();
 
-			let serverDisconnected = false;
-			let serverSocketAborted = false;
+			let wasServerDisconnected = false;
+			let wasServerSocketAborted = false;
 
 			(async () => {
 				await server.listen('socketDisconnect').once();
-				serverDisconnected = true;
+				wasServerDisconnected = true;
 			})();
 
 			(async () => {
 				await server.listen('socketConnectAbort').once(200);
-				serverSocketAborted = true;
+				wasServerSocketAborted = true;
 			})();
 
 			await wait(10);
@@ -1222,19 +1228,19 @@ describe('Server Tests', function () {
 
 			await wait(300);
 
-			assert.strictEqual(socketDisconnected, false);
-			assert.strictEqual(socketDisconnectedBeforeConnect, false);
-			assert.strictEqual(clientSocketAborted, true);
-			assert.strictEqual(serverSocketAborted, true);
-			assert.strictEqual(serverDisconnected, false);
+			assert.strictEqual(wasSocketDisconnected, false);
+			assert.strictEqual(wasSocketDisconnectedBeforeConnect, false);
+			assert.strictEqual(wasClientSocketAborted, true);
+			assert.strictEqual(wasServerSocketAborted, true);
+			assert.strictEqual(wasServerDisconnected, false);
 		});
 
 		it('Server-side socket disconnect event should trigger if the socket completed the handshake (not connectAbort)', async function () {
-			server = listen(PORT_NUMBER,
+			server = listen(portNumber,
 				{
 					...serverOptions,
 					authEngine: {
-						authKey: SERVER_AUTH_KEY,
+						authKey: serverAuthKey,
 						signToken: async () => {
 							return '';
 						},
@@ -1248,11 +1254,11 @@ describe('Server Tests', function () {
 
 			bindFailureHandlers(server);
 
-			let connectionOnServer = false;
+			let wasConnectionOnServer = false;
 
 			(async () => {
 				for await (const { socket } of server.listen('connection')) {
-					connectionOnServer = true;
+					wasConnectionOnServer = true;
 				}
 			})();
 
@@ -1260,9 +1266,9 @@ describe('Server Tests', function () {
 
 			client = new ClientSocket(clientOptions);
 
-			let socketDisconnected = false;
-			let socketDisconnectedBeforeConnect = false;
-			let clientSocketAborted = false;
+			let wasSocketDisconnected = false;
+			let wasSocketDisconnectedBeforeConnect = false;
+			let wasClientSocketAborted = false;
 
 			(async () => {
 				const { socket } = await server.listen('handshake').once();
@@ -1271,31 +1277,32 @@ describe('Server Tests', function () {
 
 				(async () => {
 					const event = await socket.listen('disconnect').once();
-					if (!connectionOnServer) {
-						socketDisconnectedBeforeConnect = true;
+					// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+					if (!wasConnectionOnServer) {
+						wasSocketDisconnectedBeforeConnect = true;
 					}
-					socketDisconnected = true;
+					wasSocketDisconnected = true;
 					assert.strictEqual(event.code, 4445);
 					assert.strictEqual(event.reason, 'Disconnect after handshake');
 				})();
 
 				(async () => {
-					const event = await socket.listen('connectAbort').once();
-					clientSocketAborted = true;
+					await socket.listen('connectAbort').once();
+					wasClientSocketAborted = true;
 				})();
 			})();
 
-			let serverDisconnected = false;
-			let serverSocketAborted = false;
+			let wasServerDisconnected = false;
+			let wasServerSocketAborted = false;
 
 			(async () => {
 				await server.listen('socketDisconnect').once();
-				serverDisconnected = true;
+				wasServerDisconnected = true;
 			})();
 
 			(async () => {
 				await server.listen('socketConnectAbort').once();
-				serverSocketAborted = true;
+				wasServerSocketAborted = true;
 			})();
 
 			await wait(30);
@@ -1303,19 +1310,19 @@ describe('Server Tests', function () {
 
 			await wait(100);
 
-			assert.strictEqual(socketDisconnectedBeforeConnect, false);
-			assert.strictEqual(socketDisconnected, true);
-			assert.strictEqual(clientSocketAborted, false);
-			assert.strictEqual(serverDisconnected, true);
-			assert.strictEqual(serverSocketAborted, false);
+			assert.strictEqual(wasSocketDisconnectedBeforeConnect, false);
+			assert.strictEqual(wasSocketDisconnected, true);
+			assert.strictEqual(wasClientSocketAborted, false);
+			assert.strictEqual(wasServerDisconnected, true);
+			assert.strictEqual(wasServerSocketAborted, false);
 		});
 
 		it('The close event should trigger when the socket loses the connection before the handshake', async function () {
-			server = listen(PORT_NUMBER,
+			server = listen(portNumber,
 				{
 					...serverOptions,
 					authEngine: {
-						authKey: SERVER_AUTH_KEY,
+						authKey: serverAuthKey,
 						signToken: async () => {
 							return '';
 						},
@@ -1333,29 +1340,29 @@ describe('Server Tests', function () {
 
 			client = new ClientSocket(clientOptions);
 
-			let serverSocketClosed = false;
-			let serverSocketAborted = false;
-			let serverClosure = false;
+			let wasServerSocketClosed = false;
+			let wasServerSocketAborted = false;
+			let wasServerClosure = false;
 
 			(async () => {
 				for await (const { socket } of server.listen('handshake')) {
 					const event = await socket.listen('close').once();
-					serverSocketClosed = true;
+					wasServerSocketClosed = true;
 					assert.strictEqual(event.code, 4444);
 					assert.strictEqual(event.reason, 'Disconnect before handshake');
 				}
 			})();
 
 			(async () => {
-				for await (const event of server.listen('socketConnectAbort')) {
-					serverSocketAborted = true;
+				for await (const _ of server.listen('socketConnectAbort')) {
+					wasServerSocketAborted = true;
 				}
 			})();
 
 			(async () => {
 				for await (const event of server.listen('socketClose')) {
 					assert.strictEqual(event.socket.status, 'closed');
-					serverClosure = true;
+					wasServerClosure = true;
 				}
 			})();
 
@@ -1363,17 +1370,17 @@ describe('Server Tests', function () {
 			client.disconnect(4444, 'Disconnect before handshake');
 
 			await wait(300);
-			assert.strictEqual(serverSocketClosed, true);
-			assert.strictEqual(serverSocketAborted, true);
-			assert.strictEqual(serverClosure, true);
+			assert.strictEqual(wasServerSocketClosed, true);
+			assert.strictEqual(wasServerSocketAborted, true);
+			assert.strictEqual(wasServerClosure, true);
 		});
 
 		it('The close event should trigger when the socket loses the connection after the handshake', async function () {
-			server = listen(PORT_NUMBER,
+			server = listen(portNumber,
 				{
 					...serverOptions,
 					authEngine: {
-						authKey: SERVER_AUTH_KEY,
+						authKey: serverAuthKey,
 						signToken: async () => {
 							return '';
 						},
@@ -1391,29 +1398,29 @@ describe('Server Tests', function () {
 
 			client = new ClientSocket(clientOptions);
 
-			let serverSocketClosed = false;
-			let serverDisconnection = false;
-			let serverClosure = false;
+			let isServerSocketClosed = false;
+			let wasServerDisconnected = false;
+			let wasServerClosure = false;
 
 			(async () => {
 				for await (const { socket } of server.listen('handshake')) {
 					const event = await socket.listen('close').once();
-					serverSocketClosed = true;
+					isServerSocketClosed = true;
 					assert.strictEqual(event.code, 4445);
 					assert.strictEqual(event.reason, 'Disconnect after handshake');
 				}
 			})();
 
 			(async () => {
-				for await (const event of server.listen('socketDisconnect')) {
-					serverDisconnection = true;
+				for await (const _ of server.listen('socketDisconnect')) {
+					wasServerDisconnected = true;
 				}
 			})();
 
 			(async () => {
 				for await (const event of server.listen('socketClose')) {
 					assert.strictEqual(event.socket.status, 'closed');
-					serverClosure = true;
+					wasServerClosure = true;
 				}
 			})();
 
@@ -1421,9 +1428,9 @@ describe('Server Tests', function () {
 			client.disconnect(4445, 'Disconnect after handshake');
 
 			await wait(300);
-			assert.strictEqual(serverSocketClosed, true);
-			assert.strictEqual(serverDisconnection, true);
-			assert.strictEqual(serverClosure, true);
+			assert.strictEqual(isServerSocketClosed, true);
+			assert.strictEqual(wasServerDisconnected, true);
+			assert.strictEqual(wasServerClosure, true);
 		});
 
 		it('Disconnection should support socket message backpressure', async function () {
@@ -1431,7 +1438,7 @@ describe('Server Tests', function () {
 			let requestDataAtTimeOfDisconnect: null | number = null;
 
 			server = listen(
-				PORT_NUMBER,
+				portNumber,
 				{
 					plugins: [new InOrderPlugin()],
 					...serverOptions,
@@ -1524,15 +1531,16 @@ describe('Server Tests', function () {
 			// Check that the disconnect event on the back end socket triggers as soon as possible (out-of-band) and not at the end of the stream.
 			// Any value less than 30 indicates that the 'disconnect' event was triggerred out-of-band.
 			// Since the client disconnect() call is executed on the 11th message, we can assume that the 'disconnect' event will trigger sooner.
+			// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 			assert.strictEqual(requestDataAtTimeOfDisconnect != null && requestDataAtTimeOfDisconnect < 15, true);
 		});
 
 		it('Socket streams should be killed immediately if socket disconnects (default/kill mode)', async function () {
 			const handledPackets: number[] = [];
-			let closedReceiver = false;
+			let isReceiverClosed = false;
 
 			server = listen(
-				PORT_NUMBER,
+				portNumber,
 				{
 					plugins: [new InOrderPlugin()],
 					...serverOptions,
@@ -1551,8 +1559,10 @@ describe('Server Tests', function () {
 			(async () => {
 				for await (const { socket } of server.listen('connection')) {
 					(async () => {
-						for await (const packet of socket.listen()) {}
-						closedReceiver = true;
+						for await (const _ of socket.listen()) {
+							// Intentional
+						}
+						isReceiverClosed = true;
 					})();
 				}
 			})();
@@ -1574,15 +1584,15 @@ describe('Server Tests', function () {
 			await wait(400);
 
 			assert.strictEqual(handledPackets.length, 4);
-			assert.strictEqual(closedReceiver, true);
+			assert.strictEqual(isReceiverClosed, true);
 		});
 
 		it('Socket streams should be closed eventually if socket disconnects (close mode)', async function () {
 			const handledPackets: number[] = [];
-			let closedReceiver = false;
+			let isReceiverClosed = false;
 
 			server = listen(
-				PORT_NUMBER,
+				portNumber,
 				{
 					...serverOptions,
 					handlers: {
@@ -1601,9 +1611,10 @@ describe('Server Tests', function () {
 			(async () => {
 				for await (const { socket } of server.listen('connection')) {
 					(async () => {
-						for await (const packet of socket.listen()) {
+						for await (const _ of socket.listen()) {
+							// Intentional
 						}
-						closedReceiver = true;
+						isReceiverClosed = true;
 					})();
 				}
 			})();
@@ -1624,15 +1635,15 @@ describe('Server Tests', function () {
 
 			await wait(400);
 			assert.strictEqual(handledPackets.length, 15);
-			assert.strictEqual(closedReceiver, true);
+			assert.strictEqual(isReceiverClosed, true);
 		});
 
 		it('Socket streams should be closed eventually if socket disconnects (none mode)', async function () {
 			const handledPackets: number[] = [];
-			let closedReceiver = false;
+			let isClosedReceiver = false;
 
 			server = listen(
-				PORT_NUMBER,
+				portNumber,
 				{
 					...serverOptions,
 					handlers: {
@@ -1651,8 +1662,10 @@ describe('Server Tests', function () {
 			(async () => {
 				for await (const { socket } of server.listen('connection')) {
 					(async () => {
-						for await (const packet of socket.listen()) {}
-						closedReceiver = false;
+						for await (const _ of socket.listen()) {
+							// Intentional
+						}
+						isClosedReceiver = false;
 					})();
 				}
 			})();
@@ -1673,14 +1686,14 @@ describe('Server Tests', function () {
 
 			await wait(400);
 			assert.strictEqual(handledPackets.length, 15);
-			assert.strictEqual(closedReceiver, false);
+			assert.strictEqual(isClosedReceiver, false);
 		});
 	});
 
 	describe('Socket RPC invoke', function () {
 		it('Should support invoking a remote procedure on the server', async function () {
 			server = listen(
-				PORT_NUMBER,
+				portNumber,
 				{
 					...serverOptions,
 					handlers: {
@@ -1722,7 +1735,7 @@ describe('Server Tests', function () {
 	describe('Socket transmit', function () {
 		it('Should support receiving remote transmitted data on the server', function (context, done) {
 			server = listen(
-				PORT_NUMBER,
+				portNumber,
 				{
 					...serverOptions,
 					handlers: {
@@ -1753,7 +1766,7 @@ describe('Server Tests', function () {
 			const backpressureHistory: number[] = [];
 
 			server = listen(
-				PORT_NUMBER,
+				portNumber,
 				{
 					plugins: [
 						{
@@ -1794,8 +1807,8 @@ describe('Server Tests', function () {
 			// Backpressure should go up and come back down.
 			assert.strictEqual(backpressureHistory.length, 21);
 			assert.strictEqual(backpressureHistory[0], 1);
-			assert.strictEqual(backpressureHistory[12] > 4, true);
-			assert.strictEqual(backpressureHistory[14] > 6, true);
+			assert.strictEqual(backpressureHistory[12]! > 4, true);
+			assert.strictEqual(backpressureHistory[14]! > 6, true);
 			assert.strictEqual(backpressureHistory[19], 1);
 		});
 
@@ -1806,7 +1819,7 @@ describe('Server Tests', function () {
 
 			(async () => {
 				for await (const { cont, requests } of requestStream) {
-					if (isPublishOptions(requests[0].data) && requests[0].data.data === 5) {
+					if (isPublishOptions(requests[0]!.data) && requests[0]!.data.data === 5) {
 						await wait(140);
 					}
 
@@ -1815,7 +1828,7 @@ describe('Server Tests', function () {
 			})();
 
 			server = listen(
-				PORT_NUMBER,
+				portNumber,
 				{
 					plugins: [
 						{
@@ -1861,8 +1874,8 @@ describe('Server Tests', function () {
 			// Backpressure should go up and come back down.
 			assert.strictEqual(backpressureHistory.length, 20);
 			assert.strictEqual(backpressureHistory[0], 1);
-			assert.strictEqual(backpressureHistory[13] > 7, true);
-			assert.strictEqual(backpressureHistory[14] > 8, true);
+			assert.strictEqual(backpressureHistory[13]! > 7, true);
+			assert.strictEqual(backpressureHistory[14]! > 8, true);
 			assert.strictEqual(backpressureHistory[19], 1);
 		});
 
@@ -1870,7 +1883,7 @@ describe('Server Tests', function () {
 			const backpressureHistory: number[] = [];
 
 			server = listen(
-				PORT_NUMBER,
+				portNumber,
 				{
 					plugins: [
 						{
@@ -1911,15 +1924,15 @@ describe('Server Tests', function () {
 			// Backpressure should go up and come back down.
 			assert.strictEqual(backpressureHistory.length, 21);
 			assert.strictEqual(backpressureHistory[0], 1);
-			assert.strictEqual(backpressureHistory[12] > 4, true);
-			assert.strictEqual(backpressureHistory[14] > 6, true);
+			assert.strictEqual(backpressureHistory[12]! > 4, true);
+			assert.strictEqual(backpressureHistory[14]! > 6, true);
 			assert.strictEqual(backpressureHistory[19], 1);
 		});
 	});
 
 	describe('Socket pub/sub', function () {
 		it('Should maintain order of publish and subscribe', async function () {
-			server = listen(PORT_NUMBER, serverOptions);
+			server = listen(portNumber, serverOptions);
 			bindFailureHandlers(server);
 
 			await server.listen('ready').once(100);
@@ -1944,7 +1957,7 @@ describe('Server Tests', function () {
 		});
 
 		it('Should maintain order of publish and subscribe when client starts out as disconnected', async function () {
-			server = listen(PORT_NUMBER, serverOptions);
+			server = listen(portNumber, serverOptions);
 			bindFailureHandlers(server);
 
 			await server.listen('ready').once();
@@ -1976,7 +1989,7 @@ describe('Server Tests', function () {
 			let error: Error | null = null;
 
 			server = listen(
-				PORT_NUMBER,
+				portNumber,
 				{
 					authEngine: {
 						signToken: async function () {
@@ -2016,7 +2029,7 @@ describe('Server Tests', function () {
 			});
 
 			(async () => {
-				for await (const event of server.exchange.listen('subscription')) {
+				for await (const _ of server.exchange.listen('subscription')) {
 					isSubscribed = true;
 				}
 			})();
@@ -2037,7 +2050,7 @@ describe('Server Tests', function () {
 			let objectAsChannelNamePublishError: Error | null = null;
 			let nullPublishError: Error | null = null;
 
-			server = listen(PORT_NUMBER, serverOptions);
+			server = listen(portNumber, serverOptions);
 			bindFailureHandlers(server);
 
 			await server.listen('ready').once(100);
@@ -2124,7 +2137,7 @@ describe('Server Tests', function () {
 		});
 
 		it('When default SimpleBroker broker engine is used, disconnect event should trigger before unsubscribe event', async function () {
-			server = listen(PORT_NUMBER, serverOptions);
+			server = listen(portNumber, serverOptions);
 			bindFailureHandlers(server);
 
 			const eventList: ((DisconnectEvent | UnsubscribeEvent) & { type: string })[] = [];
@@ -2162,13 +2175,13 @@ describe('Server Tests', function () {
 
 			await wait(300);
 
-			assert.strictEqual(eventList[0].type, 'disconnect');
-			assert.strictEqual(eventList[1].type, 'unsubscribe');
+			assert.strictEqual(eventList[0]!.type, 'disconnect');
+			assert.strictEqual(eventList[1]!.type, 'unsubscribe');
 			assert.strictEqual((eventList[1] as UnsubscribeEvent).channel, 'foo');
 		});
 
 		it('When default SimpleBroker broker engine is used, server.exchange should support consuming data from a channel', async function () {
-			server = listen(PORT_NUMBER, serverOptions);
+			server = listen(portNumber, serverOptions);
 			bindFailureHandlers(server);
 
 			await server.listen('ready').once(100);
@@ -2213,7 +2226,7 @@ describe('Server Tests', function () {
 		});
 
 		it('When default SimpleBroker broker engine is used, server.exchange should support publishing data to a channel', async function () {
-			server = listen(PORT_NUMBER, serverOptions);
+			server = listen(portNumber, serverOptions);
 			bindFailureHandlers(server);
 
 			await server.listen('ready').once(100);
@@ -2261,7 +2274,7 @@ describe('Server Tests', function () {
 			}
 
 			server = listen(
-				PORT_NUMBER,
+				portNumber,
 				{
 					brokerEngine: new CustomBrokerEngine(),
 					...serverOptions
@@ -2276,7 +2289,7 @@ describe('Server Tests', function () {
 				await server.listen('ready').once(100);
 				client = new ClientSocket(clientOptions);
 
-				for await (const event of client.channels.subscribe('foo').listen('subscribe')) {
+				for await (const _ of client.channels.subscribe('foo').listen('subscribe')) {
 					(async () => {
 						await wait(200);
 						client.disconnect();
@@ -2316,14 +2329,14 @@ describe('Server Tests', function () {
 			})();
 
 			await wait(700);
-			assert.strictEqual(eventList[0].type, 'close');
-			assert.strictEqual(eventList[1].type, 'disconnect');
-			assert.strictEqual(eventList[2].type, 'unsubscribe');
+			assert.strictEqual(eventList[0]!.type, 'close');
+			assert.strictEqual(eventList[1]!.type, 'disconnect');
+			assert.strictEqual(eventList[2]!.type, 'unsubscribe');
 			assert.strictEqual((eventList[2] as UnsubscribeEvent).channel, 'foo');
 		});
 
 		it('Socket should emit an error when trying to unsubscribe from a channel which it is not subscribed to', async function () {
-			server = listen(PORT_NUMBER, serverOptions);
+			server = listen(portNumber, serverOptions);
 
 			bindFailureHandlers(server);
 
@@ -2358,7 +2371,7 @@ describe('Server Tests', function () {
 
 			await wait(100);
 			assert.strictEqual(errorList.length, 1);
-			assert.strictEqual(errorList[0].name, 'BrokerError');
+			assert.strictEqual(errorList[0]!.name, 'BrokerError');
 		});
 
 		it('Socket should not receive messages from a channel which it has only just unsubscribed from (accounting for delayed unsubscribe by brokerEngine)', async function () {
@@ -2370,7 +2383,7 @@ describe('Server Tests', function () {
 			}
 
 			server = listen(
-				PORT_NUMBER,
+				portNumber,
 				{
 					brokerEngine: new CustomBrokerEngine(),
 					...serverOptions
@@ -2398,7 +2411,9 @@ describe('Server Tests', function () {
 			// Stub the isSubscribed method so that it always returns true.
 			// That way the client will always invoke watchers whenever
 			// it receives a #publish event.
-			client.channels.isSubscribed = function () { return true; };
+			client.channels.isSubscribed = function () {
+				return true;
+			};
 
 			const messageList: (number | string)[] = [];
 
@@ -2411,7 +2426,7 @@ describe('Server Tests', function () {
 			})();
 
 			(async () => {
-				for await (const event of fooChannel.listen('subscribe')) {
+				for await (const _ of fooChannel.listen('subscribe')) {
 					client.invoke('#unsubscribe' as any, 'foo');
 				}
 			})();
@@ -2421,7 +2436,7 @@ describe('Server Tests', function () {
 		});
 
 		it('Socket channelSubscriptions and channelSubscriptionsCount should update when socket.kickOut(channel) is called', async function () {
-			server = listen(PORT_NUMBER, serverOptions);
+			server = listen(portNumber, serverOptions);
 			bindFailureHandlers(server);
 
 			const errorList: Error[] = [];
@@ -2470,7 +2485,7 @@ describe('Server Tests', function () {
 			let subscribePluginCounter = 0;
 
 			server = listen(
-				PORT_NUMBER,
+				portNumber,
 				{
 					plugins: [
 						{
@@ -2546,25 +2561,25 @@ describe('Server Tests', function () {
 			}
 
 			(async () => {
-				for await (const event of channelList[12].listen('subscribe')) {
+				for await (const _ of channelList[12]!.listen('subscribe')) {
 					throw new Error('The my-channel-12 channel should have been blocked by MIDDLEWARE_SUBSCRIBE');
 				}
 			})();
 
 			(async () => {
-				for await (const event of channelList[12].listen('subscribeFail')) {
+				for await (const event of channelList[12]!.listen('subscribeFail')) {
 					assert.notEqual(event.error, null);
 					assert.strictEqual(event.error.name, 'UnauthorizedSubscribeError');
 				}
 			})();
 
 			(async () => {
-				for await (const event of channelList[19].listen('subscribe')) {
+				for await (const _ of channelList[19]!.listen('subscribe')) {
 					client.channels.transmitPublish('my-channel-19', 'Hello!');
 				}
 			})();
 
-			for await (const data of channelList[19]) {
+			for await (const data of channelList[19]!) {
 				assert.strictEqual(data, 'Hello!');
 				assert.strictEqual(subscribePluginCounter, 20);
 				break;
@@ -2572,15 +2587,15 @@ describe('Server Tests', function () {
 
 			assert.notEqual(receivedServerMessages[1], null);
 			// All 20 subscriptions should arrive as a single message.
-			assert.strictEqual(JSON.parse(receivedServerMessages[1].toString()).length, 20);
+			assert.strictEqual(JSON.parse(receivedServerMessages[1]!.toString()).length, 20);
 
-			assert.strictEqual(Array.isArray(JSON.parse(receivedClientMessages[0].toString())), false);
-			assert.strictEqual(JSON.parse(receivedClientMessages[1].toString()).length, 20);
+			assert.strictEqual(Array.isArray(JSON.parse(receivedClientMessages[0]!.toString())), false);
+			assert.strictEqual(JSON.parse(receivedClientMessages[1]!.toString()).length, 20);
 		});
 
 		it('The batchOnHandshake option should not break the order of subscribe and publish', async function () {
 			server = listen(
-				PORT_NUMBER,
+				portNumber,
 				{
 					plugins: [
 						new ResponseBatchingPlugin({
@@ -2626,7 +2641,7 @@ describe('Server Tests', function () {
 				// Intentionally make pingInterval higher than pingTimeout, that
 				// way the client will never receive a ping or send back a pong.
 				server = listen(
-					PORT_NUMBER,
+					portNumber,
 					{
 						pingIntervalMs: 5000,
 						pingTimeoutMs: 500,
@@ -2688,7 +2703,7 @@ describe('Server Tests', function () {
 				// Intentionally make pingInterval higher than pingTimeout, that
 				// way the client will never receive a ping or send back a pong.
 				server = listen(
-					PORT_NUMBER,
+					portNumber,
 					{
 						isPingTimeoutDisabled: true,
 						pingIntervalMs: 1000,
@@ -2751,7 +2766,7 @@ describe('Server Tests', function () {
 				// Intentionally make pingInterval higher than pingTimeout, that
 				// way the client will never receive a ping or send back a pong.
 				server = listen(
-					PORT_NUMBER,
+					portNumber,
 					{
 						pingIntervalMs: 400,
 						pingTimeoutMs: 1000,
@@ -2809,7 +2824,7 @@ describe('Server Tests', function () {
 
 	describe('Plugin', function () {
 		beforeEach(async function () {
-			server = listen(PORT_NUMBER, serverOptions);
+			server = listen(portNumber, serverOptions);
 
 			bindFailureHandlers(server);
 
@@ -2831,26 +2846,26 @@ describe('Server Tests', function () {
 				const clientA = new ClientSocket(clientOptions);
 				const clientB = new ClientSocket({
 					...clientOptions,
-					address: `ws://127.0.0.1:${PORT_NUMBER}?delayMe=true`
+					address: `ws://127.0.0.1:${portNumber}?delayMe=true`
 				});
 
-				let clientAIsConnected = false;
-				let clientBIsConnected = false;
+				let isClientConnectedA = false;
+				let isClientConnectedB = false;
 
 				(async () => {
 					await clientA.listen('connect').once();
-					clientAIsConnected = true;
+					isClientConnectedA = true;
 				})();
 
 				(async () => {
 					await clientB.listen('connect').once();
-					clientBIsConnected = true;
+					isClientConnectedB = true;
 				})();
 
 				await wait(100);
 
-				assert.strictEqual(clientAIsConnected, true);
-				assert.strictEqual(clientBIsConnected, false);
+				assert.strictEqual(isClientConnectedA, true);
+				assert.strictEqual(isClientConnectedB, false);
 
 				clientA.disconnect();
 				clientB.disconnect();
@@ -2859,7 +2874,7 @@ describe('Server Tests', function () {
 
 		describe('onHandshake', function () {
 			it('Should trigger correct events if handshake plugin blocks with an error', async function () {
-				let pluginWasExecuted = false;
+				let wasPluginExecuted = false;
 				const serverWarnings: Error[] = [];
 				const clientErrors: Error[] = [];
 				let abortStatus: null | number = null;
@@ -2867,7 +2882,7 @@ describe('Server Tests', function () {
 				server.addPlugin({
 					async onHandshake() {
 						await wait(100);
-						pluginWasExecuted = true;
+						wasPluginExecuted = true;
 						const err = new Error('Handshake failed because the server was too lazy');
 						err.name = 'TooLazyHandshakeError';
 
@@ -2897,25 +2912,25 @@ describe('Server Tests', function () {
 
 				await wait(200);
 
-				assert.strictEqual(pluginWasExecuted, true);
+				assert.strictEqual(wasPluginExecuted, true);
 				assert.notEqual(clientErrors[0], null);
-				assert.strictEqual(clientErrors[0].name, 'TooLazyHandshakeError');
+				assert.strictEqual(clientErrors[0]!.name, 'TooLazyHandshakeError');
 				assert.notEqual(clientErrors[1], null);
-				assert.strictEqual(clientErrors[1].name, 'SocketProtocolError');
+				assert.strictEqual(clientErrors[1]!.name, 'SocketProtocolError');
 				assert.notEqual(serverWarnings[0], null);
-				assert.strictEqual(serverWarnings[0].name, 'TooLazyHandshakeError');
+				assert.strictEqual(serverWarnings[0]!.name, 'TooLazyHandshakeError');
 				assert.notEqual(abortStatus, null);
 			});
 
 			it('Should send back default 4008 status code if handshake plugin blocks without providing a status code', async function () {
-				let pluginWasExecuted = false;
+				let wasPluginExecuted = false;
 				let abortStatus = 0;
 				let abortReason: string | undefined = '';
 
 				server.addPlugin({
 					async onHandshake() {
 						await wait(100);
-						pluginWasExecuted = true;
+						wasPluginExecuted = true;
 						const err = new Error('Handshake failed because the server was too lazy');
 						err.name = 'TooLazyHandshakeError';
 
@@ -2933,20 +2948,20 @@ describe('Server Tests', function () {
 				})();
 
 				await wait(200);
-				assert.strictEqual(pluginWasExecuted, true);
+				assert.strictEqual(wasPluginExecuted, true);
 				assert.strictEqual(abortStatus, 4008);
 				assert.strictEqual(abortReason, 'TooLazyHandshakeError: Handshake failed because the server was too lazy');
 			});
 
 			it('Should send back custom status code if handshake plugin blocks by providing a status code', async function () {
-				let pluginWasExecuted = false;
+				let wasPluginExecuted = false;
 				let abortStatus: number;
 				let abortReason: string | undefined;
 
 				server.addPlugin({
 					async onHandshake() {
 						await wait(100);
-						pluginWasExecuted = true;
+						wasPluginExecuted = true;
 						const err = new Error('Handshake failed because of invalid query auth parameters');
 						err.name = 'InvalidAuthQueryHandshakeError';
 						// Set custom 4501 status code as a property of the error.
@@ -2968,7 +2983,7 @@ describe('Server Tests', function () {
 				})();
 
 				await wait(200);
-				assert.strictEqual(pluginWasExecuted, true);
+				assert.strictEqual(wasPluginExecuted, true);
 				assert.strictEqual(abortStatus!, 4501);
 				assert.strictEqual(abortReason!, 'InvalidAuthQueryHandshakeError: Handshake failed because of invalid query auth parameters');
 			});
@@ -3016,7 +3031,7 @@ describe('Server Tests', function () {
 				});
 
 				(async () => {
-					const event = await server.listen('socketAuthenticate').once();
+					await server.listen('socketAuthenticate').once();
 
 					didAuthenticationEventTrigger = true;
 				})();
@@ -3047,26 +3062,26 @@ describe('Server Tests', function () {
 				const clientA = new ClientSocket(clientOptions);
 				const clientB = new ClientSocket({
 					...clientOptions,
-					address: `ws://127.0.0.1:${PORT_NUMBER}?delayMe=true`
+					address: `ws://127.0.0.1:${portNumber}?delayMe=true`
 				});
 
-				let clientAIsConnected = false;
-				let clientBIsConnected = false;
+				let isClientConnectedA = false;
+				let isClientConnectedB = false;
 
 				(async () => {
 					await clientA.listen('connect').once();
-					clientAIsConnected = true;
+					isClientConnectedA = true;
 				})();
 
 				(async () => {
 					await clientB.listen('connect').once();
-					clientBIsConnected = true;
+					isClientConnectedB = true;
 				})();
 
 				await wait(100);
 
-				assert.strictEqual(clientAIsConnected, true);
-				assert.strictEqual(clientBIsConnected, false);
+				assert.strictEqual(isClientConnectedA, true);
+				assert.strictEqual(isClientConnectedB, false);
 
 				clientA.disconnect();
 				clientB.disconnect();
@@ -3075,14 +3090,14 @@ describe('Server Tests', function () {
 
 		describe('onMessage', function () {
 			it('Should run INVOKE action in plugin if client invokes an RPC', async function () {
-				let pluginWasExecuted = false;
+				let wasPluginExecuted = false;
 				let pluginPacket: MethodRequestPacket<ServerIncomingMap & ServerPrivateMap, 'proc'> | null = null;
 
 				server.addPlugin({
 					async onMessage({ packet }) {
 						if (isRequestPacket(packet) && packet.method === 'proc') {
 							pluginPacket = packet;
-							pluginWasExecuted = true;
+							wasPluginExecuted = true;
 						}
 
 						return packet;
@@ -3096,20 +3111,20 @@ describe('Server Tests', function () {
 
 				const result = await client.invoke('proc', 123);
 
-				assert.strictEqual(pluginWasExecuted, true);
+				assert.strictEqual(wasPluginExecuted, true);
 				assert.notEqual(pluginPacket, null);
 				assert.strictEqual(result, 'success 123');
 			});
 
 			it('Should send back custom Error if INVOKE action in plugin blocks the client RPC', async function () {
-				let pluginWasExecuted = false;
+				let wasPluginExecuted = false;
 				let pluginPacket: AnyPacket<ServerIncomingMap & ServerPrivateMap, {}> | null = null;
 
 				server.addPlugin({
 					async onMessage({ packet }) {
 						if (isRequestPacket(packet) && packet.method === 'proc') {
 							pluginPacket = packet;
-							pluginWasExecuted = true;
+							wasPluginExecuted = true;
 
 							const customError = new Error('Invoke action was blocked');
 							customError.name = 'BlockedInvokeError';
@@ -3142,11 +3157,11 @@ describe('Server Tests', function () {
 
 		describe('onAuthenticate', function () {
 			it('Should not run onAuthenticate in plugin if JWT token does not exist', async function () {
-				let pluginWasExecuted = false;
+				let wasPluginExecuted = false;
 
 				server.addPlugin({
 					onAuthenticate() {
-						pluginWasExecuted = true;
+						wasPluginExecuted = true;
 					},
 					type: 'onAuthenticate'
 				});
@@ -3154,16 +3169,16 @@ describe('Server Tests', function () {
 				client = new ClientSocket(clientOptions);
 
 				await client.listen('connect').once(100);
-				assert.notEqual(pluginWasExecuted, true);
+				assert.notEqual(wasPluginExecuted, true);
 			});
 
 			it('Should run onAuthenticate in plugin if JWT token exists', async function () {
 				global.localStorage.setItem(authTokenName, validSignedAuthTokenBob);
-				let pluginWasExecuted = false;
+				let wasPluginExecuted = false;
 
 				server.addPlugin({
 					onAuthenticate() {
-						pluginWasExecuted = true;
+						wasPluginExecuted = true;
 					},
 					type: 'onAuthenticate'
 				});
@@ -3180,18 +3195,18 @@ describe('Server Tests', function () {
 
 				await client.listen('authenticate').once(100);
 
-				assert.strictEqual(pluginWasExecuted, true);
+				assert.strictEqual(wasPluginExecuted, true);
 			});
 		});
 
 		describe('onPublishIn', function () {
 			it('Should run onPublishIn in plugin if client publishes to a channel', async function () {
-				let pluginWasExecuted = false;
+				let wasPluginExecuted = false;
 				let pluginDetails: null | { channel: string, data: string } = null;
 
 				server.addPlugin({
 					async onPublishIn({ socket, transport, ...etc }) {
-						pluginWasExecuted = true;
+						wasPluginExecuted = true;
 						pluginDetails = etc;
 
 						return etc.data;
@@ -3205,18 +3220,18 @@ describe('Server Tests', function () {
 
 				await client.channels.invokePublish('hello', 'world');
 
-				assert.strictEqual(pluginWasExecuted, true);
+				assert.strictEqual(wasPluginExecuted, true);
 				assert.notEqual(pluginDetails, null);
 				assert.strictEqual(pluginDetails!.channel, 'hello');
 				assert.strictEqual(pluginDetails!.data, 'world');
 			});
 
 			it('Should be able to delay and block publish using onPublishIn plugin', async function () {
-				let pluginWasExecuted = false;
+				let wasPluginExecuted = false;
 
 				server.addPlugin({
 					async onPublishIn({ socket, transport, ...etc }) {
-						pluginWasExecuted = true;
+						wasPluginExecuted = true;
 						await wait(50);
 						const error = new Error('Blocked by plugin');
 						error.name = 'BlockedError';
@@ -3246,7 +3261,7 @@ describe('Server Tests', function () {
 				}
 				await wait(100);
 
-				assert.strictEqual(pluginWasExecuted, true);
+				assert.strictEqual(wasPluginExecuted, true);
 				assert.notEqual(error, null);
 				assert.strictEqual(error!.name, 'BlockedError');
 				assert.strictEqual(receivedMessages.length, 0);
@@ -3254,7 +3269,9 @@ describe('Server Tests', function () {
 
 			it('Delaying onPublishIn for one client should not affect other clients', async function () {
 				let done: () => void;
-				const donePromise = new Promise<void>((resolve) => { done = resolve; });
+				const donePromise = new Promise<void>(
+					(resolve) => { done = resolve; }
+				);
 
 				server.addPlugin({
 					async onPublishIn({ data, transport }) {
@@ -3282,7 +3299,7 @@ describe('Server Tests', function () {
 				const clientA = new ClientSocket(clientOptions);
 				const clientB = new ClientSocket({
 					...clientOptions,
-					address: `ws://127.0.0.1:${PORT_NUMBER}?delayMe=true`
+					address: `ws://127.0.0.1:${portNumber}?delayMe=true`
 				});
 
 				await Promise.all([
@@ -3384,12 +3401,12 @@ describe('Server Tests', function () {
 
 		describe('onSubscribe', function () {
 			it('Should run onSubscribe in plugin if client subscribes to a channel', async function () {
-				let pluginWasExecuted = false;
+				let wasPluginExecuted = false;
 				let pluginChannel: null | string = null;
 
 				server.addPlugin({
 					async onSubscribe({ channel }) {
-						pluginWasExecuted = true;
+						wasPluginExecuted = true;
 						pluginChannel = channel;
 					},
 					type: 'Subscribe'
@@ -3399,7 +3416,7 @@ describe('Server Tests', function () {
 
 				await client.channels.subscribe('hello').listen('subscribe').once();
 
-				assert.strictEqual(pluginWasExecuted, true);
+				assert.strictEqual(wasPluginExecuted, true);
 				assert.strictEqual(pluginChannel, 'hello');
 			});
 
@@ -3438,21 +3455,21 @@ describe('Server Tests', function () {
 
 				assert.strictEqual(receivedMessage!, 'bar');
 				assert.strictEqual(pluginActions.length, 2);
-				assert.strictEqual(pluginActions[0].type, 'subscribe');
-				assert.strictEqual(pluginActions[0].channel, 'foo');
-				assert.strictEqual(pluginActions[1].type, 'publishIn');
-				assert.strictEqual(pluginActions[1].channel, 'foo');
+				assert.strictEqual(pluginActions[0]!.type, 'subscribe');
+				assert.strictEqual(pluginActions[0]!.channel, 'foo');
+				assert.strictEqual(pluginActions[1]!.type, 'publishIn');
+				assert.strictEqual(pluginActions[1]!.channel, 'foo');
 			});
 		});
 
 		describe('onPublishOut', function () {
 			it('Should run onPublishOut in plugin if client publishes to a channel', async function () {
-				let pluginWasExecuted = false;
+				let wasPluginExecuted = false;
 				let pluginDetails: null | { channel: string, data: string } = null;
 
 				server.addPlugin({
 					async onPublishOut({ socket, transport, ...etc }) {
-						pluginWasExecuted = true;
+						wasPluginExecuted = true;
 						pluginDetails = etc;
 
 						return etc.data;
@@ -3465,7 +3482,7 @@ describe('Server Tests', function () {
 				await client.channels.subscribe('hello').listen('subscribe').once(100);
 				await client.channels.invokePublish('hello', 123);
 
-				assert.strictEqual(pluginWasExecuted, true);
+				assert.strictEqual(wasPluginExecuted, true);
 				assert.notEqual(pluginDetails, null);
 				assert.strictEqual(pluginDetails!.channel, 'hello');
 				assert.strictEqual(pluginDetails!.data, 123);

@@ -2,7 +2,7 @@ import type { CodecEngine } from './codec-engine.js';
 
 const base64Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
-const validJSONStartRegex = /^[ \n\r\t]*[{[]/;
+const validJsonStartRegex = /^[ \n\r\t]*[{[]/;
 
 function arrayBufferToBase64(arraybuffer: ArrayBuffer): string {
 	const bytes = new Uint8Array(arraybuffer);
@@ -67,7 +67,7 @@ class DefaultCodec implements CodecEngine {
 		const message = encodedMessage.toString();
 
 		// Performance optimization to detect invalid JSON packet sooner.
-		if (!validJSONStartRegex.test(message)) {
+		if (!validJsonStartRegex.test(message)) {
 			return message;
 		}
 

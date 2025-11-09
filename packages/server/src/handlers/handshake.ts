@@ -5,7 +5,7 @@ import { dehydrateError } from '@socket-mesh/errors';
 import { processAuthentication, validateAuthToken } from './authenticate.js';
 import { ServerRequestHandlerArgs } from './server-request-handler.js';
 
-const HANDSHAKE_REJECTION_STATUS_CODE = 4008;
+const handshakeRejectionStatusCode = 4008;
 
 export async function handshakeHandler(
 	{ options, socket, transport }: ServerRequestHandlerArgs<HandshakeOptions>
@@ -26,7 +26,7 @@ export async function handshakeHandler(
 				});
 			} catch (err) {
 				if (err.statusCode == null) {
-					err.statusCode = HANDSHAKE_REJECTION_STATUS_CODE;
+					err.statusCode = handshakeRejectionStatusCode;
 				}
 				throw err;
 			}
