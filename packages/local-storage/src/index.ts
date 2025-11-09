@@ -1,48 +1,45 @@
 export class LocalStorage implements Storage {
-	private readonly _data: {[ key: string]: string};
+	[key: string | symbol]: any
+
+	private readonly _data: { [ key: string]: string };
 
 	constructor() {
 		this._data = {};
 	}
 
-	getItem(key: string) {
-		if (this._data.hasOwnProperty(key)) {
+	clear(): void {
+		for (const key of Object.keys(this._data)) {
+			delete this._data[key];
+		}
+	}
+
+	getItem(key: string): null | string {
+		if (Object.prototype.hasOwnProperty.call(this._data, key)) {
 			return String(this._data[key]);
 		}
 		return null;
 	}
 
-	setItem(key: string, val: any) {
-		this._data[key] = String(val);
-	}
-
-	removeItem(key: string) {
-		delete this._data[key];
-	}
-
-	clear() {
-		const self = this;
-
-		Object.keys(self._data).forEach(function (key) {
-			self._data[key] = undefined;
-			delete self._data[key];
-		});
-	}
-
-	key(i: number): string {
-		i = i || 0;
-		return Object.keys(this._data)[i];
-	}
-
 	hasItem(key: string): boolean {
-		return this._data.hasOwnProperty(key);
+		return Object.prototype.hasOwnProperty.call(this._data, key);
+	}
+
+	key(i: number): null | string {
+		i = i || 0;
+		return Object.keys(this._data)[i] ?? null;
 	}
 
 	get length(): number {
 		return Object.keys(this._data).length;
 	}
 
-	[key: string | symbol]: any
+	removeItem(key: string): void {
+		delete this._data[key];
+	}
+
+	setItem(key: string, val: any): void {
+		this._data[key] = String(val);
+	}
 }
 
 export class LocalStorageProxyHandler implements ProxyHandler<LocalStorage> {

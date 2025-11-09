@@ -12,6 +12,8 @@
 	"scripts": {
 		"build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
 		"deploy": "npm run build && node ../../scripts/publish.mjs",
+		"lint": "eslint . --c ../../eslint.config.mjs",
+		"lint:fix": "eslint . --c ../../eslint.config.mjs --fix",
 		"test": "tsx --tsconfig ./tsconfig.build.json --test ./src/**/*.{spec,test}.ts ./test/**/*.{spec,test}.ts"
 	},
 	"repository": {
@@ -25,6 +27,7 @@
 		"@socket-mesh/async-stream-emitter": "workspace:^",
 		"@socket-mesh/consumable-stream": "workspace:^",
 		"@socket-mesh/stream-demux": "workspace:^",
+		"@socket-mesh/typescript-config": "workspace:^",
 		"@socket-mesh/writable-consumable-stream": "workspace:^"
 	},
 	"keywords": [

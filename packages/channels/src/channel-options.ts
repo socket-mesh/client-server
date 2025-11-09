@@ -1,5 +1,5 @@
 export interface ChannelOptions {
-	waitForAuth?: boolean,
+	data?: any,
 	priority?: number,
-	data?: any
+	waitForAuth?: boolean
 }

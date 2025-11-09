@@ -4,6 +4,11 @@ export interface ErrorEvent {
 	error: Error
 }
 
+export interface PublishEvent<T> {
+	channel: string,
+	data: T
+}
+
 export interface ReadyEvent {}
 
 export interface SubscribeEvent {
@@ -12,9 +17,4 @@ export interface SubscribeEvent {
 
 export interface UnsubscribeEvent {
 	channel: string
-}
-
-export interface PublishEvent<T> {
-	channel: string,
-	data: T
 }

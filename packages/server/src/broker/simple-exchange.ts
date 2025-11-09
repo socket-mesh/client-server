@@ -1,15 +1,31 @@
-import { ChannelDetails, ChannelMap, ChannelsOptions, PublishOptions } from "@socket-mesh/channels";
-import { Broker } from "./broker.js";
-import { Exchange } from "./exchange.js";
+import { ChannelDetails, ChannelMap, ChannelsOptions, PublishOptions } from '@socket-mesh/channels';
+
+import { Broker } from './broker.js';
+import { Exchange } from './exchange.js';
 
 export class SimpleExchange<T extends ChannelMap> extends Exchange<T> {
-	readonly id: string;
 	private readonly _broker: Broker<T>;
+	readonly id: string;
 
 	constructor(broker: Broker<T>, options?: ChannelsOptions) {
 		super(options);
 		this.id = 'exchange';
 		this._broker = broker;
+	}
+
+	async invokePublish<U extends keyof T & string>(channelName: U, data: T[U]): Promise<void> {
+		await this._broker.invokePublish(channelName, data);
+	}
+
+	async transmit(event: '#publish', packet: PublishOptions): Promise<void> {
+		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+		if (event === '#publish') {
+			this._channelDataDemux.write(packet.channel, packet.data);
+		}
+	}
+
+	async transmitPublish<U extends keyof T & string>(channelName: U, data: T[U]): Promise<void> {
+		await this._broker.transmitPublish(channelName, data);
 	}
 
 	protected async trySubscribe(channel: ChannelDetails): Promise<void> {
@@ -28,19 +44,5 @@ export class SimpleExchange<T extends ChannelMap> extends Exchange<T> {
 			await this._broker.unsubscribe(this, channel.name);
 			this.emit('unsubscribe', { channel: channel.name });
 		}
-	}
-
-	async transmit(event: '#publish', packet: PublishOptions): Promise<void> {
-		if (event === '#publish') {
-			this._channelDataDemux.write(packet.channel, packet.data);
-		}
-	}
-
-	async transmitPublish<U extends keyof T & string>(channelName: U, data: T[U]): Promise<void> {
-		await this._broker.transmitPublish(channelName, data);
-	}
-
-	async invokePublish<U extends keyof T & string>(channelName: U, data: T[U]): Promise<void> {
-		await this._broker.invokePublish(channelName, data);
 	}
 }

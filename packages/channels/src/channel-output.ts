@@ -1,5 +1,5 @@
-import { StreamDemuxStats } from "@socket-mesh/stream-demux";
-import { StreamDemuxWrapper } from "@socket-mesh/stream-demux";
+import { StreamDemuxStats } from '@socket-mesh/stream-demux';
+import { StreamDemuxWrapper } from '@socket-mesh/stream-demux';
 
 export class ChannelOutput {
 	private readonly _name: string;
@@ -10,8 +10,8 @@ export class ChannelOutput {
 		this._output = output;
 	}
 
-	hasConsumer(consumerId: number): boolean {
-		return this._output.hasConsumer(this._name, consumerId);
+	close(): void {
+		this._output.close(this._name);
 	}
 
 	getBackpressure(consumerId?: number): number {
@@ -38,8 +38,8 @@ export class ChannelOutput {
 		return this._output.getConsumerStats(this._name);
 	}
 
-	close(): void {
-		this._output.close(this._name);
+	hasConsumer(consumerId: number): boolean {
+		return this._output.hasConsumer(this._name, consumerId);
 	}
 
 	kill(consumerId?: number): void;

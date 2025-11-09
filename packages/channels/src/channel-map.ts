@@ -1,18 +1,18 @@
-export type Primitive =
-  | boolean
-  | null
-  | number
-  | string
-  | undefined;
+export interface ChannelMap { [channel: string]: JsonValue }
 
-	export interface JsonObject {
-  [key: string]: JsonValue;
+export type JsonArray = Array<JsonValue>;
+
+export interface JsonObject {
+	[key: string]: JsonValue
 }
 
-export interface JsonArray extends Array<JsonValue> {}
+export type JsonValue = JsonArray | JsonObject | Primitive;
 
-export type JsonValue = Primitive | JsonObject | JsonArray;
+export type Primitive =
+	| boolean
+	| null
+	| number
+	| string
+	| undefined; ;
 
-export interface ChannelMap { [channel: string]: JsonValue };
-
-//export type ChannelTypes<T> = T[keyof T];
+// export type ChannelTypes<T> = T[keyof T];

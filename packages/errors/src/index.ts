@@ -1,5 +1,5 @@
-import { decycle } from "./decycle.js";
-export { decycle } from "./decycle.js";
+import { decycle } from './decycle.js';
+export { decycle } from './decycle.js';
 
 export class AbortError extends Error {
 	constructor(message: string) {
@@ -8,6 +8,17 @@ export class AbortError extends Error {
 		this.name = 'AbortError';
 
 		Object.setPrototypeOf(this, AbortError.prototype);
+	}
+}
+
+// For any other auth error; not specifically related to the auth token itself.
+export class AuthError extends Error {
+	constructor(message: string) {
+		super(message);
+
+		this.name = 'AuthError';
+
+		Object.setPrototypeOf(this, AuthError.prototype);
 	}
 }
 
@@ -58,149 +69,6 @@ export class AuthTokenNotBeforeError extends AuthTokenError {
 	}
 }
 
-// For any other auth error; not specifically related to the auth token itself.
-export class AuthError extends Error {
-	constructor(message: string) {
-		super(message);
-
-		this.name = 'AuthError';
-
-		Object.setPrototypeOf(this, AuthError.prototype);
-	}
-}
-
-export class PluginError extends Error {
-	type: string;
-
-	constructor(message: string, type: string) {
-		super(message);
-
-		this.name = 'PluginError';
-		this.type = type;
-
-		Object.setPrototypeOf(this, PluginError.prototype);
-	}
-}
-
-export class PluginBlockedError extends Error {
-	type: string;
-
-	constructor(message: string, type: string) {
-		super(message);
-
-		this.name = 'PluginBlockedError';
-		this.type = type;
-
-		Object.setPrototypeOf(this, PluginBlockedError.prototype);
-	}
-}
-
-export class SilentPluginBlockedError extends Error {
-	type: string;
-
-	constructor(message: string, type: string) {
-		super(message);
-
-		this.name = 'SilentPluginBlockedError';
-		this.type = type;
-
-		Object.setPrototypeOf(this, SilentPluginBlockedError.prototype);
-	}
-}
-
-export class InvalidActionError extends Error {
-	constructor(message: string) {
-		super(message);
-
-		this.name = 'InvalidActionError';
-
-		Object.setPrototypeOf(this, InvalidActionError.prototype);
-	}
-}
-
-export class InvalidArgumentsError extends Error {
-	constructor(message: string) {
-		super(message);
-
-		this.name = 'InvalidArgumentsError';
-
-		Object.setPrototypeOf(this, InvalidArgumentsError.prototype);
-	}
-}
-
-export class InvalidOptionsError extends Error {
-	constructor(message: string) {
-		super(message);
-
-		this.name = 'InvalidOptionsError';
-
-		Object.setPrototypeOf(this, InvalidOptionsError.prototype);
-	}
-}
-
-export class InvalidMessageError extends Error {
-	constructor(message: string) {
-		super(message);
-
-		this.name = 'InvalidMessageError';
-
-		Object.setPrototypeOf(this, InvalidMessageError.prototype);
-	}
-}
-
-export class SocketProtocolError extends Error {
-	code: number;
-
-	constructor(message: string, code: number) {
-		super(message);
-
-		this.name = 'SocketProtocolError';
-		this.code = code;
-
-		Object.setPrototypeOf(this, SocketProtocolError.prototype);
-	}
-}
-
-export class ServerProtocolError extends Error {
-	constructor(message: string) {
-		super(message);
-
-		this.name = 'ServerProtocolError';
-
-		Object.setPrototypeOf(this, ServerProtocolError.prototype);
-	}
-}
-
-export class HTTPServerError extends Error {
-	constructor(message: string) {
-		super(message);
-
-		this.name = 'HTTPServerError';
-
-		Object.setPrototypeOf(this, HTTPServerError.prototype);
-	}
-}
-
-export class ResourceLimitError extends Error {
-	constructor(message: string) {
-		super(message);
-
-		this.name = 'ResourceLimitError';
-
-		Object.setPrototypeOf(this, ResourceLimitError.prototype);
-	}
-}
-
-export class TimeoutError extends Error {
-	constructor(message: string) {
-		super(message);
-
-		this.name = 'TimeoutError';
-
-		Object.setPrototypeOf(this, TimeoutError.prototype);
-	}
-}
-
 export class BadConnectionError extends Error {
 	type: string;
 
@@ -224,6 +92,82 @@ export class BrokerError extends Error {
 	}
 }
 
+export class HttpServerError extends Error {
+	constructor(message: string) {
+		super(message);
+
+		this.name = 'HttpServerError';
+
+		Object.setPrototypeOf(this, HttpServerError.prototype);
+	}
+}
+
+export class InvalidActionError extends Error {
+	constructor(message: string) {
+		super(message);
+
+		this.name = 'InvalidActionError';
+
+		Object.setPrototypeOf(this, InvalidActionError.prototype);
+	}
+}
+
+export class InvalidArgumentsError extends Error {
+	constructor(message: string) {
+		super(message);
+
+		this.name = 'InvalidArgumentsError';
+
+		Object.setPrototypeOf(this, InvalidArgumentsError.prototype);
+	}
+}
+
+export class InvalidMessageError extends Error {
+	constructor(message: string) {
+		super(message);
+
+		this.name = 'InvalidMessageError';
+
+		Object.setPrototypeOf(this, InvalidMessageError.prototype);
+	}
+}
+
+export class InvalidOptionsError extends Error {
+	constructor(message: string) {
+		super(message);
+
+		this.name = 'InvalidOptionsError';
+
+		Object.setPrototypeOf(this, InvalidOptionsError.prototype);
+	}
+}
+
+export class PluginBlockedError extends Error {
+	type: string;
+
+	constructor(message: string, type: string) {
+		super(message);
+
+		this.name = 'PluginBlockedError';
+		this.type = type;
+
+		Object.setPrototypeOf(this, PluginBlockedError.prototype);
+	}
+}
+
+export class PluginError extends Error {
+	type: string;
+
+	constructor(message: string, type: string) {
+		super(message);
+
+		this.name = 'PluginError';
+		this.type = type;
+
+		Object.setPrototypeOf(this, PluginError.prototype);
+	}
+}
+
 export class ProcessExitError extends Error {
 	code: number;
 
@@ -234,6 +178,72 @@ export class ProcessExitError extends Error {
 		this.code = code;
 
 		Object.setPrototypeOf(this, ProcessExitError.prototype);
+	}
+}
+
+export class ResourceLimitError extends Error {
+	constructor(message: string) {
+		super(message);
+
+		this.name = 'ResourceLimitError';
+
+		Object.setPrototypeOf(this, ResourceLimitError.prototype);
+	}
+}
+
+export class ServerProtocolError extends Error {
+	constructor(message: string) {
+		super(message);
+
+		this.name = 'ServerProtocolError';
+
+		Object.setPrototypeOf(this, ServerProtocolError.prototype);
+	}
+}
+
+export class SilentPluginBlockedError extends Error {
+	type: string;
+
+	constructor(message: string, type: string) {
+		super(message);
+
+		this.name = 'SilentPluginBlockedError';
+		this.type = type;
+
+		Object.setPrototypeOf(this, SilentPluginBlockedError.prototype);
+	}
+}
+
+export class SocketClosedError extends Error {
+	constructor(message: string) {
+		super(message);
+
+		this.name = 'SocketClosedError';
+
+		Object.setPrototypeOf(this, ServerProtocolError.prototype);
+	}
+}
+
+export class SocketProtocolError extends Error {
+	code: number;
+
+	constructor(message: string, code: number) {
+		super(message);
+
+		this.name = 'SocketProtocolError';
+		this.code = code;
+
+		Object.setPrototypeOf(this, SocketProtocolError.prototype);
+	}
+}
+
+export class TimeoutError extends Error {
+	constructor(message: string) {
+		super(message);
+
+		this.name = 'TimeoutError';
+
+		Object.setPrototypeOf(this, TimeoutError.prototype);
 	}
 }
 
@@ -287,7 +297,7 @@ export function dehydrateError(error: any): DehydratedError {
 			message: error.message
 		};
 
-		for (let i of Object.keys(error)) {
+		for (const i of Object.keys(error)) {
 			dehydratedError[i] = error[i];
 		}
 	} else if (typeof error === 'function') {
@@ -301,7 +311,7 @@ export function dehydrateError(error: any): DehydratedError {
 
 // Convert a dehydrated error back to its *original* form.
 export function hydrateError(error: DehydratedError): any {
-	let hydratedError: { [ key: string ] : any } | null = null;
+	let hydratedError: null | { [ key: string ]: any } = null;
 
 	if (error != null) {
 		if (typeof error === 'object') {
@@ -311,7 +321,7 @@ export function hydrateError(error: DehydratedError): any {
 				hydratedError.name = error.name;
 			}
 
-			for (let i of Object.keys(error)) {
+			for (const i of Object.keys(error)) {
 				if (hydratedError[i] === undefined) {
 					hydratedError[i as keyof Error] = error[i];
 				}

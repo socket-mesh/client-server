@@ -1,12 +1,9 @@
 {
 	"name": "@socket-mesh/main",
-	"workspaces": [
-		"packages/*"
-	],
 	"packageManager": "pnpm@9.7.0",
 	"scripts": {
 		"bundle": "cd packages/client && npm run bundle",
-		"build": "npm run build:consumable-stream && npm run build:writable-consumable-stream && npm run build:stream-demux && npm run build:async-stream-emitter && npm run build:local-storage && npm run build:auth && npm run build:errors && npm run build:formatter && npm run build:core && npm run build:channels && npm run build:client && npm run build:auth-engine && npm run build:server",
+		"build": "turbo run build",
 		"build:async-stream-emitter": "cd packages/async-stream-emitter && npm run build",
 		"build:auth": "cd packages/auth && npm run build",
 		"build:auth-engine": "cd packages/auth-engine && npm run build",
@@ -38,20 +35,22 @@
 		"generate:cert": "node ./scripts/generate-cert.mjs",
 		"generate:jwt": "node ./scripts/generate-jwt.mjs",
 		"prune": "node scripts/prune.mjs",
-		"test": "npm run test:consumable-stream && npm run test:writable-consumable-stream && npm run test:stream-demux && npm run test:async-stream-emitter && npm run test:local-storage && npm run test:auth-engine && npm run test:formatter && npm run test:client && npm run test:server",
+		"test": "npm run test:consumable-stream && npm run test:writable-consumable-stream && npm run test:stream-demux && npm run test:async-stream-emitter && npm run test:local-storage && npm run test:auth-engine && npm run test:formatter && npm run test:integration",
 		"test:async-stream-emitter": "cd packages/async-stream-emitter && npm run test",
 		"test:auth-engine": "cd packages/auth-engine && npm run test",
-		"test:client": "cd packages/client && npm run test",
 		"test:consumable-stream": "cd packages/consumable-stream && npm run test",
 		"test:formatter": "cd packages/formatter && npm run test",
+		"test:integration": "cd tests/integration && npm run test",
 		"test:local-storage": "cd packages/local-storage && npm run test",
-		"test:server": "cd packages/server && npm run test",
 		"test:stream-demux": "cd packages/stream-demux && npm run test",
 		"test:writable-consumable-stream": "cd packages/writable-consumable-stream && npm run test"
 	},
 	"devDependencies": {
+		"@secure-data-systems/eslint-config": "catalog:secure-data-systems",
+		"@secure-data-systems/tsconfig": "catalog:secure-data-systems",
 		"@types/node": "catalog:node",
 		"tsx": "catalog:",
+		"turbo": "catalog:",
 		"typescript": "catalog:"
 	}
 }

@@ -1,13 +1,14 @@
-import { HandlerMap, PrivateMethodMap, PublicMethodMap, ServiceMap, Socket, SocketOptions } from "@socket-mesh/core";
-import { WebSocket } from "ws";
-import { ServerTransport } from "./server-transport.js";
-import { Exchange } from "./broker/exchange.js";
-import { Server } from "./server.js";
-import { IncomingMessage } from "http";
-import { ServerPlugin } from "./plugin/server-plugin.js";
-import { ChannelMap } from "@socket-mesh/channels";
-import { ServerSocketState } from "./server-socket-state.js";
-import { ClientPrivateMap, ServerPrivateMap } from "@socket-mesh/client";
+import { ChannelMap } from '@socket-mesh/channels';
+import { ClientPrivateMap, ServerPrivateMap } from '@socket-mesh/client';
+import { HandlerMap, PrivateMethodMap, PublicMethodMap, ServiceMap, Socket, SocketOptions } from '@socket-mesh/core';
+import { IncomingMessage } from 'http';
+import { WebSocket } from 'ws';
+
+import { Exchange } from './broker/exchange.js';
+import { ServerPlugin } from './plugin/server-plugin.js';
+import { ServerSocketState } from './server-socket-state.js';
+import { ServerTransport } from './server-transport.js';
+import { Server } from './server.js';
 
 export interface ServerSocketOptions<
 	TIncoming extends PublicMethodMap,
@@ -24,7 +25,7 @@ export interface ServerSocketOptions<
 	TPrivateOutgoing & ClientPrivateMap,
 	TService,
 	TState & ServerSocketState
-> {
+	> {
 	handlers: HandlerMap<
 		TIncoming & TPrivateIncoming & ServerPrivateMap,
 		TOutgoing,
@@ -32,11 +33,11 @@ export interface ServerSocketOptions<
 		TService,
 		TState & ServerSocketState
 	>,
-	plugins?: ServerPlugin<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>[],
 	id?: string,
-	service?: string,
-	server: Server<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>,
+	plugins?: ServerPlugin<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>[],
 	request: IncomingMessage,
+	server: Server<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>,
+	service?: string,
 	socket: WebSocket
 }
 
@@ -55,9 +56,9 @@ export class ServerSocket<
 	TPrivateOutgoing & ClientPrivateMap,
 	TService,
 	TState & ServerSocketState
-> {
-	public readonly server: Server<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>;
+	> {
 	private _serverTransport: ServerTransport<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>;
+	public readonly server: Server<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>;
 
 	constructor(options: ServerSocketOptions<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>) {
 		const transport = new ServerTransport<TIncoming, TChannel, TService, TOutgoing, TPrivateIncoming, TPrivateOutgoing, TServerState, TState>(options);
@@ -69,8 +70,8 @@ export class ServerSocket<
 	}
 
 	async deauthenticate(rejectOnFailedDelivery?: boolean): Promise<boolean> {
-		await super.deauthenticate();
-		
+		const result = await super.deauthenticate();
+
 		if (rejectOnFailedDelivery) {
 			try {
 				await this._serverTransport.invoke('#removeAuthToken', undefined)[0];
@@ -78,7 +79,7 @@ export class ServerSocket<
 				this._serverTransport.onError(error);
 				throw error;
 			}
-			return;
+			return result;
 		}
 
 		try {
@@ -88,14 +89,20 @@ export class ServerSocket<
 				throw err;
 			}
 		}
+
+		return result;
 	}
 
 	public get exchange(): Exchange<TChannel> {
 		return this.server.exchange;
 	}
 
+	public get id(): string {
+		return this._serverTransport.id;
+	}
+
 	kickOut(channel: string, message: string): Promise<void[]> {
-		const channels = channel ? [channel] : Object.keys(this.state.channelSubscriptions);
+		const channels = channel ? [channel] : Object.keys(this.state.channelSubscriptions || {});
 
 		return Promise.all(channels.map((channelName) => {
 			this.transmit('#kickOut', { channel: channelName, message });
@@ -107,7 +114,7 @@ export class ServerSocket<
 		return this._serverTransport.ping();
 	}
 
-	get service(): string {
+	get service(): string | undefined {
 		return this._serverTransport.service;
 	}
 

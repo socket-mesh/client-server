@@ -1,15 +1,15 @@
-import { HandshakeOptions, HandshakeStatus } from "@socket-mesh/client";
-import { wait } from "@socket-mesh/core";
-import { processAuthentication, validateAuthToken } from "./authenticate.js";
-import { dehydrateError } from "@socket-mesh/errors";
-import { ServerRequestHandlerArgs } from "./server-request-handler.js";
+import { HandshakeOptions, HandshakeStatus } from '@socket-mesh/client';
+import { wait } from '@socket-mesh/core';
+import { dehydrateError } from '@socket-mesh/errors';
 
-const HANDSHAKE_REJECTION_STATUS_CODE = 4008;
+import { processAuthentication, validateAuthToken } from './authenticate.js';
+import { ServerRequestHandlerArgs } from './server-request-handler.js';
+
+const handshakeRejectionStatusCode = 4008;
 
 export async function handshakeHandler(
 	{ options, socket, transport }: ServerRequestHandlerArgs<HandshakeOptions>
 ): Promise<HandshakeStatus> {
-
 	const server = socket.server;
 	const wasAuthenticated = !!transport.signedAuthToken;
 	const authInfo = await validateAuthToken(server.auth, options.authToken);
@@ -18,15 +18,15 @@ export async function handshakeHandler(
 		if (plugin.onHandshake) {
 			try {
 				await plugin.onHandshake({
+					authInfo: 'authError' in authInfo
+						? { authError: authInfo.authError, signedAuthToken: options.authToken }
+						: { authToken: authInfo.authToken, signedAuthToken: options.authToken },
 					socket,
-					transport,
-					authInfo : 'authError' in authInfo ?
-						{ signedAuthToken: options.authToken, authError: authInfo.authError } :
-						{ signedAuthToken: options.authToken, authToken: authInfo.authToken }
+					transport
 				});
 			} catch (err) {
 				if (err.statusCode == null) {
-					err.statusCode = HANDSHAKE_REJECTION_STATUS_CODE;
+					err.statusCode = handshakeRejectionStatusCode;
 				}
 				throw err;
 			}
@@ -34,13 +34,17 @@ export async function handshakeHandler(
 	}
 
 	let authError: Error | undefined = undefined;
-	let changed: boolean;
+	let changed = false;
 
 	try {
 		changed = await processAuthentication(socket, transport, authInfo);
 
 		if (socket.status === 'closed') {
-			return;
+			return {
+				authToken: options.authToken,
+				id: socket.id,
+				pingTimeoutMs: server.pingTimeoutMs
+			};
 		}
 	} catch (err) {
 		if (options.authToken) {
@@ -61,15 +65,15 @@ export async function handshakeHandler(
 
 	if (authError) {
 		return {
+			authError,
 			id: socket.id,
-			pingTimeoutMs: server.pingTimeoutMs,
-			authError
+			pingTimeoutMs: server.pingTimeoutMs
 		};
 	}
 
 	return {
+		authToken: options.authToken,
 		id: socket.id,
-		pingTimeoutMs: server.pingTimeoutMs,
-		authToken: options.authToken
+		pingTimeoutMs: server.pingTimeoutMs
 	};
 }

@@ -16,6 +16,8 @@
 		"build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
 		"bundle": "rollup --config ./rollup.config.js",
 		"deploy": "npm run build && node ../../scripts/publish.mjs",
+		"lint": "eslint . --c ../../eslint.config.mjs",
+		"lint:fix": "eslint . --c ../../eslint.config.mjs --fix",
 		"test": "tsx --tsconfig ./tsconfig.build.json --test ./src/**/*.{spec,test}.ts ./test/**/*.{spec,test}.ts"
 	},
 	"repository": {
@@ -32,8 +34,7 @@
 		"@rollup/plugin-node-resolve": "catalog:rollup",
 		"@rollup/plugin-terser": "catalog:rollup",
 		"@rollup/plugin-typescript": "catalog:rollup",
-		"@socket-mesh/server": "workspace:^",
-		"@socket-mesh/local-storage": "workspace:^",
+		"@socket-mesh/typescript-config": "workspace:^",
 		"@socket-mesh/writable-consumable-stream": "workspace:^",
 		"@types/clone-deep": "catalog:clone-deep",
 		"@types/jsonwebtoken": "catalog:json-web-token",

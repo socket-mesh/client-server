@@ -1,45 +1,24 @@
-import ws from "isomorphic-ws";
-import { MethodPacket, ServicePacket } from "./packet.js";
-import { AuthToken, SignedAuthToken } from "@socket-mesh/auth";
-import { AnyResponse } from "./response.js";
-import { MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap } from "./maps/method-map.js";
+import { AuthToken, SignedAuthToken } from '@socket-mesh/auth';
+import ws from 'isomorphic-ws';
 
-export type SocketEvent<
-	TIncoming extends MethodMap,
-	TOutgoing extends PublicMethodMap,
-	TPrivateOutgoing extends PrivateMethodMap,
-	TService extends ServiceMap
-> =
-	AuthStateChangeEvent |
-	RemoveAuthTokenEvent |
-	AuthenticateEvent |
-	BadAuthTokenEvent |
-	CloseEvent |
-	ConnectEvent |
-	ConnectingEvent |
-	DeauthenticateEvent |
-	DisconnectEvent | 
-	ErrorEvent |
-	MessageEvent |
-	PingEvent |
-	PongEvent |
-	RequestEvent<TIncoming, TService> |
-	ResponseEvent<TOutgoing, TPrivateOutgoing, TService>;
-
-export type AuthStateChangeEvent = AuthenticatedChangeEvent | DeauthenticatedChangeEvent;
+import { MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap } from './maps/method-map.js';
+import { MethodPacket, ServicePacket } from './packet.js';
+import { AnyResponse } from './response.js';
 
 export interface AuthenticatedChangeEvent {
+	authToken: AuthToken | null,
 	isAuthenticated: true,
-	wasAuthenticated: boolean,
 	signedAuthToken: SignedAuthToken,
-	authToken: AuthToken
+	wasAuthenticated: boolean
 }
 
 export interface AuthenticateEvent {
-	wasSigned: boolean,
+	authToken: AuthToken | null,
 	signedAuthToken: SignedAuthToken,
-	authToken: AuthToken
+	wasSigned: boolean
 }
+
+export type AuthStateChangeEvent = AuthenticatedChangeEvent | DeauthenticatedChangeEvent;
 
 export interface BadAuthTokenEvent {
 	error: Error,
@@ -52,23 +31,22 @@ export interface CloseEvent {
 }
 
 export interface ConnectEvent {
-	id: string,
+	authError?: Error,
+	id: null | string,
 	isAuthenticated: boolean,
-	pingTimeoutMs: number,
-	authError?: Error
+	pingTimeoutMs: number
 }
 
-export interface ConnectingEvent {
-}
-
-export interface DeauthenticateEvent {
-	signedAuthToken: SignedAuthToken,
-	authToken: AuthToken
-}
+export type ConnectingEvent = object;
 
 export interface DeauthenticatedChangeEvent {
 	isAuthenticated: false,
 	wasAuthenticated: true
+}
+
+export interface DeauthenticateEvent {
+	authToken: AuthToken | null,
+	signedAuthToken: SignedAuthToken
 }
 
 export interface DisconnectEvent {
@@ -85,9 +63,9 @@ export interface MessageEvent {
 	isBinary: boolean
 }
 
-export interface PingEvent {}
+export type PingEvent = object;
 
-export interface PongEvent {}
+export type PongEvent = object;
 
 export interface RemoveAuthTokenEvent {
 	oldAuthToken: SignedAuthToken
@@ -97,7 +75,7 @@ export interface RequestEvent<
 	TIncoming extends MethodMap,
 	TService extends ServiceMap
 > {
-	request: ServicePacket<TService> | MethodPacket<TIncoming>
+	request: MethodPacket<TIncoming> | ServicePacket<TService>
 }
 
 export interface ResponseEvent<
@@ -107,3 +85,25 @@ export interface ResponseEvent<
 > {
 	response: AnyResponse<TOutgoing, TPrivateOutgoing, TService>
 }
+
+export type SocketEvent<
+	TIncoming extends MethodMap,
+	TOutgoing extends PublicMethodMap,
+	TPrivateOutgoing extends PrivateMethodMap,
+	TService extends ServiceMap
+> =
+	AuthenticateEvent
+	| AuthStateChangeEvent
+	| BadAuthTokenEvent
+	| CloseEvent
+	| ConnectEvent
+	| ConnectingEvent
+	| DeauthenticateEvent
+	| DisconnectEvent
+	| ErrorEvent
+	| MessageEvent
+	| PingEvent
+	| PongEvent
+	| RemoveAuthTokenEvent
+	| RequestEvent<TIncoming, TService>
+	| ResponseEvent<TOutgoing, TPrivateOutgoing, TService>;

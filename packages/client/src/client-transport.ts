@@ -1,11 +1,12 @@
-import { FunctionReturnType, InvokeMethodOptions, InvokeServiceOptions, SocketTransport, SocketStatus, MethodMap, ServiceMap, PublicMethodMap, PrivateMethodMap } from "@socket-mesh/core";
-import ws from "isomorphic-ws";
-import { ClientAuthEngine, LocalStorageAuthEngine, isAuthEngine } from "./client-auth-engine.js";
-import { hydrateError, socketProtocolErrorStatuses } from "@socket-mesh/errors";
-import { ServerPrivateMap, HandshakeStatus } from "./maps/server-map.js";
-import { AutoReconnectOptions, ClientSocketOptions, ConnectOptions } from "./client-socket-options.js";
-import { AuthToken } from "@socket-mesh/auth";
-import { ClientPrivateMap } from "./maps/client-map.js";
+import { AuthToken } from '@socket-mesh/auth';
+import { FunctionReturnType, InvokeMethodOptions, InvokeServiceOptions, MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap, SocketStatus, SocketTransport } from '@socket-mesh/core';
+import { hydrateError, SocketClosedError, socketProtocolErrorStatuses } from '@socket-mesh/errors';
+import ws from 'isomorphic-ws';
+
+import { ClientAuthEngine, isAuthEngine, LocalStorageAuthEngine } from './client-auth-engine.js';
+import { AutoReconnectOptions, ClientSocketOptions, ConnectOptions } from './client-socket-options.js';
+import { ClientPrivateMap } from './maps/client-map.js';
+import { HandshakeStatus, ServerPrivateMap } from './maps/server-map.js';
 
 export class ClientTransport<
 	TIncoming extends MethodMap,
@@ -19,20 +20,22 @@ export class ClientTransport<
 	TPrivateOutgoing & ServerPrivateMap,
 	TService,
 	TState
-> {
-	public readonly authEngine: ClientAuthEngine;
+	> {
+	private _autoReconnect: AutoReconnectOptions | false;
+
+	private _connectAttempts: number;
+	private _connectTimeoutRef: NodeJS.Timeout | null;
+
+	private _pendingReconnectTimeout: null | number;
+	private _pingTimeoutMs: number;
 
 	private _uri: URL;
 	private _wsOptions: ws.ClientOptions;
-
+	public readonly authEngine: ClientAuthEngine;
 	public connectTimeoutMs: number;
-	private _connectTimeoutRef: NodeJS.Timeout | null;
-
-	private _autoReconnect: AutoReconnectOptions | false;
-	private _connectAttempts: number;
-	private _pendingReconnectTimeout: number | null;
-	private _pingTimeoutMs: number;
 	public isPingTimeoutDisabled: boolean;
+
+	public type: 'client';
 
 	constructor(options: ClientSocketOptions<TOutgoing, TService, TIncoming, TPrivateOutgoing, TState>) {
 		super(options);
@@ -40,9 +43,9 @@ export class ClientTransport<
 		this.type = 'client';
 		this._uri = typeof options.address === 'string' ? new URL(options.address) : options.address;
 		this.authEngine =
-			isAuthEngine(options.authEngine) ?
-			options.authEngine :
-			new LocalStorageAuthEngine(
+			isAuthEngine(options.authEngine)
+			? options.authEngine
+			: new LocalStorageAuthEngine(
 				Object.assign(
 					{ authTokenName: `socketmesh.authToken${this._uri.protocol}${this._uri.hostname}` },
 					options.authEngine
@@ -58,25 +61,23 @@ export class ClientTransport<
 
 		this._connectAttempts = 0;
 		this._pendingReconnectTimeout = null;
-		this.autoReconnect = options.autoReconnect;
+		this.autoReconnect = options.autoReconnect ?? false;
 		this.isPingTimeoutDisabled = (options.isPingTimeoutDisabled === true);
 	}
 
 	public get autoReconnect(): AutoReconnectOptions | false {
 		return this._autoReconnect;
 	}
-	
-	public set autoReconnect(value: Partial<AutoReconnectOptions> | boolean) {
+
+	public set autoReconnect(value: boolean | Partial<AutoReconnectOptions>) {
 		if (value) {
-			this._autoReconnect = Object.assign<AutoReconnectOptions, Partial<AutoReconnectOptions>>(
-				{
-					initialDelay: 10000,
-					randomness: 10000,
-					multiplier: 1.5,
-					maxDelayMs: 60000
-				},
-				value === true ? {} : value
-			);
+			this._autoReconnect = {
+				initialDelay: 10000,
+				maxDelayMs: 60000,
+				multiplier: 1.5,
+				randomness: 10000,
+				...(value === true ? {} : value)
+			};
 		} else {
 			this._autoReconnect = false;
 		}
@@ -86,28 +87,28 @@ export class ClientTransport<
 		let timeoutMs = this.connectTimeoutMs;
 
 		if (options) {
-			let changeOptions = false;
+			let didOptionsChange = false;
 
 			if (options.connectTimeoutMs) {
 				timeoutMs = options.connectTimeoutMs;
 			}
 
 			if (options.address) {
-				changeOptions = true;
+				didOptionsChange = true;
 				this._uri = typeof options.address === 'string' ? new URL(options.address) : options.address;
 			}
 
 			if (options.wsOptions) {
-				changeOptions = true;
+				didOptionsChange = true;
 				this._wsOptions = options.wsOptions;
 			}
 
-			if (changeOptions && this.status !== 'closed') {
+			if (didOptionsChange && this.status !== 'closed') {
 				this.disconnect(
 					1000,
 					'Socket was disconnected by the client to initiate a new connection'
 				);
-			}	
+			}
 		}
 
 		if (this.status === 'closed') {
@@ -125,7 +126,7 @@ export class ClientTransport<
 		return this._connectAttempts;
 	}
 
-	public override disconnect(code=1000, reason?: string) {
+	public override disconnect(code = 1000, reason?: string) {
 		if (code !== 4007) {
 			this.resetReconnect();
 		}
@@ -150,9 +151,44 @@ export class ClientTransport<
 		return status;
 	}
 
+	override invoke<TMethod extends keyof TOutgoing>(method: TMethod, arg?: Parameters<TOutgoing[TMethod]>[0]): [Promise<FunctionReturnType<TOutgoing[TMethod]>>, () => void];
+	override invoke<TServiceName extends keyof TService, TMethod extends keyof TService[TServiceName]>(options: [TServiceName, TMethod, (false | number)?], arg?: Parameters<TService[TServiceName][TMethod]>[0]): [Promise<FunctionReturnType<TService[TServiceName][TMethod]>>, () => void];
+	override invoke<TServiceName extends keyof TService, TMethod extends keyof TService[TServiceName]>(options: InvokeServiceOptions<TService, TServiceName, TMethod>, arg?: Parameters<TService[TServiceName][TMethod]>[0]): [Promise<FunctionReturnType<TService[TServiceName][TMethod]>>, () => void];
+	override invoke<TMethod extends keyof TOutgoing>(options: InvokeMethodOptions<TOutgoing, TMethod>, arg?: Parameters<TOutgoing[TMethod]>[0]): [Promise<FunctionReturnType<TOutgoing[TMethod]>>, () => void];
+	override invoke<TMethod extends keyof (TPrivateOutgoing & ServerPrivateMap)>(method: TMethod, arg: Parameters<(TPrivateOutgoing & ServerPrivateMap)[TMethod]>[0]): [Promise<FunctionReturnType<(TPrivateOutgoing & ServerPrivateMap)[TMethod]>>, () => void];
+	override invoke<TMethod extends keyof (TPrivateOutgoing & ServerPrivateMap)>(options: InvokeMethodOptions<(TPrivateOutgoing & ServerPrivateMap), TMethod>, arg?: Parameters<(TPrivateOutgoing & ServerPrivateMap)[TMethod]>[0]): [Promise<FunctionReturnType<(TPrivateOutgoing & ServerPrivateMap)[TMethod]>>, () => void];
+	override invoke<TServiceName extends keyof TService, TServiceMethod extends keyof TService[TServiceName], TMethod extends keyof TOutgoing, TPrivateMethod extends keyof (TPrivateOutgoing & ServerPrivateMap)>(
+		methodOptions: [TServiceName, TServiceMethod, (false | number)?] | InvokeMethodOptions<(TPrivateOutgoing & ServerPrivateMap), TPrivateMethod> | InvokeMethodOptions<TOutgoing, TMethod> | InvokeServiceOptions<TService, TServiceName, TServiceMethod> | TMethod | TPrivateMethod,
+		arg?: (Parameters<(TPrivateOutgoing & ServerPrivateMap)[TPrivateMethod]> | Parameters<TOutgoing[TMethod]> | Parameters<TService[TServiceName][TServiceMethod]>)[0]
+	): [Promise<FunctionReturnType<(TPrivateOutgoing & ServerPrivateMap)[TPrivateMethod] | TOutgoing[TMethod] | TService[TServiceName][TServiceMethod]>>, () => void] {
+		let wasAborted = false;
+		let abort: () => void =
+			() => { wasAborted = true; };
+
+		const promise = Promise.resolve()
+			.then(() => {
+				if (this.status === 'closed') {
+					this.connect();
+					return this.socket.listen('connect').once();
+				}
+			})
+			.then(() => {
+				const result = super.invoke(methodOptions as TMethod, arg);
+				abort = result[1];
+
+				if (wasAborted) {
+					abort();
+				}
+
+				return result[0];
+			});
+
+		return [promise, () => abort()];
+	}
+
 	protected override onClose(code: number, reason?: Buffer) {
 		const status = this.status;
-		let reconnecting = false;
+		let isReconnecting = false;
 
 		super.onClose(code, reason);
 
@@ -169,17 +205,17 @@ export class ClientTransport<
 				// status, don't wait before trying to reconnect - These could happen
 				// if the client wakes up after a period of inactivity and in this case we
 				// want to re-establish the connection as soon as possible.
-				reconnecting = !!this.autoReconnect;
+				isReconnecting = !!this.autoReconnect;
 				this.tryReconnect(0);
 
 				// Codes 4500 and above will be treated as permanent disconnects.
 				// Socket will not try to auto-reconnect.
 			} else if (code !== 1000 && code < 4500) {
-				reconnecting = !!this.autoReconnect;
+				isReconnecting = !!this.autoReconnect;
 				this.tryReconnect();
 			}
 		}
-		if (!reconnecting) {
+		if (!isReconnecting) {
 			const strReason = reason?.toString() || socketProtocolErrorStatuses[code];
 
 			this.onDisconnect(status, code, strReason);
@@ -189,15 +225,18 @@ export class ClientTransport<
 	protected override onOpen() {
 		super.onOpen();
 
-		clearTimeout(this._connectTimeoutRef);
-		this._connectTimeoutRef = null;
+		if (this._connectTimeoutRef) {
+			clearTimeout(this._connectTimeoutRef);
+			this._connectTimeoutRef = null;
+		}
+
 		this.resetReconnect();
 		this.resetPingTimeout(this.isPingTimeoutDisabled ? false : this.pingTimeoutMs, 4000);
 
 		let authError: Error;
 
 		this.handshake()
-			.then(status => {
+			.then((status) => {
 				this.id = status.id;
 				this.pingTimeoutMs = status.pingTimeoutMs;
 
@@ -214,7 +253,7 @@ export class ClientTransport<
 			.then(() => {
 				this.setReadyStatus(this.pingTimeoutMs, authError);
 			})
-			.catch(err => {
+			.catch((err) => {
 				if (err.statusCode == null) {
 					err.statusCode = 4003;
 				}
@@ -248,20 +287,22 @@ export class ClientTransport<
 	}
 
 	public async send(data: Buffer | string): Promise<void> {
+		if (!this.webSocket) {
+			throw new SocketClosedError('Web socket is closed.');
+		}
+
 		this.webSocket.send(data);
 	}
 
-	override async setAuthorization(authToken: AuthToken): Promise<boolean>;
-	override async setAuthorization(signedAuthToken: string, authToken?: AuthToken): Promise<boolean>;
-	override async setAuthorization(signedAuthToken: string | AuthToken, authToken?: AuthToken): Promise<boolean> {
+	override async setAuthorization(signedAuthToken: string, authToken?: AuthToken): Promise<boolean> {
 		const wasAuthenticated = !!this.signedAuthToken;
-		const changed = await super.setAuthorization(signedAuthToken as string, authToken);
+		const changed = await super.setAuthorization(signedAuthToken, authToken);
 
 		if (changed) {
 			this.triggerAuthenticationEvents(false, wasAuthenticated);
 			// Even if saving the auth token failes we do NOT want to throw an exception.
-			this.authEngine.saveToken(this.signedAuthToken)
-				.catch(err => {
+			this.authEngine.saveToken(signedAuthToken)
+				.catch((err) => {
 					this.onError(err);
 				});
 		}
@@ -275,6 +316,19 @@ export class ClientTransport<
 		}
 
 		return super.status;
+	}
+
+	override transmit<TMethod extends keyof TOutgoing>(method: TMethod, arg?: Parameters<TOutgoing[TMethod]>[0]): Promise<void>;
+	override transmit<TServiceName extends keyof TService, TMethod extends keyof TService[TServiceName]>(options: [TServiceName, TMethod], arg?: Parameters<TService[TServiceName][TMethod]>[0]): Promise<void>;
+	override transmit<TMethod extends keyof (TPrivateOutgoing & ServerPrivateMap)>(method: TMethod, arg?: Parameters<(TPrivateOutgoing & ServerPrivateMap)[TMethod]>[0]): Promise<void>;
+	override async transmit<TServiceName extends keyof TService, TServiceMethod extends keyof TService[TServiceName], TMethod extends keyof TOutgoing>(serviceAndMethod: [TServiceName, TServiceMethod] | TMethod, arg?: (Parameters<TOutgoing[TMethod]> | Parameters<TService[TServiceName][TServiceMethod]>)[0]): Promise<void> {
+		if (this.status === 'closed') {
+			this.connect();
+
+			await this.socket.listen('connect').once();
+		}
+
+		await super.transmit(serviceAndMethod as TMethod, arg);
 	}
 
 	private tryReconnect(initialDelay?: number): void {
@@ -303,17 +357,15 @@ export class ClientTransport<
 		this.connect({ connectTimeoutMs: timeoutMs });
 	}
 
-	public type: 'client'
-
 	public get uri(): URL {
-		return this._uri
+		return this._uri;
 	}
 
 	protected get webSocket() {
 		return super.webSocket;
 	}
 
-	protected set webSocket(value: ws.WebSocket | null) {
+	protected set webSocket(value: null | ws.WebSocket) {
 		if (this.webSocket) {
 			if (this._connectTimeoutRef) {
 				clearTimeout(this._connectTimeoutRef);
@@ -323,7 +375,7 @@ export class ClientTransport<
 
 		super.webSocket = value;
 
-		if (this.webSocket && this.webSocket.on) {
+		if (this.webSocket?.on) {
 			// WebSockets will throw an error if they are closed before they are completely open.
 			// We hook into these events to supress those errors and clean them up after a connection is established.
 			function onOpenCloseError(this: ws.WebSocket) {
@@ -336,49 +388,5 @@ export class ClientTransport<
 			this.webSocket.on('close', onOpenCloseError);
 			this.webSocket.on('error', onOpenCloseError);
 		}
-	}
-
-	override transmit<TMethod extends keyof TOutgoing>(method: TMethod, arg?: Parameters<TOutgoing[TMethod]>[0]): Promise<void>;
-	override transmit<TServiceName extends keyof TService, TMethod extends keyof TService[TServiceName]>(options: [TServiceName, TMethod], arg?: Parameters<TService[TServiceName][TMethod]>[0]): Promise<void>;
-	override transmit<TMethod extends keyof (TPrivateOutgoing & ServerPrivateMap)>(method: TMethod, arg?: Parameters<(TPrivateOutgoing & ServerPrivateMap)[TMethod]>[0]): Promise<void>;
-	override async transmit<TServiceName extends keyof TService, TServiceMethod extends keyof TService[TServiceName], TMethod extends keyof TOutgoing>(serviceAndMethod: TMethod | [TServiceName, TServiceMethod], arg?: (Parameters<TOutgoing[TMethod]> | Parameters<TService[TServiceName][TServiceMethod]>)[0]): Promise<void> {
-		if (this.status === 'closed') {
-			this.connect();
-
-			await this.socket.listen('connect').once();
-		}
-
-		await super.transmit(serviceAndMethod as TMethod, arg);
-	}
-
-	override invoke<TMethod extends keyof TOutgoing>(method: TMethod, arg?: Parameters<TOutgoing[TMethod]>[0]): [Promise<FunctionReturnType<TOutgoing[TMethod]>>, () => void];
-	override invoke<TServiceName extends keyof TService, TMethod extends keyof TService[TServiceName]>(options: [TServiceName, TMethod, (number | false)?], arg?: Parameters<TService[TServiceName][TMethod]>[0]): [Promise<FunctionReturnType<TService[TServiceName][TMethod]>>, () => void];
-	override invoke<TServiceName extends keyof TService, TMethod extends keyof TService[TServiceName]>(options: InvokeServiceOptions<TService, TServiceName, TMethod>, arg?: Parameters<TService[TServiceName][TMethod]>[0]): [Promise<FunctionReturnType<TService[TServiceName][TMethod]>>, () => void];
-	override invoke<TMethod extends keyof TOutgoing>(options: InvokeMethodOptions<TOutgoing, TMethod>, arg?: Parameters<TOutgoing[TMethod]>[0]): [Promise<FunctionReturnType<TOutgoing[TMethod]>>, () => void];
-	override invoke<TMethod extends keyof (TPrivateOutgoing & ServerPrivateMap)>(method: TMethod, arg: Parameters<(TPrivateOutgoing & ServerPrivateMap)[TMethod]>[0]): [Promise<FunctionReturnType<(TPrivateOutgoing & ServerPrivateMap)[TMethod]>>, () => void];
-	override invoke<TMethod extends keyof (TPrivateOutgoing & ServerPrivateMap)>(options: InvokeMethodOptions<(TPrivateOutgoing & ServerPrivateMap), TMethod>, arg?: Parameters<(TPrivateOutgoing & ServerPrivateMap)[TMethod]>[0]): [Promise<FunctionReturnType<(TPrivateOutgoing & ServerPrivateMap)[TMethod]>>, () => void];
-	override invoke<TServiceName extends keyof TService, TServiceMethod extends keyof TService[TServiceName], TMethod extends keyof TOutgoing, TPrivateMethod extends keyof (TPrivateOutgoing & ServerPrivateMap)>(
-		methodOptions: TMethod | TPrivateMethod | [TServiceName, TServiceMethod, (number | false)?] | InvokeServiceOptions<TService, TServiceName, TServiceMethod> | InvokeMethodOptions<TOutgoing, TMethod> | InvokeMethodOptions<(TPrivateOutgoing & ServerPrivateMap), TPrivateMethod>,
-		arg?: (Parameters<TOutgoing[TMethod]> | Parameters<(TPrivateOutgoing & ServerPrivateMap)[TPrivateMethod]> | Parameters<TService[TServiceName][TServiceMethod]>)[0]
-	): [Promise<FunctionReturnType<TOutgoing[TMethod] | (TPrivateOutgoing & ServerPrivateMap)[TPrivateMethod] | TService[TServiceName][TServiceMethod]>>, () => void] {
-		let abort: () => void;
-
-		return [
-			Promise.resolve()
-				.then(() => {
-					if (this.status === 'closed') {
-						this.connect();
-			
-						return this.socket.listen('connect').once();
-					}
-				})
-				.then(() => {
-					const result = super.invoke(methodOptions as TMethod, arg);
-					abort = result[1];
-
-					return result[0];
-				}),
-			abort
-		];
 	}
 }

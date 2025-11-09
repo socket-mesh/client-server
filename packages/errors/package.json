@@ -10,6 +10,8 @@
 	"scripts": {
 		"build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
 		"deploy": "npm run build && node ../../scripts/publish.mjs",
+		"lint": "eslint . --c ../../eslint.config.mjs",
+		"lint:fix": "eslint . --c ../../eslint.config.mjs --fix",
 		"test": "echo \"Error: no test specified\" && exit 1"
 	},
 	"repository": {
@@ -24,5 +26,8 @@
 	"bugs": {
 		"url": "https://github.com/socket-mesh/client-server/labels/errors"
 	},
-	"homepage": "https://github.com/socket-mesh/main/tree/main/packages/errors#README.md"
+	"homepage": "https://github.com/socket-mesh/main/tree/main/packages/errors#README.md",
+	"devDependencies": {
+		"@socket-mesh/typescript-config": "workspace:^"
+	}
 }

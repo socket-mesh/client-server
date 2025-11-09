@@ -9,6 +9,8 @@
 	"scripts": {
 		"build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
 		"deploy": "npm run build && node ../../scripts/publish.mjs",
+		"lint": "eslint . --c ../../eslint.config.mjs",
+		"lint:fix": "eslint . --c ../../eslint.config.mjs --fix",
 		"test": "tsx --tsconfig ./tsconfig.build.json --test ./src/**/*.{spec,test}.ts ./test/**/*.{spec,test}.ts"
 	},
 	"keywords": [
@@ -27,6 +29,7 @@
 		"url": "https://github.com/socket-mesh/client-server/labels/core"
 	},
 	"devDependencies": {
+		"@socket-mesh/typescript-config": "workspace:^",
 		"@types/base64id": "catalog:base64id",
 		"@types/ws": "catalog:ws"
 	},

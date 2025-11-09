@@ -9,6 +9,8 @@
 	"scripts": {
 		"build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
 		"deploy": "npm run build && node ../../scripts/publish.mjs",
+		"lint": "eslint . --c ../../eslint.config.mjs",
+		"lint:fix": "eslint . --c ../../eslint.config.mjs --fix",
 		"test": "tsx --tsconfig ./tsconfig.build.json --test ./src/**/*.{spec,test}.ts ./test/**/*.{spec,test}.ts"
 	},
 	"repository": {
@@ -28,6 +30,9 @@
 		"url": "https://github.com/socket-mesh/writable-consumable-stream/issues"
 	},
 	"homepage": "https://github.com/socket-mesh/writable-consumable-stream#readme",
+	"devDependencies": {
+		"@socket-mesh/typescript-config": "workspace:^"
+	},
 	"dependencies": {
 		"@socket-mesh/consumable-stream": "workspace:^"
 	}

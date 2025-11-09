@@ -1,5 +1,5 @@
-import { ChannelOptions } from "./channel-options.js";
-import { ChannelState } from "./channel-state.js";
+import { ChannelOptions } from './channel-options.js';
+import { ChannelState } from './channel-state.js';
 
 export type ChannelEvent = KickOutEvent | SubscribeEvent | SubscribeFailEvent | SubscribeStateChangeEvent | UnsubscribeEvent;
 
@@ -15,14 +15,14 @@ export interface SubscribeEvent {
 
 export interface SubscribeFailEvent {
 	channel: string,
-	options: ChannelOptions,
-	error: Error
+	error: Error,
+	options: ChannelOptions
 }
 
 export interface SubscribeStateChangeEvent {
 	channel: string,
-	oldState: ChannelState,
 	newState: ChannelState,
+	oldState: ChannelState,
 	options: ChannelOptions
 }
 

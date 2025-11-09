@@ -1,5 +1,5 @@
 export interface ConsumerStats {
-	id: number,
 	backpressure: number,
+	id: number,
 	timeout?: number
 }

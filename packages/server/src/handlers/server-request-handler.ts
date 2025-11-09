@@ -1,9 +1,10 @@
-import { ClientPrivateMap, ServerPrivateMap } from "@socket-mesh/client";
-import { PrivateMethodMap, PublicMethodMap, RequestHandlerArgs, ServiceMap } from "@socket-mesh/core"
-import { ServerSocketState } from "../server-socket-state.js";
-import { ServerSocket } from "../server-socket.js";
-import { ServerTransport } from "../server-transport.js";
-import { ChannelMap } from "@socket-mesh/channels";
+import { ChannelMap } from '@socket-mesh/channels';
+import { ClientPrivateMap, ServerPrivateMap } from '@socket-mesh/client';
+import { PrivateMethodMap, PublicMethodMap, RequestHandlerArgs, ServiceMap } from '@socket-mesh/core';
+
+import { ServerSocketState } from '../server-socket-state.js';
+import { ServerSocket } from '../server-socket.js';
+import { ServerTransport } from '../server-transport.js';
 
 export type ServerRequestHandlerArgs<
 	TOptions,
