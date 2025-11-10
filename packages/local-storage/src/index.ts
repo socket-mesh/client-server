@@ -59,6 +59,6 @@ export class LocalStorageProxyHandler implements ProxyHandler<LocalStorage> {
 	}
 }
 
-const localStorage: Storage = 'localStorage' in globalThis ? globalThis.localStorage : new Proxy<LocalStorage>(new LocalStorage(), new LocalStorageProxyHandler());
+const LocalStorageInstance: Storage = 'localStorage' in globalThis ? globalThis.localStorage : new Proxy<LocalStorage>(new LocalStorage(), new LocalStorageProxyHandler());
 
-export default localStorage;
+export default LocalStorageInstance;

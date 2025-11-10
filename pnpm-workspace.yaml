@@ -38,7 +38,7 @@ catalogs:
     "rollup-plugin-dts": ^6.2.3
 
   secure-data-systems:
-    "@secure-data-systems/eslint-config": 1.0.18
+    "@secure-data-systems/eslint-config": 1.0.26
     "@secure-data-systems/tsconfig": 1.0.2
 
   ws:

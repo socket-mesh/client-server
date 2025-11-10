@@ -1,6 +1,6 @@
 import { AuthToken } from '@socket-mesh/auth';
 import { FunctionReturnType, InvokeMethodOptions, InvokeServiceOptions, MethodMap, PrivateMethodMap, PublicMethodMap, ServiceMap, SocketStatus, SocketTransport } from '@socket-mesh/core';
-import { hydrateError, SocketClosedError, socketProtocolErrorStatuses } from '@socket-mesh/errors';
+import { hydrateError, SocketClosedError, SocketProtocolErrorStatuses } from '@socket-mesh/errors';
 import ws from 'isomorphic-ws';
 
 import { ClientAuthEngine, isAuthEngine, LocalStorageAuthEngine } from './client-auth-engine.js';
@@ -216,7 +216,7 @@ export class ClientTransport<
 			}
 		}
 		if (!isReconnecting) {
-			const strReason = reason?.toString() || socketProtocolErrorStatuses[code];
+			const strReason = reason?.toString() || SocketProtocolErrorStatuses[code];
 
 			this.onDisconnect(status, code, strReason);
 		}

@@ -3,7 +3,7 @@ import { AuthTokenOptions } from '@socket-mesh/auth-engine';
 import { ChannelMap, PublishOptions } from '@socket-mesh/channels';
 import { ClientPrivateMap, ServerPrivateMap } from '@socket-mesh/client';
 import { abortRequest, AnyPacket, AnyResponse, InboundMessage, InvokeMethodRequest, InvokeServiceRequest, PrivateMethodMap, PublicMethodMap, ServiceMap, SocketStatus, SocketTransport, TransmitMethodRequest, TransmitServiceRequest } from '@socket-mesh/core';
-import { AuthError, BrokerError, InvalidActionError, socketProtocolErrorStatuses } from '@socket-mesh/errors';
+import { AuthError, BrokerError, InvalidActionError, SocketProtocolErrorStatuses } from '@socket-mesh/errors';
 import base64id from 'base64id';
 import { IncomingMessage } from 'http';
 import jwt from 'jsonwebtoken';
@@ -83,7 +83,7 @@ export class ServerTransport<
 
 	protected override onClose(code: number, reason?: Buffer | string): void {
 		const status = this.status;
-		const strReason = reason?.toString() || socketProtocolErrorStatuses[code];
+		const strReason = reason?.toString() || SocketProtocolErrorStatuses[code];
 
 		super.onClose(code, reason);
 

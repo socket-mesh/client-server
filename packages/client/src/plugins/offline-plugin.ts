@@ -1,6 +1,6 @@
 import { AnyRequest, MethodMap, Plugin, PrivateMethodMap, PublicMethodMap, SendRequestPluginArgs, ServiceMap } from '@socket-mesh/core';
 
-const systemMethods = ['#handshake', '#removeAuthToken'];
+const SYSTEM_METHODS = ['#handshake', '#removeAuthToken'];
 
 export class OfflinePlugin<
 	TIncoming extends MethodMap,
@@ -56,11 +56,11 @@ export class OfflinePlugin<
 			return;
 		}
 
-		const systemRequests = requests.filter(item => systemMethods.indexOf(String(item.method)) > -1);
+		const systemRequests = requests.filter(item => SYSTEM_METHODS.indexOf(String(item.method)) > -1);
 		let otherRequests: AnyRequest<TOutgoing, TPrivateOutgoing, TService>[] = requests;
 
 		if (systemRequests.length) {
-			otherRequests = (systemRequests.length === requests.length) ? [] : requests.filter(item => systemMethods.indexOf(String(item.method)) < 0);
+			otherRequests = (systemRequests.length === requests.length) ? [] : requests.filter(item => SYSTEM_METHODS.indexOf(String(item.method)) < 0);
 		}
 
 		if (otherRequests.length) {

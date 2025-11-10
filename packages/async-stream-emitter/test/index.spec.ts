@@ -4,10 +4,10 @@ import { afterEach, beforeEach, describe, it } from 'node:test';
 
 import { AsyncStreamEmitter } from '../src/index.js';
 
-const pendingTimeoutSet = new Set<NodeJS.Timeout>();
+const PendingTimeoutSet = new Set<NodeJS.Timeout>();
 
 function cancelAllPendingWaits() {
-	for (const timeout of pendingTimeoutSet) {
+	for (const timeout of PendingTimeoutSet) {
 		clearTimeout(timeout);
 	}
 }
@@ -15,10 +15,10 @@ function cancelAllPendingWaits() {
 function wait(duration: number): Promise<void> {
 	return new Promise((resolve) => {
 		const timeout = setTimeout(() => {
-			pendingTimeoutSet.clear();
+			PendingTimeoutSet.clear();
 			resolve();
 		}, duration);
-		pendingTimeoutSet.add(timeout);
+		PendingTimeoutSet.add(timeout);
 	});
 }
 

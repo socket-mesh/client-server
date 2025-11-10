@@ -3,10 +3,10 @@ import { afterEach, beforeEach, describe, it } from 'node:test';
 
 import { ConsumableStream } from '../src/index.js';
 
-const pendingTimeoutSet = new Set<NodeJS.Timeout>();
+const PendingTimeoutSet = new Set<NodeJS.Timeout>();
 
 function cancelAllPendingWaits() {
-	for (const timeout of pendingTimeoutSet) {
+	for (const timeout of PendingTimeoutSet) {
 		clearTimeout(timeout);
 	}
 }
@@ -14,10 +14,10 @@ function cancelAllPendingWaits() {
 function wait(duration: number): Promise<void> {
 	return new Promise((resolve) => {
 		const timeout = setTimeout(() => {
-			pendingTimeoutSet.delete(timeout);
+			PendingTimeoutSet.delete(timeout);
 			resolve();
 		}, duration);
-		pendingTimeoutSet.add(timeout);
+		PendingTimeoutSet.add(timeout);
 	});
 }
 
@@ -31,7 +31,7 @@ class ConsumableStreamSubclass<T> extends ConsumableStream<T> {
 
 	async* createConsumer() {
 		while (this._dataPromiseList.length) {
-			const result = await this._dataPromiseList[this._dataPromiseList.length - 1];
+			const result = await this._dataPromiseList[this._dataPromiseList.length - 1]!;
 			yield result;
 		}
 	}

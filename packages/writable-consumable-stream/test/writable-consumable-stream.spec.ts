@@ -9,10 +9,10 @@ import { afterEach, beforeEach, describe, it } from 'node:test';
 import { WritableConsumableStream } from '../src/index.js';
 import { WritableStreamConsumer } from '../src/writable-stream-consumer.js';
 
-const pendingTimeoutSet = new Set<NodeJS.Timeout>();
+const PendingTimeoutSet = new Set<NodeJS.Timeout>();
 
 function cancelAllPendingWaits() {
-	for (const timeout of pendingTimeoutSet) {
+	for (const timeout of PendingTimeoutSet) {
 		clearTimeout(timeout);
 	}
 }
@@ -20,10 +20,10 @@ function cancelAllPendingWaits() {
 function wait(duration: number) {
 	return new Promise<void>((resolve) => {
 		const timeout = setTimeout(() => {
-			pendingTimeoutSet.delete(timeout);
+			PendingTimeoutSet.delete(timeout);
 			resolve();
 		}, duration);
-		pendingTimeoutSet.add(timeout);
+		PendingTimeoutSet.add(timeout);
 	});
 }
 

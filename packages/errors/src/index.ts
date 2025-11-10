@@ -257,7 +257,7 @@ export class UnknownError extends Error {
 	}
 }
 
-export const socketProtocolErrorStatuses: { [code: number]: string } = {
+export const SocketProtocolErrorStatuses: { [code: number]: string } = {
 	1001: 'Socket was disconnected',
 	1002: 'A WebSocket protocol error was encountered',
 	1003: 'Server terminated socket because it received invalid data',
@@ -280,7 +280,7 @@ export const socketProtocolErrorStatuses: { [code: number]: string } = {
 	4009: 'Server received a message before the client handshake'
 };
 
-export const socketProtocolIgnoreStatuses: { [code: number]: string } = {
+export const SocketProtocolIgnoreStatuses: { [code: number]: string } = {
 	1000: 'Socket closed normally',
 	1001: 'Socket hung up'
 };

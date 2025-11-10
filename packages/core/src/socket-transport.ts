@@ -1,5 +1,5 @@
 import { AuthToken, extractAuthTokenData, SignedAuthToken } from '@socket-mesh/auth';
-import { AbortError, AuthError, BadConnectionError, dehydrateError, hydrateError, InvalidActionError, InvalidArgumentsError, PluginBlockedError, SocketClosedError, SocketProtocolError, socketProtocolErrorStatuses, socketProtocolIgnoreStatuses, TimeoutError } from '@socket-mesh/errors';
+import { AbortError, AuthError, BadConnectionError, dehydrateError, hydrateError, InvalidActionError, InvalidArgumentsError, PluginBlockedError, SocketClosedError, SocketProtocolError, SocketProtocolErrorStatuses, SocketProtocolIgnoreStatuses, TimeoutError } from '@socket-mesh/errors';
 import defaultCodec, { CodecEngine } from '@socket-mesh/formatter';
 import ws from 'isomorphic-ws';
 
@@ -352,7 +352,7 @@ export class SocketTransport<
 			}
 		}
 
-		if (!socketProtocolIgnoreStatuses[code]) {
+		if (!SocketProtocolIgnoreStatuses[code]) {
 			let closeMessage: string;
 
 			if (typeof reason === 'string') {
@@ -361,10 +361,10 @@ export class SocketTransport<
 				closeMessage = `Socket connection closed with status code ${code}`;
 			}
 
-			this.onError(new SocketProtocolError(socketProtocolErrorStatuses[code] || closeMessage, code));
+			this.onError(new SocketProtocolError(SocketProtocolErrorStatuses[code] || closeMessage, code));
 		}
 
-		const strReason = reason?.toString() || socketProtocolErrorStatuses[code];
+		const strReason = reason?.toString() || SocketProtocolErrorStatuses[code];
 
 		this._socket.emit('close', { code, reason: strReason });
 	}

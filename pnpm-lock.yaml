@@ -76,8 +76,8 @@ catalogs:
       version: 6.2.3
   secure-data-systems:
     '@secure-data-systems/eslint-config':
-      specifier: 1.0.18
-      version: 1.0.18
+      specifier: 1.0.26
+      version: 1.0.26
     '@secure-data-systems/tsconfig':
       specifier: 1.0.2
       version: 1.0.2
@@ -98,7 +98,7 @@ importers:
     devDependencies:
       '@secure-data-systems/eslint-config':
         specifier: catalog:secure-data-systems
-        version: 1.0.18(typescript@5.9.3)
+        version: 1.0.26(typescript@5.9.3)
       '@secure-data-systems/tsconfig':
         specifier: catalog:secure-data-systems
         version: 1.0.2
@@ -869,8 +869,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@secure-data-systems/eslint-config@1.0.18':
-    resolution: {integrity: sha512-4PLOPWJAiBdxaBmJetx3Zbtu9aLodd/bRaPdCQ2hiaMYbQxghKoMMf9BSjZntT8Rva1pMHvBUNXzG7AfaAIeOA==}
+  '@secure-data-systems/eslint-config@1.0.26':
+    resolution: {integrity: sha512-UanGy6nImQ+1T93P0pQVpr5B9R+nRrUvNuXW3tYzhAt1pOX334OuLVzE1/41KpOa07SyXfpjqSM6SpfxJ9K7UA==}
 
   '@secure-data-systems/tsconfig@1.0.2':
     resolution: {integrity: sha512-0rsc2XK6qI+hcJ5iy7bgPD+t+5rPYh1zr6SsOtu59vajjkCpf1bVtX9Bx16KkGitt8POL4X2M8ieK66kjHqb1A==}
@@ -2041,7 +2041,7 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.52.5':
     optional: true
 
-  '@secure-data-systems/eslint-config@1.0.18(typescript@5.9.3)':
+  '@secure-data-systems/eslint-config@1.0.26(typescript@5.9.3)':
     dependencies:
       '@eslint/eslintrc': 3.3.1
       '@secure-data-systems/tsconfig': 1.0.2

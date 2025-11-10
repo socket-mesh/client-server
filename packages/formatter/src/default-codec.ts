@@ -1,8 +1,8 @@
 import type { CodecEngine } from './codec-engine.js';
 
-const base64Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+const BASE_64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
-const validJsonStartRegex = /^[ \n\r\t]*[{[]/;
+const ValidJsonStartRegex = /^[ \n\r\t]*[{[]/;
 
 function arrayBufferToBase64(arraybuffer: ArrayBuffer): string {
 	const bytes = new Uint8Array(arraybuffer);
@@ -10,10 +10,10 @@ function arrayBufferToBase64(arraybuffer: ArrayBuffer): string {
 	let base64 = '';
 
 	for (let i = 0; i < len; i += 3) {
-		base64 += base64Chars[bytes[i]! >> 2];
-		base64 += base64Chars[((bytes[i]! & 3) << 4) | (bytes[i + 1]! >> 4)];
-		base64 += base64Chars[((bytes[i + 1]! & 15) << 2) | (bytes[i + 2]! >> 6)];
-		base64 += base64Chars[bytes[i + 2]! & 63];
+		base64 += BASE_64_CHARS[bytes[i]! >> 2];
+		base64 += BASE_64_CHARS[((bytes[i]! & 3) << 4) | (bytes[i + 1]! >> 4)];
+		base64 += BASE_64_CHARS[((bytes[i + 1]! & 15) << 2) | (bytes[i + 2]! >> 6)];
+		base64 += BASE_64_CHARS[bytes[i + 2]! & 63];
 	}
 
 	if ((len % 3) === 2) {
@@ -67,7 +67,7 @@ class DefaultCodec implements CodecEngine {
 		const message = encodedMessage.toString();
 
 		// Performance optimization to detect invalid JSON packet sooner.
-		if (!validJsonStartRegex.test(message)) {
+		if (!ValidJsonStartRegex.test(message)) {
 			return message;
 		}
 
@@ -97,6 +97,6 @@ class DefaultCodec implements CodecEngine {
 	}
 }
 
-const defaultCodec = new DefaultCodec();
+const DefaultCodecInstance = new DefaultCodec();
 
-export default defaultCodec;
+export default DefaultCodecInstance;

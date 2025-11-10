@@ -7,7 +7,7 @@ import { ServerSocket } from '../server-socket.js';
 import { ServerTransport } from '../server-transport.js';
 import { ServerRequestHandlerArgs } from './server-request-handler.js';
 
-const handshakeRejectionStatusCode = 4008;
+const HANDSHAKE_REJECTION_STATUS_CODE = 4008;
 
 export type AuthInfo = InvalidAuthInfo | ValidAuthInfo;
 
@@ -25,7 +25,7 @@ export async function authenticateHandler(
 	{ isRpc, options: signedAuthToken, socket, transport }: ServerRequestHandlerArgs<string>
 ): Promise<void> {
 	if (!isRpc) {
-		socket.disconnect(handshakeRejectionStatusCode);
+		socket.disconnect(HANDSHAKE_REJECTION_STATUS_CODE);
 
 		throw new InvalidActionError('Handshake request was malformatted');
 	}

@@ -3,7 +3,7 @@ import cloneDeep from 'clone-deep';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 
-const defaultExpiry = 86400;
+const DEFAULT_EXPIRY = 86400;
 
 export interface AuthEngine extends AuthOptions {
 	signToken(token: object, signOptions?: jwt.SignOptions): Promise<string>,
@@ -53,7 +53,7 @@ export function defaultAuthEngine(options?: AuthOptions): AuthEngine {
 
 			// We cannot have the exp claim on the token and the expiresIn option
 			// set at the same time or else auth.signToken will throw an error.
-			const expiresIn = signOptions.expiresIn || this.defaultExpiry || defaultExpiry;
+			const expiresIn = signOptions.expiresIn || this.defaultExpiry || DEFAULT_EXPIRY;
 
 			token = cloneDeep(token);
 
