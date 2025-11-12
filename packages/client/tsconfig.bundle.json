@@ -1,0 +1,7 @@
+{
+	"extends": "./tsconfig.build.json",
+	"compilerOptions": {
+		"module": "Node16",
+		"outDir": "./bundle/dist"
+	}
+}

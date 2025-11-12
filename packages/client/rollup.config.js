@@ -10,12 +10,13 @@ export default [
 	{
 		input: 'src/index.ts',
 		output: {
-			file: './bundle/socket-mesh-client.js',
+			dir: './bundle',
+			entryFileNames: 'socket-mesh-client.js',
 			format: 'es'
 		},
 		plugins: [
 			typescript({
-				tsconfig: './tsconfig.build.json'
+				tsconfig: './tsconfig.bundle.json'
 			}),
 			commonjs(),
 			nodeResolve({

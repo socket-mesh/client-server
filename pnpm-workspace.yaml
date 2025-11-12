@@ -29,12 +29,12 @@ catalogs:
 
   rollup:
     "@kineticcafe/rollup-plugin-delete": ^3.0.2
-    "@rollup/plugin-alias": ^5.1.1
-    "@rollup/plugin-commonjs": ^28.0.8
+    "@rollup/plugin-alias": ^6.0.0
+    "@rollup/plugin-commonjs": ^29.0.0
     "@rollup/plugin-node-resolve": ^16.0.3
     "@rollup/plugin-terser": ^0.4.4
-    "@rollup/plugin-typescript": ^11.1.6
-    "rollup": ^4.52.5
+    "@rollup/plugin-typescript": ^12.3.0
+    "rollup": ^4.53.2
     "rollup-plugin-dts": ^6.2.3
 
   secure-data-systems:

@@ -16,10 +16,10 @@ export default [
 			'**/turbo/*',
 			'**/scripts/*',
 			'**/*-dbschema.js',
+			'**/rollup.config.js',
 			'commitlint.config.js',
 			'eslint.config.mjs',
 			'release.config.mjs',
-			'rollup.config.js',
 			'test.ts',
 			'tsconfig.json'
 		]
