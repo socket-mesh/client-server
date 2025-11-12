@@ -9,10 +9,9 @@
 	"author": "Greg Kimmy",
 	"scripts": {
 		"build": "node ../../scripts/build.mjs && tsc --project tsconfig.build.json",
-		"deploy": "npm run build && node ../../scripts/publish.mjs",
+		"deploy": "node ../../scripts/publish.mjs",
 		"lint": "eslint . --c ../../eslint.config.mjs",
-		"lint:fix": "eslint . --c ../../eslint.config.mjs --fix",
-		"test": "echo \"Error: no test specified\" && exit 1"
+		"lint:fix": "eslint . --c ../../eslint.config.mjs --fix"
 	},
 	"repository": {
 		"type": "git",
