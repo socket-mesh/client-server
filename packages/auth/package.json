@@ -1,6 +1,6 @@
 {
 	"name": "@socket-mesh/auth",
-	"version": "2.2.0",
+	"version": "2.2.1",
 	"description": "Auth module for SocketMesh",
 	"type": "module",
 	"main": "dist/index.js",

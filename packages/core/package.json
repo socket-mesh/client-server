@@ -1,6 +1,6 @@
 {
 	"name": "@socket-mesh/core",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"description": "Core module for SocketMesh Server",
 	"type": "module",
 	"main": "dist/index.js",
